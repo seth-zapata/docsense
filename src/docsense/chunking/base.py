@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
-from docsense.ingestion.loader import Document
+if TYPE_CHECKING:
+    from docsense.ingestion.loader import Document
 
 
 @dataclass

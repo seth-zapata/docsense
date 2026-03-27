@@ -26,7 +26,7 @@ def reciprocal_rank_fusion(
     chunk_scores: dict[str, float] = {}
     chunk_map: dict[str, Chunk] = {}
 
-    for results, weight in zip(result_lists, weights):
+    for results, weight in zip(result_lists, weights, strict=True):
         for rank, result in enumerate(results):
             cid = result.chunk.chunk_id
             chunk_map[cid] = result.chunk

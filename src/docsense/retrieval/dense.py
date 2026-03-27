@@ -34,14 +34,16 @@ class DenseRetriever:
         self.index.add(embeddings.astype(np.float32))
         self.chunks.extend(chunks)
 
-    def search(self, query_embedding: NDArray[np.float32], top_k: int = 20) -> list[RetrievalResult]:
+    def search(
+        self, query_embedding: NDArray[np.float32], top_k: int = 20
+    ) -> list[RetrievalResult]:
         if not self.chunks:
             return []
         query = query_embedding.reshape(1, -1).astype(np.float32)
         scores, indices = self.index.search(query, min(top_k, len(self.chunks)))
 
         results = []
-        for score, idx in zip(scores[0], indices[0]):
+        for score, idx in zip(scores[0], indices[0], strict=True):
             if idx == -1:
                 continue
             results.append(RetrievalResult(chunk=self.chunks[idx], score=float(score)))

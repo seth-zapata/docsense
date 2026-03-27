@@ -4,7 +4,6 @@ from pathlib import Path
 
 from pydantic_settings import BaseSettings
 
-
 # Resolve project root relative to this file: src/docsense/config.py -> project root
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 DATA_DIR = PROJECT_ROOT / "data"

@@ -4,9 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import numpy as np
-
 if TYPE_CHECKING:
+    import numpy as np
     from numpy.typing import NDArray
 
     from docsense.chunking.base import Chunk
@@ -25,9 +24,7 @@ class Embedder:
         if self._model is None:
             from sentence_transformers import SentenceTransformer
 
-            self._model = SentenceTransformer(
-                self.config.model_name, device=self.config.device
-            )
+            self._model = SentenceTransformer(self.config.model_name, device=self.config.device)
         return self._model
 
     def embed_texts(self, texts: list[str]) -> NDArray[np.float32]:

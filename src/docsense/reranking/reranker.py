@@ -37,7 +37,7 @@ class CrossEncoderReranker:
 
         reranked = [
             RetrievalResult(chunk=r.chunk, score=float(s))
-            for r, s in zip(results, scores)
+            for r, s in zip(results, scores, strict=True)
         ]
         reranked.sort(key=lambda x: x.score, reverse=True)
         return reranked[:top_k]
