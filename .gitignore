@@ -21,6 +21,7 @@ env/
 data/raw/
 data/processed/
 data/embeddings/
+data/index/
 *.faiss
 *.pkl
 
