@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Data (large files)
+data/raw/
+data/processed/
+data/embeddings/
+*.faiss
+*.pkl
+
+# Models
+models/
+*.bin
+*.safetensors
+
+# Experiment tracking
+wandb/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.local
+
+# Coverage
+htmlcov/
+.coverage
+coverage.xml
+
+# Notebooks checkpoints
+.ipynb_checkpoints/
+
+# Personal dev log (not a repo artifact)
+DEVLOG.md
+
+# Project prompt (personal reference)
+project_prompt_rag_finetune.md
