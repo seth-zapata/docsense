@@ -49,8 +49,8 @@ coverage.xml
 # Notebooks checkpoints
 .ipynb_checkpoints/
 
-# Personal dev log (not a repo artifact)
-DEVLOG.md
+# Engineering journal (personal notes, not a repo artifact)
+docs/journal/
 
 # Project prompt (personal reference)
 project_prompt_rag_finetune.md
