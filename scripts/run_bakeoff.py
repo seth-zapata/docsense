@@ -52,6 +52,10 @@ from docsense.evaluation.retrieval_metrics import (
     precision_at_k,
     recall_at_k,
 )
+from docsense.reranking.reranker import CrossEncoderReranker
+from docsense.retrieval.dense import DenseRetriever
+from docsense.retrieval.hybrid import HybridRetriever
+from docsense.retrieval.sparse import SparseRetriever
 
 if TYPE_CHECKING:
     from docsense.chunking.base import Chunk
@@ -87,13 +91,18 @@ def _load_index_and_chunks(strategy: str) -> tuple[faiss.Index, list[Chunk]]:
     return index, chunks
 
 
-def _eval_strategy(
+def _eval_strategy_dense(
     strategy: str,
     embedder: Embedder,
     eval_set: list[EvalQuery],
     eval_k: int,
 ) -> dict:
-    """Run dense-only retrieval for one strategy; return metrics dict."""
+    """Run dense-only retrieval for one strategy; return metrics dict.
+
+    Matches the Phase 1 baseline methodology: raw FAISS index search, no
+    BM25, no fusion, no reranker. Over-retrieves at chunk granularity, then
+    dedupes to ~eval_k unique doc_ids.
+    """
     index, chunks = _load_index_and_chunks(strategy)
     logger.info("  %s: index=%d vectors, %d chunks", strategy, index.ntotal, len(chunks))
 
@@ -114,6 +123,50 @@ def _eval_strategy(
             chunk_doc_ids.append(chunks[idx].doc_id)
         retrieved = deduplicate_preserving_order(chunk_doc_ids)
 
+        relevant = {c.doc_id for c in chunks if _is_relevant(c.doc_id, prefixes)}
+        per_query.append({"retrieved": retrieved, "relevant": relevant})
+
+    return _aggregate_metrics(per_query, eval_k=eval_k, chunks_total=len(chunks))
+
+
+def _eval_strategy_rerank(
+    strategy: str,
+    embedder: Embedder,
+    eval_set: list[EvalQuery],
+    eval_k: int,
+    settings: Settings,
+) -> dict:
+    """Run the full HybridRetriever + cross-encoder pipeline for one strategy.
+
+    Methodological note: this differs from the dense-only path in *three*
+    ways simultaneously — it adds BM25, adds RRF fusion of dense+sparse,
+    and adds the cross-encoder reranker. The bakeoff therefore measures
+    the combined effect of "the production retrieval stack" vs. the
+    Phase 1 dense-only baseline. A future `--hybrid` flag (no rerank)
+    would let us ablate the reranker contribution alone.
+    """
+    index, chunks = _load_index_and_chunks(strategy)
+    logger.info("  %s: index=%d vectors, %d chunks", strategy, index.ntotal, len(chunks))
+
+    dense = DenseRetriever(dimension=index.d)
+    dense.index = index
+    dense.chunks = chunks
+
+    sparse = SparseRetriever()
+    sparse.add(chunks)
+
+    reranker = CrossEncoderReranker(settings.reranking)
+    hybrid = HybridRetriever(dense, sparse, embedder, settings.retrieval, reranker=reranker)
+
+    # Over-retrieve to give the cross-encoder a richer pool *and* leave
+    # enough headroom that dedup yields ~eval_k unique doc_ids. Same
+    # multiplier (×4) as the dense-only path so the eval is symmetric.
+    eval_top_k = min(eval_k * 4, index.ntotal)
+
+    per_query: list[dict] = []
+    for query, prefixes in eval_set:
+        results = hybrid.search(query, top_k=eval_top_k)
+        retrieved = deduplicate_preserving_order([r.chunk.doc_id for r in results])
         relevant = {c.doc_id for c in chunks if _is_relevant(c.doc_id, prefixes)}
         per_query.append({"retrieved": retrieved, "relevant": relevant})
 
@@ -205,6 +258,16 @@ def main() -> int:
         help="Path to a baseline JSON to diff against. Pass empty to skip.",
     )
     parser.add_argument(
+        "--rerank",
+        action="store_true",
+        help=(
+            "Use the full HybridRetriever + cross-encoder pipeline instead of "
+            "dense-only. Note: this also enables BM25 + RRF fusion, so the "
+            "comparison vs Phase 1 conflates three additions; see the "
+            "methodology note in the report."
+        ),
+    )
+    parser.add_argument(
         "--out",
         type=Path,
         default=None,
@@ -220,25 +283,38 @@ def main() -> int:
     logger.info("Embedder: %s", settings.embedding.model_name)
     logger.info("eval_k=%d, strategies=%s", args.eval_k, args.strategies)
 
+    pipeline = "hybrid+rerank" if args.rerank else "dense-only"
+    suffix = f"-{pipeline.replace('+', '-')}"
     out_path = args.out or DEFAULT_REPORTS_DIR / (
-        f"bakeoff-{datetime.now(tz=UTC).strftime('%Y%m%d')}.json"
+        f"bakeoff-{datetime.now(tz=UTC).strftime('%Y%m%d')}{suffix}.json"
     )
 
-    results = {
+    results: dict = {
         "schema_version": 1,
         "captured_at": datetime.now(tz=UTC).isoformat(timespec="seconds"),
         "eval_k": args.eval_k,
-        "pipeline": "dense-only",
+        "pipeline": pipeline,
         "embedding_model": settings.embedding.model_name,
+        "reranker_model": (settings.reranking.model_name if args.rerank else None),
+        "retrieval": {
+            "rerank_candidates": (settings.retrieval.rerank_candidates if args.rerank else None),
+            "dense_weight": (settings.retrieval.dense_weight if args.rerank else None),
+            "sparse_weight": (settings.retrieval.sparse_weight if args.rerank else None),
+        },
         "eval_set": "curated",
         "eval_set_size": len(CURATED_QUERIES),
         "strategies": {},
     }
     for strategy in args.strategies:
         logger.info("Evaluating %s ...", strategy)
-        results["strategies"][strategy] = _eval_strategy(
-            strategy, embedder, CURATED_QUERIES, eval_k=args.eval_k
-        )
+        if args.rerank:
+            results["strategies"][strategy] = _eval_strategy_rerank(
+                strategy, embedder, CURATED_QUERIES, eval_k=args.eval_k, settings=settings
+            )
+        else:
+            results["strategies"][strategy] = _eval_strategy_dense(
+                strategy, embedder, CURATED_QUERIES, eval_k=args.eval_k
+            )
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(results, indent=2, sort_keys=False) + "\n")
