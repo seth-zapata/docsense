@@ -39,17 +39,32 @@ src/docsense/
 ```bash
 # Install (dev)
 pip install -e ".[dev]"
-pre-commit install                        # one-time, enables git-commit hooks
+pre-commit install                                   # commit hooks: ruff, mypy
+pre-commit install --hook-type pre-push              # pre-push hook: pytest
 
 # Lint and type-check
 ruff check src/ tests/
 ruff format src/ tests/
-mypy                                      # uses files/config from pyproject.toml
+mypy                                                 # uses files/config from pyproject.toml
 
 # Test
-pytest                                    # all tests
-pytest -m "not slow and not gpu"          # fast tests only
-pytest --cov=docsense --cov-report=term   # with coverage
+pytest                                               # all tests
+pytest -m "not slow and not gpu"                     # fast tests only
+pytest --cov=docsense --cov-report=term              # with coverage
+```
+
+## Workflow
+
+`main` is branch-protected: direct push is blocked, every change goes through
+a PR with `lint`, `typecheck`, and `test` checks required. Auto-merge with
+rebase + branch deletion is enabled, so the typical cycle is:
+
+```bash
+git checkout -b <branch-name>
+# ...commits...
+git push -u origin <branch-name>           # pre-push hook runs pytest locally
+gh pr create --fill --title "..." --body "..."
+gh pr merge --auto --rebase --delete-branch  # merges when CI passes
 ```
 
 ## Tech Stack
