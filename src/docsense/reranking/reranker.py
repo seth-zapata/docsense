@@ -28,12 +28,22 @@ class CrossEncoderReranker:
         return self._model
 
     def rerank(
-        self, query: str, results: list[RetrievalResult], top_k: int | None = None
+        self, query: str, results: list[RetrievalResult], top_k: int
     ) -> list[RetrievalResult]:
+        """Score each (query, result) pair with the cross-encoder, then return
+        the top_k by descending score.
+
+        ``top_k`` is required: the reranker has no business inferring what the
+        final delivered count should be. That's a retrieval-level decision,
+        owned by the caller (typically ``HybridRetriever`` reading from
+        ``RetrievalConfig.top_k``).
+
+        ``RerankingConfig.batch_size`` is exclusively the cross-encoder
+        inference batch size — it must not influence the result count.
+        """
         if not results:
             return []
 
-        top_k = top_k or self.config.batch_size
         pairs = [(query, r.chunk.text) for r in results]
         # CrossEncoder.predict's stub expects list[<huge union>]; list invariance
         # rejects our list[tuple[str, str]] even though it's accepted at runtime.

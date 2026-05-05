@@ -49,7 +49,7 @@ class TestCrossEncoderReranker:
         mock_model = _make_mock_model_with_scores([])
         reranker._model = mock_model
 
-        out = reranker.rerank("any query", [])
+        out = reranker.rerank("any query", [], top_k=10)
 
         assert out == []
         mock_model.predict.assert_not_called()
@@ -67,7 +67,7 @@ class TestCrossEncoderReranker:
         )
         reranker._model = _make_mock_model_with_scores([0.5, 0.1, 0.95])
 
-        out = reranker.rerank("query", results)
+        out = reranker.rerank("query", results, top_k=3)
 
         assert [r.chunk.text for r in out] == ["text C", "text A", "text B"]
 
@@ -78,7 +78,7 @@ class TestCrossEncoderReranker:
         results = _make_results(("a", 0.5), ("b", 0.5))
         reranker._model = _make_mock_model_with_scores([0.7, 0.3])
 
-        out = reranker.rerank("query", results)
+        out = reranker.rerank("query", results, top_k=2)
 
         assert out[0].score == pytest.approx(0.7)
         assert out[1].score == pytest.approx(0.3)
@@ -95,16 +95,33 @@ class TestCrossEncoderReranker:
         assert len(out) == 2
         assert [r.chunk.text for r in out] == ["b", "d"]
 
-    def test_top_k_defaults_to_batch_size_when_none(self):
-        """When top_k is None the reranker uses config.batch_size."""
+    def test_top_k_is_required(self):
+        """The reranker must NOT infer a top_k from RerankingConfig.batch_size
+        or any other source. Callers own the cutoff decision; calling
+        rerank() without top_k must fail at the type/call boundary."""
         config = RerankingConfig(model_name="dummy", device="cpu", batch_size=2)
         reranker = CrossEncoderReranker(config)
+        results = _make_results(("a", 0.0), ("b", 0.0))
+        reranker._model = _make_mock_model_with_scores([0.1, 0.4])
+
+        with pytest.raises(TypeError):
+            reranker.rerank("query", results)  # type: ignore[call-arg]
+
+    def test_batch_size_only_affects_cross_encoder_inference(self):
+        """RerankingConfig.batch_size must control predict's batch_size kwarg
+        and nothing else — specifically, it must not change the result count."""
+        config = RerankingConfig(model_name="dummy", device="cpu", batch_size=7)
+        reranker = CrossEncoderReranker(config)
         results = _make_results(("a", 0.0), ("b", 0.0), ("c", 0.0), ("d", 0.0))
-        reranker._model = _make_mock_model_with_scores([0.1, 0.4, 0.2, 0.3])
+        mock_model = _make_mock_model_with_scores([0.1, 0.4, 0.2, 0.3])
+        reranker._model = mock_model
 
-        out = reranker.rerank("query", results)
+        out = reranker.rerank("query", results, top_k=4)
 
-        assert len(out) == 2
+        # batch_size flowed to predict
+        assert mock_model.predict.call_args.kwargs["batch_size"] == 7
+        # but did not constrain the result count
+        assert len(out) == 4
 
     def test_predict_receives_query_chunk_pairs(self):
         """The cross-encoder must see (query, chunk_text) pairs as input."""
@@ -114,7 +131,7 @@ class TestCrossEncoderReranker:
         mock_model = _make_mock_model_with_scores([0.0, 0.0])
         reranker._model = mock_model
 
-        reranker.rerank("the query", results)
+        reranker.rerank("the query", results, top_k=2)
 
         passed_pairs = mock_model.predict.call_args.args[0]
         assert passed_pairs == [("the query", "first"), ("the query", "second")]
@@ -127,7 +144,7 @@ class TestCrossEncoderReranker:
         original_chunks = [r.chunk for r in results]
         reranker._model = _make_mock_model_with_scores([0.3, 0.7])
 
-        out = reranker.rerank("query", results)
+        out = reranker.rerank("query", results, top_k=2)
 
         assert out[0].chunk is original_chunks[1]
         assert out[1].chunk is original_chunks[0]
