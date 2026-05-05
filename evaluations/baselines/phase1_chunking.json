@@ -1,0 +1,108 @@
+{
+  "schema_version": 1,
+  "phase": 1,
+  "description": "Chunking strategy bakeoff at eval_k=10. Dense-only retrieval (FAISS IndexFlatIP over normalized MiniLM-L6-v2 embeddings). No BM25, no RRF fusion, no reranker. These are the corrected numbers after the chunk-vs-doc deduplication fix in commit 446662a — the original notebook run inflated Recall and nDCG by counting multiple chunks of the same relevant doc as separate hits. Phase 2 commits will be measured against this baseline; eval_k=10 is preserved across phases for direct comparability.",
+  "captured_at": "2026-05-04",
+  "captured_from": {
+    "notebook": "notebooks/chunking_comparison.ipynb",
+    "commit": "5a651df"
+  },
+  "corpus": {
+    "name": "huggingface/transformers docs (en)",
+    "source_path": "docs/source/en",
+    "num_documents": 656,
+    "fetch_method": "git sparse-checkout",
+    "corpus_sha_at_capture": null,
+    "notes": "Corpus SHA wasn't recorded at fetch time. Subsequent Phase 2 runs should re-fetch and pin the SHA."
+  },
+  "embedding": {
+    "model": "sentence-transformers/all-MiniLM-L6-v2",
+    "dimension": 384,
+    "normalize": true
+  },
+  "retrieval": {
+    "pipeline": "dense-only",
+    "index_type": "FAISS IndexFlatIP",
+    "rrf_k": null,
+    "dense_weight": null,
+    "sparse_weight": null,
+    "reranker": null
+  },
+  "eval": {
+    "set": "curated",
+    "set_size": 20,
+    "set_source": "src/docsense/evaluation/eval_queries.py (CURATED_QUERIES)",
+    "k": 10,
+    "relevance_granularity": "document",
+    "retrieval_granularity": "chunk",
+    "dedup": "deduplicate_preserving_order at chunk-doc boundary; over-retrieve top_k*4 chunks then dedupe to ~top_k unique doc_ids before computing metrics"
+  },
+  "strategies": {
+    "fixed": {
+      "chunker": "FixedSizeChunker(chunk_size=512, chunk_overlap=64)",
+      "chunks_total": 10681,
+      "metrics": {
+        "MRR": 0.551,
+        "P@1": 0.350,
+        "P@3": 0.283,
+        "P@5": 0.220,
+        "P@10": 0.140,
+        "Recall@1": 0.227,
+        "Recall@3": 0.530,
+        "Recall@5": 0.659,
+        "Recall@10": 0.764,
+        "nDCG@1": 0.350,
+        "nDCG@3": 0.481,
+        "nDCG@5": 0.535,
+        "nDCG@10": 0.565,
+        "hit_rate_top_5": 0.80
+      }
+    },
+    "recursive": {
+      "chunker": "RecursiveChunker(chunk_size=512, chunk_overlap=64)",
+      "chunks_total": 12601,
+      "metrics": {
+        "MRR": 0.692,
+        "P@1": 0.550,
+        "P@3": 0.317,
+        "P@5": 0.230,
+        "P@10": 0.155,
+        "Recall@1": 0.352,
+        "Recall@3": 0.604,
+        "Recall@5": 0.657,
+        "Recall@10": 0.863,
+        "nDCG@1": 0.550,
+        "nDCG@3": 0.586,
+        "nDCG@5": 0.615,
+        "nDCG@10": 0.684,
+        "hit_rate_top_5": 0.80
+      }
+    },
+    "header": {
+      "chunker": "HeaderChunker(max_chunk_size=1024, min_header_level=2)",
+      "chunks_total": 14218,
+      "metrics": {
+        "MRR": 0.623,
+        "P@1": 0.450,
+        "P@3": 0.350,
+        "P@5": 0.250,
+        "P@10": 0.155,
+        "Recall@1": 0.277,
+        "Recall@3": 0.630,
+        "Recall@5": 0.709,
+        "Recall@10": 0.743,
+        "nDCG@1": 0.450,
+        "nDCG@3": 0.577,
+        "nDCG@5": 0.610,
+        "nDCG@10": 0.620,
+        "hit_rate_top_5": 0.85
+      }
+    }
+  },
+  "headline_findings": [
+    "Recursive wins on rank-sensitive metrics (MRR, P@1, nDCG@10, Recall@10).",
+    "Header is more competitive than the original (inflated) numbers suggested — best on hit_rate_top_5, beats fixed on every metric, gap to recursive on nDCG@10 is ~9% relative (was ~18% before metrics fix).",
+    "Fixed performs worst as expected — cutting mid-paragraph damages semantic coherence.",
+    "Open question for Phase 2: does the cross-encoder reranker close the recursive-vs-header gap, or even flip the order? Header chunks are larger, which hurts a bi-encoder's single-vector compression but should not penalize a cross-encoder."
+  ]
+}
