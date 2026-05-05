@@ -65,5 +65,42 @@ pytest --cov=docsense --cov-report=term   # with coverage
 
 - Source code in `src/docsense/`, tests in `tests/`
 - Config via pydantic-settings (env vars + config files)
-- Type hints throughout, ruff for linting/formatting
+- Type hints throughout, ruff for linting/formatting, mypy for type checking
 - Tests use pytest with markers: `slow`, `gpu`, `integration`
+
+## Roadmap
+
+### Phases
+
+- **Phase 1 — closed.** Ingestion, three chunking strategies, hybrid retrieval
+  (BM25 + FAISS + RRF), retrieval metrics, chunking bakeoff, eval scaffold,
+  CI fortification (test matrix, mypy, pre-commit).
+- **Phase 2 — in progress.** Cross-encoder re-ranker wired into
+  `HybridRetriever`, re-bakeoff with re-ranking, context assembly, prompt
+  construction, base-model generation (Mistral 7B / Llama 3 8B).
+- **Phase 3.** QLoRA fine-tuning track — supervised dataset construction,
+  training script, eval against base-model baseline.
+- **Phase 4.** FastAPI serving + `tracing/` (structured query logs), end-to-end
+  generation eval (faithfulness, answer relevance), Docker packaging.
+
+### Deferred CI fortification
+
+Items left out of the initial CI fortification (test matrix + mypy + pre-commit
+shipped 2026-05-04). Pick up as the relevant code or context lands:
+
+- **Coverage gate.** Currently coverage is reported but not enforced. Set a
+  floor (~75–80%) once Phase 2 lands more code so the gate is meaningful.
+- **Notebook smoke test.** `nbmake` pytest plugin runs notebooks as tests.
+  Worth adding once notebooks become user-facing artifacts in Phase 2/3.
+- **Dependency audit.** `pip-audit` action against `pyproject.toml` once the
+  dep set stabilizes (post-Phase 3, after fine-tuning settles).
+- **CD pipeline (deploy stages).** Build container → push to GHCR → deploy
+  to staging → smoke test → manual gate → prod. Phase 4 work — only kicks in
+  when the FastAPI service is ready to deploy.
+
+### Eval methodology — additional sets
+
+- **5c (LLM-generated queries).** Use the Anthropic SDK to generate
+  "what would a user ask about this section?" queries against a held-out doc
+  set. Add when re-bakeoff happens after the re-ranker, so three eval sets
+  exist (curated, structural, LLM-generated) and we can compare agreement.
