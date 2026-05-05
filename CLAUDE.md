@@ -70,6 +70,11 @@ pytest --cov=docsense --cov-report=term   # with coverage
 
 ## Roadmap
 
+> The full system overview lives in [`docs/architecture.md`](docs/architecture.md).
+> This section is the active worklist. **When closing a phase, update both
+> this Phases list and the corresponding section in `docs/architecture.md`** so
+> the architecture doc stays in sync with reality.
+
 ### Phases
 
 - **Phase 1 — closed.** Ingestion, three chunking strategies, hybrid retrieval
