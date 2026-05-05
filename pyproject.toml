@@ -107,6 +107,27 @@ module = [
 ]
 ignore_missing_imports = true
 
+[tool.coverage.run]
+source = ["docsense"]
+# Intentional coverage exemptions. Each entry must be justified — bullshit
+# tests just to hit a line counter degrade the suite without catching
+# regressions. Adding to this list should be its own deliberate commit, not
+# bundled with the feature it's excusing.
+omit = [
+    # Git sparse-checkout boundary. Testing this means either real network
+    # calls (flaky, slow, depends on github.com) or mocking subprocess.run
+    # (verifies our impl, not behavior). Implicitly tested by the
+    # build_index.py script working end-to-end on real data.
+    "src/docsense/ingestion/fetcher.py",
+    # Static data module — just the curated eval queries list. Coverage of
+    # "this list contains the items I put in it" is meaningless.
+    "src/docsense/evaluation/eval_queries.py",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
