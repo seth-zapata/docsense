@@ -56,4 +56,8 @@ jobs:
       - name: Install dependencies
         run: pip install -e ".[dev]"
       - name: Run tests
-        run: pytest -m "not slow and not gpu and not integration" --cov=docsense --cov-report=term-missing
+        # --cov-fail-under=90 enforces the floor in CI only. The natural
+        # state is ~98%; the gate sits 8 points lower so adding a feature
+        # with reasonable tests doesn't trip it. Calibration intent: catch
+        # egregious coverage slips, not nudge into test theater.
+        run: pytest -m "not slow and not gpu and not integration" --cov=docsense --cov-report=term-missing --cov-fail-under=90
