@@ -8,13 +8,12 @@ version = "0.1.0"
 description = "Production-grade RAG system with fine-tuned LLM for technical documentation Q&A"
 readme = "README.md"
 license = "MIT"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 authors = [{ name = "Seth Zapata" }]
 keywords = ["rag", "retrieval-augmented-generation", "fine-tuning", "nlp", "llm"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
@@ -62,7 +61,7 @@ Repository = "https://github.com/sethzapata/docsense"
 where = ["src"]
 
 [tool.ruff]
-target-version = "py311"
+target-version = "py312"
 line-length = 100
 src = ["src", "tests"]
 
@@ -86,7 +85,7 @@ ignore = [
 known-first-party = ["docsense"]
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.12"
 files = ["src/docsense"]
 check_untyped_defs = true
 warn_unused_ignores = true

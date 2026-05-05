@@ -54,7 +54,7 @@ pytest --cov=docsense --cov-report=term   # with coverage
 
 ## Tech Stack
 
-- Python 3.11+, PyTorch, Hugging Face (Transformers, PEFT, Accelerate, Datasets, TRL)
+- Python 3.12, PyTorch, Hugging Face (Transformers, PEFT, Accelerate, Datasets, TRL)
 - sentence-transformers for embeddings + cross-encoder re-ranking
 - FAISS for vector store, rank_bm25 for sparse retrieval
 - FastAPI + uvicorn for serving
