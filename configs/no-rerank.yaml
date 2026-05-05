@@ -1,0 +1,26 @@
+# Ablation: same knobs as default but tuned for use *without* the
+# --rerank flag. Run as:
+#
+#   python scripts/run_bakeoff.py --config configs/no-rerank.yaml
+#
+# (No --rerank — the script's pipeline toggle is independent of the
+# config file. Loading this config without --rerank uses dense-only
+# retrieval, matching the Phase 1 baseline methodology with a chosen
+# top_k and chunking strategy.)
+#
+# Note: rerank_candidates is set to 0 as documentation that no rerank
+# pool is needed in this configuration. The dense-only path doesn't
+# read rerank_candidates anyway, but pinning it here makes the intent
+# explicit for anyone reading the config.
+
+chunking:
+  strategy: recursive
+  chunk_size: 512
+  chunk_overlap: 64
+
+retrieval:
+  top_k: 10                  # higher delivered count since there's no
+                             # rerank to trim from a larger candidate pool
+  rerank_candidates: 0       # not used in dense-only path; documents intent
+  dense_weight: 0.6          # not used in dense-only path; documents intent
+  sparse_weight: 0.4

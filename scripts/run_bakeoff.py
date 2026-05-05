@@ -41,6 +41,7 @@ from typing import TYPE_CHECKING
 
 import faiss
 import numpy as np
+import yaml
 
 from docsense.config import DATA_DIR, Settings
 from docsense.embedding.embedder import Embedder
@@ -70,6 +71,23 @@ DEFAULT_REPORTS_DIR = PROJECT_ROOT / "evaluations" / "reports"
 
 ALL_STRATEGIES = ("fixed", "recursive", "header")
 METRIC_KS = (1, 3, 5, 10)
+
+
+def _load_settings(config_path: Path | None) -> Settings:
+    """Build a Settings instance, optionally overriding from a YAML file.
+
+    The YAML structure mirrors the nested Settings tree (chunking, embedding,
+    retrieval, reranking). Only fields you want to override need be present;
+    omitted fields fall back to pydantic defaults. Top-level keys in the YAML
+    that don't match a Settings field are ignored.
+    """
+    if config_path is None:
+        return Settings()
+    raw = yaml.safe_load(config_path.read_text()) or {}
+    if not isinstance(raw, dict):
+        msg = f"Config file {config_path} must contain a YAML mapping at top level."
+        raise ValueError(msg)
+    return Settings(**raw)
 
 
 def _is_relevant(doc_id: str, prefixes: list[str]) -> bool:
@@ -258,6 +276,16 @@ def main() -> int:
         help="Path to a baseline JSON to diff against. Pass empty to skip.",
     )
     parser.add_argument(
+        "--config",
+        type=Path,
+        default=None,
+        help=(
+            "Path to a YAML config that overrides Settings defaults. See "
+            "configs/default.yaml for the schema. Pipeline selection (--rerank) "
+            "stays an explicit flag and is not encoded in the config."
+        ),
+    )
+    parser.add_argument(
         "--rerank",
         action="store_true",
         help=(
@@ -278,7 +306,9 @@ def main() -> int:
     if args.eval_k <= 0:
         parser.error("--eval-k must be positive")
 
-    settings = Settings()
+    settings = _load_settings(args.config)
+    if args.config is not None:
+        logger.info("Config loaded from %s", args.config)
     embedder = Embedder(settings.embedding)
     logger.info("Embedder: %s", settings.embedding.model_name)
     logger.info("eval_k=%d, strategies=%s", args.eval_k, args.strategies)

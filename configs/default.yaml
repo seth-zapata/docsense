@@ -1,0 +1,31 @@
+# Default knobs for the production-style bakeoff.
+#
+# Used by `scripts/run_bakeoff.py --config configs/default.yaml`. When
+# combined with --rerank, this exercises the full HybridRetriever +
+# cross-encoder pipeline with production-typical parameters.
+#
+# The keys here mirror the nested pydantic Settings structure in
+# src/docsense/config.py. Only fields you want to override need be
+# present; everything else falls back to the pydantic defaults.
+
+chunking:
+  strategy: recursive
+  chunk_size: 512
+  chunk_overlap: 64
+
+embedding:
+  model_name: sentence-transformers/all-MiniLM-L6-v2
+  batch_size: 64
+  device: cpu
+  normalize: true
+
+retrieval:
+  top_k: 5                   # final delivered count (e.g., chunks → LLM)
+  rerank_candidates: 20      # fused candidates fed to the reranker
+  dense_weight: 0.6          # RRF weight: dense vs sparse
+  sparse_weight: 0.4
+
+reranking:
+  model_name: cross-encoder/ms-marco-MiniLM-L-6-v2
+  batch_size: 32             # cross-encoder inference batch size
+  device: cpu
