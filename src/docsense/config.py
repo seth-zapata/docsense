@@ -17,10 +17,14 @@ class EmbeddingConfig(BaseSettings):
 
 
 class RetrievalConfig(BaseSettings):
-    top_k: int = 20
+    # Final number of results returned to the caller (e.g., chunks fed to the LLM).
+    top_k: int = 5
+    # How many fused candidates are sent to the cross-encoder reranker. Only
+    # consumed when a reranker is wired into HybridRetriever; without one,
+    # search() returns top_k directly from the fusion stage.
+    rerank_candidates: int = 20
     dense_weight: float = 0.6
     sparse_weight: float = 0.4
-    rerank_top_k: int = 5
 
 
 class RerankingConfig(BaseSettings):
