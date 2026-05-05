@@ -39,10 +39,12 @@ src/docsense/
 ```bash
 # Install (dev)
 pip install -e ".[dev]"
+pre-commit install                        # one-time, enables git-commit hooks
 
-# Lint
+# Lint and type-check
 ruff check src/ tests/
 ruff format src/ tests/
+mypy                                      # uses files/config from pyproject.toml
 
 # Test
 pytest                                    # all tests

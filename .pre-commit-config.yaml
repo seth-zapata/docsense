@@ -1,0 +1,41 @@
+# Pre-commit hooks for docsense.
+#
+# Install once after cloning: pre-commit install
+# Then hooks run automatically on `git commit`.
+#
+# Local hooks (ruff, mypy) use language: system so they pick up the
+# pinned versions from the dev venv (`pip install -e ".[dev]"`). This
+# avoids maintaining version pins in a third place beyond pyproject.toml
+# and the CI workflow.
+
+repos:
+  # Generic hygiene checks.
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=500]
+
+  # Lint, format, and type-check using the venv's pinned tool versions.
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check
+        entry: ruff check --fix
+        language: system
+        types_or: [python, pyi]
+      - id: ruff-format
+        name: ruff format
+        entry: ruff format
+        language: system
+        types_or: [python, pyi]
+      - id: mypy
+        name: mypy
+        entry: mypy
+        language: system
+        pass_filenames: false
+        types: [python]
