@@ -7,6 +7,8 @@ from typing import TYPE_CHECKING
 from docsense.retrieval.dense import RetrievalResult
 
 if TYPE_CHECKING:
+    from sentence_transformers import CrossEncoder
+
     from docsense.config import RerankingConfig
 
 
@@ -15,10 +17,10 @@ class CrossEncoderReranker:
 
     def __init__(self, config: RerankingConfig) -> None:
         self.config = config
-        self._model = None
+        self._model: CrossEncoder | None = None
 
     @property
-    def model(self):
+    def model(self) -> CrossEncoder:
         if self._model is None:
             from sentence_transformers import CrossEncoder
 

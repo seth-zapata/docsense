@@ -47,7 +47,7 @@ dev = [
     "pytest-cov>=5.0.0",
     "pytest-asyncio>=0.23.0",
     "ruff==0.15.8",
-    "mypy>=1.9.0",
+    "mypy==1.19.1",
     "pre-commit>=3.6.0",
 ]
 gpu = [
@@ -84,6 +84,20 @@ ignore = [
 
 [tool.ruff.lint.isort]
 known-first-party = ["docsense"]
+
+[tool.mypy]
+python_version = "3.11"
+files = ["src/docsense"]
+check_untyped_defs = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+no_implicit_optional = true
+
+# Third-party libraries without type stubs. Listed explicitly rather than
+# globally ignored so a future stub release will surface real errors.
+[[tool.mypy.overrides]]
+module = ["faiss", "rank_bm25", "sentence_transformers"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

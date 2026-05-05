@@ -25,7 +25,7 @@ class FixedSizeChunker(ChunkingStrategy):
         if not text:
             return []
 
-        chunks = []
+        chunks: list[Chunk] = []
         start = 0
 
         while start < len(text):

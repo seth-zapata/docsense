@@ -23,6 +23,21 @@ jobs:
       - name: Format check
         run: ruff format --check src/ tests/
 
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install dependencies
+        # Mypy needs the actual deps installed to resolve cross-package types
+        # (e.g., numpy.typing). Editable install matches the dev environment.
+        run: pip install -e ".[dev]"
+      - name: Type check
+        run: mypy
+
   test:
     runs-on: ubuntu-latest
     strategy:

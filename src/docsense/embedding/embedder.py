@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     import numpy as np
     from numpy.typing import NDArray
+    from sentence_transformers import SentenceTransformer
 
     from docsense.chunking.base import Chunk
     from docsense.config import EmbeddingConfig
@@ -17,10 +18,10 @@ class Embedder:
 
     def __init__(self, config: EmbeddingConfig) -> None:
         self.config = config
-        self._model = None
+        self._model: SentenceTransformer | None = None
 
     @property
-    def model(self):
+    def model(self) -> SentenceTransformer:
         if self._model is None:
             from sentence_transformers import SentenceTransformer
 
