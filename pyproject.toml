@@ -93,10 +93,19 @@ warn_unused_ignores = true
 warn_redundant_casts = true
 no_implicit_optional = true
 
-# Third-party libraries without type stubs. Listed explicitly rather than
-# globally ignored so a future stub release will surface real errors.
+# Third-party libraries without type stubs. Listed explicitly (with .*
+# wildcards to cover submodules like `sentence_transformers.SentenceTransformer`)
+# rather than globally ignored, so a future stub release will surface real
+# errors instead of staying silently masked.
 [[tool.mypy.overrides]]
-module = ["faiss", "rank_bm25", "sentence_transformers"]
+module = [
+    "faiss",
+    "faiss.*",
+    "rank_bm25",
+    "rank_bm25.*",
+    "sentence_transformers",
+    "sentence_transformers.*",
+]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

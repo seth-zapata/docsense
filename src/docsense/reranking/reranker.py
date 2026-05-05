@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 from docsense.retrieval.dense import RetrievalResult
 
@@ -35,7 +35,12 @@ class CrossEncoderReranker:
 
         top_k = top_k or self.config.batch_size
         pairs = [(query, r.chunk.text) for r in results]
-        scores = self.model.predict(pairs, batch_size=self.config.batch_size)
+        # CrossEncoder.predict's stub expects list[<huge union>]; list invariance
+        # rejects our list[tuple[str, str]] even though it's accepted at runtime.
+        # Casting at the boundary keeps our internal types tight without resorting
+        # to a `# type: ignore` (which warn_unused_ignores would punish on the
+        # local environments where the stub resolves more permissively).
+        scores = self.model.predict(cast("list[Any]", pairs), batch_size=self.config.batch_size)
 
         reranked = [
             RetrievalResult(chunk=r.chunk, score=float(s))
