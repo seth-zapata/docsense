@@ -86,10 +86,9 @@ pytest --cov=docsense --cov-report=term   # with coverage
 ### Deferred CI fortification
 
 Items left out of the initial CI fortification (test matrix + mypy + pre-commit
-shipped 2026-05-04). Pick up as the relevant code or context lands:
+shipped 2026-05-04, coverage gate at 90% added same day). Pick up as the
+relevant code or context lands:
 
-- **Coverage gate.** Currently coverage is reported but not enforced. Set a
-  floor (~75–80%) once Phase 2 lands more code so the gate is meaningful.
 - **Notebook smoke test.** `nbmake` pytest plugin runs notebooks as tests.
   Worth adding once notebooks become user-facing artifacts in Phase 2/3.
 - **Dependency audit.** `pip-audit` action against `pyproject.toml` once the
