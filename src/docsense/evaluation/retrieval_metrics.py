@@ -1,8 +1,32 @@
-"""Retrieval quality metrics: precision@k, recall@k, MRR, nDCG."""
+"""Retrieval quality metrics: precision@k, recall@k, MRR, nDCG.
+
+All metrics here assume `retrieved_ids` and `relevant_ids` are at the **same
+granularity**. If you retrieve at chunk level but judge relevance at document
+level, multiple chunks from the same relevant document will each count as a
+hit, which inflates recall (can exceed 1.0) and nDCG. Use
+:func:`deduplicate_preserving_order` to convert a chunk-level ranking into a
+document-level ranking before passing it to these functions.
+"""
 
 from __future__ import annotations
 
 import numpy as np
+
+
+def deduplicate_preserving_order(items: list[str]) -> list[str]:
+    """Return unique items in first-occurrence order.
+
+    Useful for converting a chunk-level retrieval ranking (where multiple
+    chunks share a doc_id) into a document-level ranking suitable for the
+    metrics in this module.
+    """
+    seen: set[str] = set()
+    result: list[str] = []
+    for item in items:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
 
 
 def precision_at_k(retrieved_ids: list[str], relevant_ids: set[str], k: int) -> float:
@@ -39,7 +63,6 @@ def ndcg_at_k(retrieved_ids: list[str], relevant_ids: set[str], k: int) -> float
 
     dcg = sum(g / np.log2(i + 2) for i, g in enumerate(gains))
 
-    ideal_gains = sorted(gains, reverse=True)
     n_relevant_in_k = min(len(relevant_ids), k)
     ideal_gains = [1.0] * n_relevant_in_k + [0.0] * (k - n_relevant_in_k)
     idcg = sum(g / np.log2(i + 2) for i, g in enumerate(ideal_gains))

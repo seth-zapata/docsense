@@ -17,16 +17,26 @@ def _tokenize(text: str) -> list[str]:
 
 
 class SparseRetriever:
-    """BM25-based sparse retrieval."""
+    """BM25-based sparse retrieval.
+
+    Note on incremental updates: rank_bm25's ``BM25Okapi`` doesn't support
+    incremental updates — adding a single chunk requires recomputing the
+    full IDF table over the entire corpus. We cache per-chunk tokens so
+    repeated ``add()`` calls don't re-tokenize the existing corpus, but the
+    ``BM25Okapi`` index itself is rebuilt on every ``add()``. For one-shot
+    indexing this is fine; for high-frequency incremental updates a
+    different sparse-retrieval library would be needed.
+    """
 
     def __init__(self) -> None:
         self.chunks: list[Chunk] = []
+        self._tokenized: list[list[str]] = []
         self._bm25: BM25Okapi | None = None
 
     def add(self, chunks: list[Chunk]) -> None:
         self.chunks.extend(chunks)
-        corpus = [_tokenize(c.text) for c in self.chunks]
-        self._bm25 = BM25Okapi(corpus)
+        self._tokenized.extend(_tokenize(c.text) for c in chunks)
+        self._bm25 = BM25Okapi(self._tokenized)
 
     def search(self, query: str, top_k: int = 20) -> list[RetrievalResult]:
         if self._bm25 is None or not self.chunks:

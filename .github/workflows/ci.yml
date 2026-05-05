@@ -15,7 +15,9 @@ jobs:
         with:
           python-version: "3.11"
       - name: Install ruff
-        run: pip install ruff
+        # Pinned to match the version in pyproject.toml's dev extras to
+        # eliminate local-vs-CI lint drift.
+        run: pip install ruff==0.15.8
       - name: Lint
         run: ruff check src/ tests/
       - name: Format check
