@@ -1,15 +1,18 @@
 # Pre-commit hooks for docsense.
 #
-# Install once after cloning: pre-commit install
-# Then hooks run automatically on `git commit`.
+# Install once after cloning:
+#   pre-commit install                      # commit-stage hooks (ruff, mypy)
+#   pre-commit install --hook-type pre-push # push-stage hook (pytest)
 #
-# Local hooks (ruff, mypy) use language: system so they pick up the
-# pinned versions from the dev venv (`pip install -e ".[dev]"`). This
-# avoids maintaining version pins in a third place beyond pyproject.toml
-# and the CI workflow.
+# Local hooks invoke the venv's binaries directly via .venv/bin/... rather
+# than relying on PATH order. This makes them deterministic regardless of
+# whether the user has the venv activated, and avoids silently picking up
+# mismatched versions from globally-installed Python tooling (e.g.,
+# miniconda's older ruff). The venv path is repo-relative; the project
+# convention is `python -m venv .venv` from the repo root.
 
 repos:
-  # Generic hygiene checks.
+  # Generic hygiene checks (commit stage).
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
@@ -20,22 +23,32 @@ repos:
       - id: check-added-large-files
         args: [--maxkb=500]
 
-  # Lint, format, and type-check using the venv's pinned tool versions.
+  # Lint, format, and type-check on commit; full PR-CI-parity test on push.
+  # The test suite is too slow for every commit but cheap enough for every
+  # push, and pre-push catches the bulk of CI failures locally before they
+  # ever reach the PR.
   - repo: local
     hooks:
       - id: ruff-check
         name: ruff check
-        entry: ruff check --fix
+        entry: .venv/bin/ruff check --fix
         language: system
         types_or: [python, pyi]
       - id: ruff-format
         name: ruff format
-        entry: ruff format
+        entry: .venv/bin/ruff format
         language: system
         types_or: [python, pyi]
       - id: mypy
         name: mypy
-        entry: mypy
+        entry: .venv/bin/mypy
         language: system
         pass_filenames: false
         types: [python]
+      - id: pytest
+        name: pytest (PR-CI parity)
+        entry: .venv/bin/pytest -m "not slow and not gpu and not integration"
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
