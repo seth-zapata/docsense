@@ -12,6 +12,13 @@ import pytest
 from docsense.config import JudgeConfig
 from docsense.evaluation.llama_judge import (
     LlamaJudge,
+    _AttributionEntry,
+    _AttributionsResponse,
+    _ClaimsResponse,
+    _extract_json_block,
+    _parse_json_response,
+    _RefusalResponse,
+    _RelevanceResponse,
     _snap_to_anchor,
     parse_claim_attributions,
     parse_claims,
@@ -58,6 +65,116 @@ def _chunks(*texts: str) -> list[ChunkRef]:
         ChunkRef(doc_id=f"doc{i}.md", chunk_id=str(i), score=1.0, text=text)
         for i, text in enumerate(texts, start=1)
     ]
+
+
+# --------------------------------------------------------------------
+# JSON helpers (added 2026-05-06 for PR C.2 — judge-output-via-JSON)
+# --------------------------------------------------------------------
+
+
+class TestExtractJsonBlock:
+    def test_clean_json_passthrough(self):
+        assert _extract_json_block('{"a": 1}') == '{"a": 1}'
+
+    def test_strips_markdown_fence(self):
+        text = '```json\n{"a": 1}\n```'
+        assert _extract_json_block(text) == '{"a": 1}'
+
+    def test_strips_unlabeled_fence(self):
+        text = '```\n{"a": 1}\n```'
+        assert _extract_json_block(text) == '{"a": 1}'
+
+    def test_extracts_from_prose_preamble(self):
+        """LLMs sometimes preface output with 'Here is my response:'.
+        Extract the JSON block out of the surrounding prose."""
+        text = 'Here is my response:\n{"a": 1, "b": "x"}\nThanks!'
+        assert _extract_json_block(text) == '{"a": 1, "b": "x"}'
+
+    def test_returns_text_when_no_json_present(self):
+        """No braces, no fences — pass through. _parse_json_response
+        will then fail to json.loads it, which is the right behavior."""
+        assert _extract_json_block("just prose, sorry") == "just prose, sorry"
+
+
+class TestParseJsonResponse:
+    def test_clean_response_validates(self):
+        text = '{"score": 0.75, "rationale": "ok"}'
+        parsed = _parse_json_response(text, _RelevanceResponse)
+        assert parsed is not None
+        assert parsed.score == 0.75
+
+    def test_fence_wrapped_response_parses(self):
+        text = '```json\n{"score": 1.0, "rationale": "great"}\n```'
+        parsed = _parse_json_response(text, _RelevanceResponse)
+        assert parsed is not None
+        assert parsed.score == 1.0
+
+    def test_invalid_json_returns_none(self):
+        text = "not json at all"
+        assert _parse_json_response(text, _RelevanceResponse) is None
+
+    def test_missing_field_returns_none(self):
+        """Pydantic rejects { } missing 'score' — that's a validation
+        error, returns None so the caller falls back."""
+        text = '{"rationale": "ok"}'
+        assert _parse_json_response(text, _RelevanceResponse) is None
+
+    def test_out_of_range_score_returns_none(self):
+        """Field(ge=0.0, le=1.0) catches LLM-emitted 5.0; returns
+        None to trigger retry rather than silently clamping."""
+        text = '{"score": 5.0, "rationale": "out of range"}'
+        assert _parse_json_response(text, _RelevanceResponse) is None
+
+    def test_claims_response(self):
+        text = '{"claims": ["alpha", "beta"]}'
+        parsed = _parse_json_response(text, _ClaimsResponse)
+        assert parsed is not None
+        assert parsed.claims == ["alpha", "beta"]
+
+    def test_empty_claims_response(self):
+        """The empty-claims signal: the JSON parsed cleanly, the list
+        is empty. Distinguishes from a parse failure (where None
+        would be returned)."""
+        text = '{"claims": []}'
+        parsed = _parse_json_response(text, _ClaimsResponse)
+        assert parsed is not None
+        assert parsed.claims == []
+
+    def test_attributions_response(self):
+        text = """{
+          "attributions": [
+            {"claim_idx": 1, "supporting_chunk_idx": 2, "rationale": "ok"},
+            {"claim_idx": 2, "supporting_chunk_idx": null, "rationale": "no chunk"}
+          ]
+        }"""
+        parsed = _parse_json_response(text, _AttributionsResponse)
+        assert parsed is not None
+        assert len(parsed.attributions) == 2
+        assert parsed.attributions[0].supporting_chunk_idx == 2
+        assert parsed.attributions[1].supporting_chunk_idx is None
+
+    def test_attribution_zero_idx_rejected(self):
+        """claim_idx is 1-indexed; 0 would conflate with no-claim."""
+        text = '{"attributions": [{"claim_idx": 0, "supporting_chunk_idx": 1}]}'
+        assert _parse_json_response(text, _AttributionsResponse) is None
+
+    def test_refusal_response(self):
+        text = '{"refused": true, "rationale": "model said it"}'
+        parsed = _parse_json_response(text, _RefusalResponse)
+        assert parsed is not None
+        assert parsed.refused is True
+
+
+class TestResponseSchemas:
+    """Spot-pin a few field-validator behaviors directly on the schemas."""
+
+    def test_attribution_entry_optional_rationale(self):
+        entry = _AttributionEntry(claim_idx=1, supporting_chunk_idx=2)
+        assert entry.rationale is None
+
+    def test_attribution_entry_optional_chunk(self):
+        entry = _AttributionEntry(claim_idx=1)
+        assert entry.supporting_chunk_idx is None
 
 
 # --------------------------------------------------------------------

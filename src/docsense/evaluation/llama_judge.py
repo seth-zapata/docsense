@@ -33,8 +33,11 @@ decompose into claims the way faithfulness does.
 
 from __future__ import annotations
 
+import json
 import re
 from typing import TYPE_CHECKING, Any, cast
+
+from pydantic import BaseModel, Field, ValidationError
 
 from docsense.evaluation.judge import (
     ClaimAttribution,
@@ -52,6 +55,114 @@ if TYPE_CHECKING:
 
 
 _RELEVANCE_ANCHORS: tuple[float, ...] = (0.0, 0.25, 0.5, 0.75, 1.0)
+
+
+# --- JSON output helpers (added 2026-05-06 for PR C.2) ---------------
+#
+# Replaces regex-based parsing of LLM output. The judge is *our* tool,
+# we own the prompt and the output format — so we should ask for a
+# parseable shape (JSON) rather than parse free-form text with regex.
+# Eliminates the ``curated_001`` 8/8 PARSE_FAILED edge case that
+# motivated this PR (LLM output drifted from our regex format in ways
+# the regex couldn't accommodate; JSON has much more forgiving shape
+# tolerance — extra whitespace, key casing, fence wrapping all become
+# easy to handle).
+#
+# Each judge method has its own pydantic response schema below; the
+# ``_parse_json_response`` helper does the parse + validate; the
+# ``_call_with_json_retry`` method on LlamaJudge handles one retry on
+# parse failure with a clarifying instruction. Permanent failure
+# (after retry) returns None — the calling method handles the
+# fallback the same way the prior PARSE_FAILED markers worked.
+
+
+# Strips ```json ... ``` markdown fences if present, then locates the
+# first top-level JSON object. Tolerant of LLM prose before/after the
+# JSON (occasional "Here is my response:" preambles).
+_JSON_FENCE_RE = re.compile(r"```(?:json)?\s*(.*?)\s*```", re.DOTALL)
+
+
+def _extract_json_block(text: str) -> str:
+    """Return the JSON-looking substring from raw LLM output.
+
+    Tries, in order: a markdown code fence's contents, then the first
+    ``{...}`` block in the text, then the original text. Doesn't
+    validate JSON syntax — that's ``_parse_json_response``'s job.
+    """
+    text = text.strip()
+    fence_match = _JSON_FENCE_RE.search(text)
+    if fence_match is not None:
+        return fence_match.group(1).strip()
+    # Find the first balanced-ish JSON object. We use a simple greedy
+    # match here — if the LLM emits multiple JSON blocks we take the
+    # outermost; if it emits prose around a JSON block we take the
+    # JSON. json.loads will reject anything truly malformed.
+    brace_match = re.search(r"\{.*\}", text, re.DOTALL)
+    if brace_match is not None:
+        return brace_match.group(0)
+    return text
+
+
+def _parse_json_response[T: BaseModel](text: str, schema: type[T]) -> T | None:
+    """Extract + parse + validate ``text`` against ``schema``.
+
+    Returns ``None`` on any failure (json decode error, pydantic
+    validation error). The caller decides what to do — typically
+    one retry then a fallback to a parse-failure marker.
+    """
+    block = _extract_json_block(text)
+    try:
+        raw = json.loads(block)
+    except json.JSONDecodeError:
+        return None
+    try:
+        return schema.model_validate(raw)
+    except ValidationError:
+        return None
+
+
+# --- Response schemas, one per judge call ----------------------------
+
+
+class _ClaimsResponse(BaseModel):
+    """Schema for ``extract_claims`` output. Empty ``claims`` list is
+    the explicit "no factual claims" signal (replaces the prior
+    NO_CLAIMS sentinel)."""
+
+    claims: list[str]
+
+
+class _AttributionEntry(BaseModel):
+    """One per-claim attribution as the judge emits it. The eval
+    driver post-processes these into ``ClaimAttribution`` objects;
+    this schema is just the wire format."""
+
+    claim_idx: int = Field(ge=1)
+    supporting_chunk_idx: int | None = None
+    rationale: str | None = None
+
+
+class _AttributionsResponse(BaseModel):
+    """Schema for ``attribute_claims_to_chunks`` output."""
+
+    attributions: list[_AttributionEntry]
+
+
+class _RelevanceResponse(BaseModel):
+    """Schema for ``judge_relevance`` output. ``score`` is constrained
+    to ``[0, 1]`` here; the snap-to-anchor happens in post-processing
+    so 0.7 → 0.75 doesn't trip pydantic validation."""
+
+    score: float = Field(ge=0.0, le=1.0)
+    rationale: str
+
+
+class _RefusalResponse(BaseModel):
+    """Schema for ``judge_refusal`` output."""
+
+    refused: bool
+    rationale: str
+
 
 # Tolerant of the model dropping the colon, putting the number inline
 # with text, or emitting a leading-dot decimal like ".75". Anchored to
