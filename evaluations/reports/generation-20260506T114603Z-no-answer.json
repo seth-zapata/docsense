@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "captured_at": "2026-05-06T10:29:45+00:00",
+  "captured_at": "2026-05-06T12:33:05+00:00",
   "eval_set": "no-answer",
   "eval_set_size": 25,
   "limit_applied": null,
@@ -35,24 +35,24 @@
   },
   "timing_ms_per_query": {
     "retrieve_ms": {
-      "p50": 432.34,
-      "p95": 680.72,
-      "p99": 5775.5,
-      "mean": 721.76,
+      "p50": 339.74,
+      "p95": 648.52,
+      "p99": 2699.98,
+      "mean": 510.62,
       "n": 25
     },
     "assemble_ms": {
       "p50": 0.02,
-      "p95": 0.03,
-      "p99": 0.03,
-      "mean": 0.02,
+      "p95": 0.05,
+      "p99": 0.06,
+      "mean": 0.03,
       "n": 25
     },
     "generate_ms": {
-      "p50": 2040.12,
-      "p95": 3694.79,
-      "p99": 3789.21,
-      "mean": 2122.81,
+      "p50": 1212.63,
+      "p95": 3445.03,
+      "p99": 3583.96,
+      "mean": 1943.39,
       "n": 25
     }
   },
@@ -64,9 +64,9 @@
       "is_no_answer_query": true,
       "n_retrieved_chunks": 5,
       "timing": {
-        "retrieve_ms": 7381.15868694149,
-        "assemble_ms": 0.027175061404705048,
-        "generate_ms": 1714.9133021011949
+        "retrieve_ms": 3344.5613961666822,
+        "assemble_ms": 0.020319828763604164,
+        "generate_ms": 1145.0384098570794
       },
       "citation_check": {
         "n_markers_in_text": 0,
@@ -82,7 +82,7 @@
       },
       "refusal_judge": {
         "refused": true,
-        "rationale": "The answer explicitly states that the model lacks sufficient context to provide a response."
+        "rationale": "The model lacks specific information about AWS Lambda free-tier limits."
       }
     },
     {
@@ -92,9 +92,9 @@
       "is_no_answer_query": true,
       "n_retrieved_chunks": 5,
       "timing": {
-        "retrieve_ms": 690.9169559367001,
-        "assemble_ms": 0.02303207293152809,
-        "generate_ms": 3295.4735511448234
+        "retrieve_ms": 287.2277998831123,
+        "assemble_ms": 0.02204999327659607,
+        "generate_ms": 3161.4362101536244
       },
       "citation_check": {
         "n_markers_in_text": 0,
@@ -110,19 +110,19 @@
       },
       "refusal_judge": {
         "refused": true,
-        "rationale": "The answer explicitly states that the context doesn't cover the topic of filing federal income taxes in California."
+        "rationale": "The answer explicitly states the context is insufficient for answering the question."
       }
     },
     {
       "query_id": "no_answer_003",
       "query": "What are the GDPR data-retention requirements for EU users?",
-      "answer_text": "I don't have enough context to answer that. The provided context discusses multi-round conversations, key-value caching in LLMs, and models like EuroBERT and YOuTu. It does not mention GDPR or data-retention requirements for EU users.",
+      "answer_text": "I don't have enough context to answer that. The provided context discusses multi-round conversations, key-value caching in language models, and datasets like VoxPopuli and EuroBERT. It does not mention GDPR or data-retention requirements for EU users.",
       "is_no_answer_query": true,
       "n_retrieved_chunks": 5,
       "timing": {
-        "retrieve_ms": 278.2135361339897,
-        "assemble_ms": 0.02415711060166359,
-        "generate_ms": 3815.6239648815244
+        "retrieve_ms": 284.48946005664766,
+        "assemble_ms": 0.019350089132785797,
+        "generate_ms": 3304.974240018055
       },
       "citation_check": {
         "n_markers_in_text": 0,
@@ -138,7 +138,7 @@
       },
       "refusal_judge": {
         "refused": true,
-        "rationale": "The answer explicitly states that the context does not cover the topic of GDPR data-retention requirements for EU users."
+        "rationale": "The answer explicitly states the context does not cover the topic."
       }
     },
     {
@@ -148,9 +148,9 @@
       "is_no_answer_query": true,
       "n_retrieved_chunks": 5,
       "timing": {
-        "retrieve_ms": 436.6597658954561,
-        "assemble_ms": 0.020842067897319794,
-        "generate_ms": 1025.911474833265
+        "retrieve_ms": 315.1594800874591,
+        "assemble_ms": 0.05282997153699398,
+        "generate_ms": 1022.661630064249
       },
       "citation_check": {
         "n_markers_in_text": 0,
@@ -166,19 +166,19 @@
       },
       "refusal_judge": {
         "refused": true,
-        "rationale": "The answer explicitly states that the model lacks sufficient context to provide an answer."
+        "rationale": "The model lacks information about the latest iPhone model and its release date."
       }
     },
     {
       "query_id": "no_answer_005",
       "query": "Should I buy a MacBook Pro M4 or M3?",
-      "answer_text": "I don't have enough context to answer that. The provided context discusses hardware requirements for using the `kernels` library and quantization techniques, but it does not provide specific recommendations for purchasing a MacBook Pro M4 or M3.",
+      "answer_text": "I don't have enough context to answer that. The provided context discusses requirements for using the `kernels` library on Apple Silicon Macs with MPS support, but it doesn't provide specific recommendations for purchasing a MacBook Pro M4 or M3.",
       "is_no_answer_query": true,
       "n_retrieved_chunks": 5,
       "timing": {
-        "retrieve_ms": 412.8127109725028,
-        "assemble_ms": 0.020273029804229736,
-        "generate_ms": 3572.1670871134847
+        "retrieve_ms": 339.74055014550686,
+        "assemble_ms": 0.0481500755995512,
+        "generate_ms": 3473.6811330076307
       },
       "citation_check": {
         "n_markers_in_text": 0,
@@ -194,7 +194,7 @@
       },
       "refusal_judge": {
         "refused": true,
-        "rationale": "The answer explicitly states that the necessary information is not provided in the context."
+        "rationale": "The answer explicitly states the lack of relevant information in the context."
       }
     },
     {
@@ -204,9 +204,9 @@
       "is_no_answer_query": true,
       "n_retrieved_chunks": 5,
       "timing": {
-        "retrieve_ms": 332.02819991856813,
-        "assemble_ms": 0.034327851608395576,
-        "generate_ms": 3651.637875009328
+        "retrieve_ms": 281.24952502548695,
+        "assemble_ms": 0.025140121579170227,
+        "generate_ms": 3330.4351321421564
       },
       "citation_check": {
         "n_markers_in_text": 0,
@@ -222,7 +222,7 @@
       },
       "refusal_judge": {
         "refused": true,
-        "rationale": "The answer explicitly states that the necessary information is not available in the provided context."
+        "rationale": "The answer explicitly states that the necessary information is not available in the context."
       }
     },
     {
@@ -232,9 +232,9 @@
       "is_no_answer_query": true,
       "n_retrieved_chunks": 5,
       "timing": {
-        "retrieve_ms": 391.0029858816415,
-        "assemble_ms": 0.02404884435236454,
-        "generate_ms": 1138.8076459988952
+        "retrieve_ms": 315.46307797543705,
+        "assemble_ms": 0.054045114666223526,
+        "generate_ms": 1118.4046750422567
       },
       "citation_check": {
         "n_markers_in_text": 0,
@@ -250,7 +250,7 @@
       },
       "refusal_judge": {
         "refused": true,
-        "rationale": "The answer explicitly states that the model lacks sufficient context to provide a response."
+        "rationale": "The model recognized the context didn't have information about mechanical keyboard maintenance."
       }
     },
     {
@@ -260,9 +260,9 @@
       "is_no_answer_query": true,
       "n_retrieved_chunks": 5,
       "timing": {
-        "retrieve_ms": 639.0397069044411,
-        "assemble_ms": 0.023049069568514824,
-        "generate_ms": 1199.3674170225859
+        "retrieve_ms": 658.8248910848051,
+        "assemble_ms": 0.03210711292922497,
+        "generate_ms": 1212.6348980236799
       },
       "citation_check": {
         "n_markers_in_text": 0,
@@ -278,19 +278,19 @@
       },
       "refusal_judge": {
         "refused": true,
-        "rationale": "The answer explicitly states that the model lacks sufficient context to provide a response."
+        "rationale": "The model lacks context about the user's dietary needs, preferences, or specific requirements for the cookies."
       }
     },
     {
       "query_id": "no_answer_009",
       "query": "What's the best time of year to visit Tokyo?",
-      "answer_text": "I don't have enough context to answer that. The provided context does not include information about the best time of year to visit Tokyo.",
+      "answer_text": "I don't have enough context to answer that. The provided context discusses cycling spots in Tokyo but does not mention the best time of year to visit.",
       "is_no_answer_query": true,
       "n_retrieved_chunks": 5,
       "timing": {
-        "retrieve_ms": 364.3098787870258,
-        "assemble_ms": 0.025652116164565086,
-        "generate_ms": 2552.496303105727
+        "retrieve_ms": 365.51161017268896,
+        "assemble_ms": 0.03006984479725361,
+        "generate_ms": 2799.4350059889257
       },
       "citation_check": {
         "n_markers_in_text": 0,
@@ -306,7 +306,7 @@
       },
       "refusal_judge": {
         "refused": true,
-        "rationale": "The answer explicitly states that the necessary information is not available in the provided context."
+        "rationale": "The answer explicitly states the context is insufficient for the question."
       }
     },
     {
@@ -316,9 +316,9 @@
       "is_no_answer_query": true,
       "n_retrieved_chunks": 5,
       "timing": {
-        "retrieve_ms": 484.09203183837235,
-        "assemble_ms": 0.0235140323638916,
-        "generate_ms": 2319.9959760531783
+        "retrieve_ms": 507.3135788552463,
+        "assemble_ms": 0.060345977544784546,
+        "generate_ms": 2551.8877459689975
       },
       "citation_check": {
         "n_markers_in_text": 0,
@@ -344,9 +344,9 @@
       "is_no_answer_query": true,
       "n_retrieved_chunks": 5,
       "timing": {
-        "retrieve_ms": 579.9449540209025,
-        "assemble_ms": 0.022685155272483826,
-        "generate_ms": 2040.117013035342
+        "retrieve_ms": 607.2964640334249,
+        "assemble_ms": 0.022064894437789917,
+        "generate_ms": 2264.8333290126175
       },
       "citation_check": {
         "n_markers_in_text": 0,
@@ -362,7 +362,7 @@
       },
       "refusal_judge": {
         "refused": true,
-        "rationale": "The answer explicitly states that the context doesn't contain the necessary information."
+        "rationale": "The model recognized the context didn't have information about a Lakers game or its score."
       }
     },
     {
@@ -372,9 +372,9 @@
       "is_no_answer_query": true,
       "n_retrieved_chunks": 5,
       "timing": {
-        "retrieve_ms": 354.9728700891137,
-        "assemble_ms": 0.023061875253915787,
-        "generate_ms": 2493.2100099977106
+        "retrieve_ms": 337.2304409276694,
+        "assemble_ms": 0.017734011635184288,
+        "generate_ms": 2523.5854831989855
       },
       "citation_check": {
         "n_markers_in_text": 0,
@@ -390,7 +390,7 @@
       },
       "refusal_judge": {
         "refused": true,
-        "rationale": "The answer explicitly states that the context is insufficient to answer the question."
+        "rationale": "The answer explicitly states the lack of relevant context."
       }
     },
     {
@@ -400,9 +400,9 @@
       "is_no_answer_query": true,
       "n_retrieved_chunks": 5,
       "timing": {
-        "retrieve_ms": 331.3530490268022,
-        "assemble_ms": 0.022684922441840172,
-        "generate_ms": 1126.4028139412403
+        "retrieve_ms": 314.32829494588077,
+        "assemble_ms": 0.03753788769245148,
+        "generate_ms": 1079.0783381089568
       },
       "citation_check": {
         "n_markers_in_text": 0,
@@ -418,7 +418,7 @@
       },
       "refusal_judge": {
         "refused": true,
-        "rationale": "The answer explicitly states that the model lacks sufficient context to provide a price for Bitcoin."
+        "rationale": "The model lacks information about the current price of Bitcoin."
       }
     },
     {
@@ -428,9 +428,9 @@
       "is_no_answer_query": true,
       "n_retrieved_chunks": 5,
       "timing": {
-        "retrieve_ms": 565.4292579274625,
-        "assemble_ms": 0.02033100463449955,
-        "generate_ms": 1209.2096579726785
+        "retrieve_ms": 506.2472438439727,
+        "assemble_ms": 0.024827895686030388,
+        "generate_ms": 1072.8047650773078
       },
       "citation_check": {
         "n_markers_in_text": 0,
@@ -446,7 +446,7 @@
       },
       "refusal_judge": {
         "refused": true,
-        "rationale": "The answer explicitly states that the model lacks sufficient context to provide an answer."
+        "rationale": "The model lacks information about the current US unemployment rate."
       }
     },
     {
@@ -456,9 +456,9 @@
       "is_no_answer_query": true,
       "n_retrieved_chunks": 5,
       "timing": {
-        "retrieve_ms": 514.2572780605406,
-        "assemble_ms": 0.02279621548950672,
-        "generate_ms": 1153.2127861864865
+        "retrieve_ms": 488.952849060297,
+        "assemble_ms": 0.020395033061504364,
+        "generate_ms": 1004.2960590217263
       },
       "citation_check": {
         "n_markers_in_text": 0,
@@ -474,19 +474,19 @@
       },
       "refusal_judge": {
         "refused": true,
-        "rationale": "The answer explicitly states that the model lacks sufficient context to provide a response."
+        "rationale": "The model lacks information about future market trends or specific predictions."
       }
     },
     {
       "query_id": "no_answer_016",
       "query": "How do I configure Postgres streaming replication?",
-      "answer_text": "I don't have enough context to answer that. The provided context is related to model inference, sequence parallelism, and streaming text generation, but does not mention anything about configuring Postgres streaming replication.",
+      "answer_text": "I don't have enough context to answer that.",
       "is_no_answer_query": true,
       "n_retrieved_chunks": 5,
       "timing": {
-        "retrieve_ms": 398.571735015139,
-        "assemble_ms": 0.0280928798019886,
-        "generate_ms": 3286.365339998156
+        "retrieve_ms": 305.5724098812789,
+        "assemble_ms": 0.01943996176123619,
+        "generate_ms": 922.4569799844176
       },
       "citation_check": {
         "n_markers_in_text": 0,
@@ -502,7 +502,7 @@
       },
       "refusal_judge": {
         "refused": true,
-        "rationale": "The answer explicitly states that the context is insufficient for answering the question."
+        "rationale": "The model recognized the context didn't have the necessary information to provide a configuration for Postgres streaming replication."
       }
     },
     {
@@ -512,9 +512,9 @@
       "is_no_answer_query": true,
       "n_retrieved_chunks": 5,
       "timing": {
-        "retrieve_ms": 581.2541469931602,
-        "assemble_ms": 0.019958941265940666,
-        "generate_ms": 998.8884299527854
+        "retrieve_ms": 543.2279400993139,
+        "assemble_ms": 0.024209963157773018,
+        "generate_ms": 873.6140700057149
       },
       "citation_check": {
         "n_markers_in_text": 0,
@@ -530,7 +530,7 @@
       },
       "refusal_judge": {
         "refused": true,
-        "rationale": "The answer explicitly states that the model lacks sufficient context to provide a response."
+        "rationale": "The model lacks sufficient context to provide a specific configuration for nginx as a reverse proxy."
       }
     },
     {
@@ -540,9 +540,9 @@
       "is_no_answer_query": true,
       "n_retrieved_chunks": 5,
       "timing": {
-        "retrieve_ms": 432.34173697419465,
-        "assemble_ms": 0.02336408942937851,
-        "generate_ms": 3705.583671107888
+        "retrieve_ms": 399.88575014285743,
+        "assemble_ms": 0.036449870094656944,
+        "generate_ms": 3618.778589880094
       },
       "citation_check": {
         "n_markers_in_text": 0,
@@ -558,7 +558,7 @@
       },
       "refusal_judge": {
         "refused": true,
-        "rationale": "The answer explicitly states that the context lacks information about SQL syntax, which is necessary to answer the question."
+        "rationale": "The answer explicitly states the context is insufficient for answering the question."
       }
     },
     {
@@ -568,9 +568,9 @@
       "is_no_answer_query": true,
       "n_retrieved_chunks": 5,
       "timing": {
-        "retrieve_ms": 324.2877849843353,
-        "assemble_ms": 0.019412022083997726,
-        "generate_ms": 2511.3120551686734
+        "retrieve_ms": 310.9608900267631,
+        "assemble_ms": 0.021870015189051628,
+        "generate_ms": 2224.394279997796
       },
       "citation_check": {
         "n_markers_in_text": 0,
@@ -586,7 +586,7 @@
       },
       "refusal_judge": {
         "refused": true,
-        "rationale": "The answer explicitly states that the context is insufficient for answering the question, and that the context is about a different topic."
+        "rationale": "The answer indicates the model recognized the context didn't have the necessary information for deploying React apps to Vercel."
       }
     },
     {
@@ -596,9 +596,9 @@
       "is_no_answer_query": true,
       "n_retrieved_chunks": 5,
       "timing": {
-        "retrieve_ms": 273.9833800587803,
-        "assemble_ms": 0.02353801392018795,
-        "generate_ms": 3357.7357281465083
+        "retrieve_ms": 241.37523001991212,
+        "assemble_ms": 0.017369864508509636,
+        "generate_ms": 3101.074649952352
       },
       "citation_check": {
         "n_markers_in_text": 0,
@@ -614,7 +614,7 @@
       },
       "refusal_judge": {
         "refused": true,
-        "rationale": "The answer explicitly states that the context doesn't cover JavaScript variable declarations."
+        "rationale": "The answer explicitly states the context doesn't cover JavaScript variable declarations."
       }
     },
     {
@@ -624,9 +624,9 @@
       "is_no_answer_query": true,
       "n_retrieved_chunks": 5,
       "timing": {
-        "retrieve_ms": 639.9460469838232,
-        "assemble_ms": 0.021281884983181953,
-        "generate_ms": 992.6215119194239
+        "retrieve_ms": 474.0948900580406,
+        "assemble_ms": 0.023759901523590088,
+        "generate_ms": 985.1736600976437
       },
       "citation_check": {
         "n_markers_in_text": 0,
@@ -642,7 +642,7 @@
       },
       "refusal_judge": {
         "refused": true,
-        "rationale": "The answer explicitly states that the model lacks sufficient context to provide a response."
+        "rationale": "The model lacks specific information about the chemical formula of caffeine."
       }
     },
     {
@@ -652,9 +652,9 @@
       "is_no_answer_query": true,
       "n_retrieved_chunks": 5,
       "timing": {
-        "retrieve_ms": 518.308199942112,
-        "assemble_ms": 0.02211914397776127,
-        "generate_ms": 1006.5897910390049
+        "retrieve_ms": 503.69075988419354,
+        "assemble_ms": 0.023760134354233742,
+        "generate_ms": 999.821970006451
       },
       "citation_check": {
         "n_markers_in_text": 0,
@@ -670,7 +670,7 @@
       },
       "refusal_judge": {
         "refused": true,
-        "rationale": "The answer explicitly states that the model lacks sufficient context to provide a response."
+        "rationale": "The model explicitly states it lacks sufficient context to provide an answer."
       }
     },
     {
@@ -680,9 +680,9 @@
       "is_no_answer_query": true,
       "n_retrieved_chunks": 5,
       "timing": {
-        "retrieve_ms": 447.22191896289587,
-        "assemble_ms": 0.01756497658789158,
-        "generate_ms": 933.4430128801614
+        "retrieve_ms": 421.52749095112085,
+        "assemble_ms": 0.047969166189432144,
+        "generate_ms": 1027.2144512273371
       },
       "citation_check": {
         "n_markers_in_text": 0,
@@ -698,7 +698,7 @@
       },
       "refusal_judge": {
         "refused": true,
-        "rationale": "The answer explicitly states that the model lacks sufficient context to provide a population figure."
+        "rationale": "The model explicitly states it lacks sufficient context to provide an answer."
       }
     },
     {
@@ -708,9 +708,9 @@
       "is_no_answer_query": true,
       "n_retrieved_chunks": 5,
       "timing": {
-        "retrieve_ms": 293.22140803560615,
-        "assemble_ms": 0.023884931579232216,
-        "generate_ms": 923.4988880343735
+        "retrieve_ms": 290.3483079280704,
+        "assemble_ms": 0.02137315459549427,
+        "generate_ms": 1029.9750140402466
       },
       "citation_check": {
         "n_markers_in_text": 0,
@@ -726,7 +726,7 @@
       },
       "refusal_judge": {
         "refused": true,
-        "rationale": "The answer explicitly states that the model lacks sufficient context to provide an answer."
+        "rationale": "The model lacks sufficient context to identify the director of the movie Inception."
       }
     },
     {
@@ -736,9 +736,9 @@
       "is_no_answer_query": true,
       "n_retrieved_chunks": 5,
       "timing": {
-        "retrieve_ms": 378.77796101383865,
-        "assemble_ms": 0.021115876734256744,
-        "generate_ms": 3045.5966780427843
+        "retrieve_ms": 321.14545488730073,
+        "assemble_ms": 0.032676151022315025,
+        "generate_ms": 2736.9990181177855
       },
       "citation_check": {
         "n_markers_in_text": 0,
@@ -754,7 +754,7 @@
       },
       "refusal_judge": {
         "refused": true,
-        "rationale": "The answer explicitly states that the context doesn't contain the necessary information."
+        "rationale": "The answer explicitly states the lack of relevant information in the context."
       }
     }
   ]

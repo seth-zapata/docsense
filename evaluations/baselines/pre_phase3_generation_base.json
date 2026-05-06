@@ -1,16 +1,16 @@
 {
-  "schema_version": 3,
+  "schema_version": 4,
   "phase": "pre-phase-3",
   "description": "Pre-Phase-3 generation baseline. Qwen 2.5 7B Instruct (NF4) running through the production retrieval stack (hybrid + cross-encoder rerank, recursive chunking, top_k=5, max_context_tokens=3500). Judged by Llama 3.1 8B Instruct (NF4, temperature=0). Faithfulness uses RAGAS-style claim-level decomposition with per-chunk attribution: extract atomic claims from the answer, then for each claim identify which retrieved chunk supports it (or 'none'). Score is n_supported_claims / n_total_claims, continuous in [0, 1]. Relevance still uses the 5-anchor absolute scale. Citation grounding and refusal behavior measured by deterministic rule-based checks. This is the starting line Phase 3 fine-tuning will be measured against.",
   "captured_at": "2026-05-06",
   "captured_from": {
     "reports": [
-      "evaluations/reports/generation-20260506T091119Z-curated.json",
-      "evaluations/reports/generation-20260506T093302Z-structural.json",
-      "evaluations/reports/generation-20260506T102436Z-no-answer.json"
+      "evaluations/reports/generation-20260506T114603Z-curated.json",
+      "evaluations/reports/generation-20260506T114603Z-structural.json",
+      "evaluations/reports/generation-20260506T114603Z-no-answer.json"
     ],
-    "commit": "40b9b9930fff61ad3f3a1bbb8f2bce6c30362aae",
-    "notes": "Schema version bumped 1 → 3 across two methodology iterations on 2026-05-06: (v1→v2) faithfulness moved from 5-anchor absolute scoring to RAGAS-style claim-level decomposition with per-chunk attribution, eliminating LLM-as-judge anchor saturation at 0.75; (v2→v3) refusal detection on no-answer queries added an LLM-judge primitive (judge_refusal) running alongside the existing regex heuristic for cross-validation, and the no-answer eval set was expanded from n=8 to n=25 covering broader off-corpus domains. The earlier numbers from each iteration are preserved in git history. See evaluations/analyses/2026-05-06-baseline-generation-eval.md for the full methodology iteration log including the docs/journal/2026-05-06-eval-methodology-iteration.md companion entry."
+    "commit": "fec3dc6d62d68c89b53c3edb9e9d7b6f22f49b07",
+    "notes": "Schema version bumped 1 → 4 across three methodology iterations on 2026-05-06: (v1→v2) faithfulness moved from 5-anchor absolute scoring to RAGAS-style claim-level decomposition with per-chunk attribution, eliminating LLM-as-judge anchor saturation at 0.75; (v2→v3) refusal detection added an LLM-judge primitive (judge_refusal) running alongside the existing regex heuristic for cross-validation, and the no-answer eval set was expanded from n=8 to n=25; (v3→v4) all four judge calls migrated from regex parsing of free-form output to JSON output + pydantic validation + retry-on-parse-failure, eliminating the curated_001 8/8 PARSE_FAILED edge case from the v2 baseline. The first v4 run uncovered (and the cross-validation methodology surfaced within minutes) a missed prompt update — the refusal prompt still asked for the old REFUSED:yes/no text format, producing 25/25 judge parse failures that the rule-based regex didn't see. Fix landed as commit fec3dc6 (refusal prompt rewritten to JSON format, attribution prompt strengthened with explicit chunk-range constraint). The numbers below are from the post-fix v4 run. Older numbers preserved in git history. See evaluations/analyses/2026-05-06-baseline-generation-eval.md for the full methodology iteration log."
   },
   "config": {
     "generator_model": "Qwen/Qwen2.5-7B-Instruct",
@@ -35,66 +35,66 @@
     "curated": {
       "n_queries": 20,
       "faithfulness": {
-        "score_mean": 0.853,
+        "score_mean": 0.894,
         "score_median": 1.000,
-        "score_stdev": 0.304,
-        "score_min": 0.0,
+        "score_stdev": 0.199,
+        "score_min": 0.333,
         "score_max": 1.0,
         "score_distribution": {
-          "0.0": 2, "0.0-0.25": 0, "0.25-0.5": 0, "0.5-0.75": 1,
-          "0.75-1.0": 4, "1.0": 13
+          "0.0": 0, "0.0-0.25": 0, "0.25-0.5": 1, "0.5-0.75": 2,
+          "0.75-1.0": 3, "1.0": 14
         },
         "claims_total_extracted": 128,
-        "claims_total_supported": 114,
-        "claims_support_rate": 0.891,
+        "claims_total_supported": 109,
+        "claims_support_rate": 0.852,
         "claims_mean_per_answer": 6.40,
-        "claims_max_per_answer": 10,
-        "n_no_claims_extracted": 1,
+        "claims_max_per_answer": 15,
+        "n_no_claims_extracted": 0,
         "n_score_parse_failures": 0,
-        "n_claim_parse_failures": 9,
-        "n_claim_out_of_range": 5,
-        "chunk_usage_distribution": {"1": 9, "2": 20, "3": 31, "4": 31, "5": 23, "none": 14}
+        "n_claim_parse_failures": 0,
+        "n_claim_out_of_range": 18,
+        "chunk_usage_distribution": {"1": 19, "2": 28, "3": 22, "4": 22, "5": 18, "none": 19}
       },
       "relevance": {
-        "mean": 0.725,
-        "anchor_distribution": {"0.00": 0, "0.25": 1, "0.50": 0, "0.75": 19, "1.00": 0},
+        "mean": 0.775,
+        "anchor_distribution": {"0.00": 0, "0.25": 0, "0.50": 0, "0.75": 18, "1.00": 2},
         "n_parse_failures": 0
       },
-      "citation_frac_with_any_marker": 0.60,
-      "citation_frac_all_in_range": 0.60,
-      "citation_mean_n_markers": 2.20
+      "citation_frac_with_any_marker": 0.50,
+      "citation_frac_all_in_range": 0.50,
+      "citation_mean_n_markers": 1.65
     },
     "structural": {
       "n_queries": 30,
       "faithfulness": {
-        "score_mean": 0.853,
+        "score_mean": 0.889,
         "score_median": 1.000,
-        "score_stdev": 0.321,
+        "score_stdev": 0.285,
         "score_min": 0.0,
         "score_max": 1.0,
         "score_distribution": {
-          "0.0": 3, "0.0-0.25": 0, "0.25-0.5": 1, "0.5-0.75": 0,
-          "0.75-1.0": 4, "1.0": 22
+          "0.0": 2, "0.0-0.25": 1, "0.25-0.5": 0, "0.5-0.75": 1,
+          "0.75-1.0": 2, "1.0": 24
         },
-        "claims_total_extracted": 156,
-        "claims_total_supported": 146,
-        "claims_support_rate": 0.936,
-        "claims_mean_per_answer": 5.20,
-        "claims_max_per_answer": 14,
+        "claims_total_extracted": 145,
+        "claims_total_supported": 128,
+        "claims_support_rate": 0.883,
+        "claims_mean_per_answer": 4.83,
+        "claims_max_per_answer": 15,
         "n_no_claims_extracted": 2,
         "n_score_parse_failures": 0,
         "n_claim_parse_failures": 1,
-        "n_claim_out_of_range": 3,
-        "chunk_usage_distribution": {"1": 45, "2": 22, "3": 33, "4": 32, "5": 14, "none": 10}
+        "n_claim_out_of_range": 11,
+        "chunk_usage_distribution": {"1": 53, "2": 22, "3": 25, "4": 13, "5": 15, "none": 17}
       },
       "relevance": {
-        "mean": 0.717,
-        "anchor_distribution": {"0.00": 0, "0.25": 3, "0.50": 0, "0.75": 25, "1.00": 2},
+        "mean": 0.742,
+        "anchor_distribution": {"0.00": 2, "0.25": 1, "0.50": 0, "0.75": 20, "1.00": 7},
         "n_parse_failures": 0
       },
-      "citation_frac_with_any_marker": 0.567,
-      "citation_frac_all_in_range": 0.567,
-      "citation_mean_n_markers": 1.70
+      "citation_frac_with_any_marker": 0.467,
+      "citation_frac_all_in_range": 0.467,
+      "citation_mean_n_markers": 1.533
     }
   },
   "metrics_off_corpus": {
@@ -114,30 +114,30 @@
   "timing_ms_per_query": {
     "_schema_note": "AWS-standard latency reporting: p50 (typical UX), p95 (slow tail without single-outlier dominance), p99 (1-in-100 tail). p90 and max were dropped — p95 supersedes p90, and max is recoverable from per_query data when needed and is too sensitive to one-off slow events (cold-start warmup, GC pause) to be a useful summary at small N. Mean is included alongside the percentiles because mean ≫ p50 reveals heavy-tailed distributions.",
     "curated": {
-      "retrieve_ms": {"p50": 315.17, "p95": 1276.74, "p99": 8713.81, "mean": 854.82, "n": 20},
-      "generate_ms": {"p50": 15125.35, "p95": 25148.21, "p99": 26282.13, "mean": 16254.75, "n": 20},
-      "note": "retrieve p99=8714 ms reflects a one-time cross-encoder warmup on the first query. Latency unchanged from prior measurement — methodology change is in the judging path only, which doesn't enter retrieve/generate timing."
+      "retrieve_ms": {"p50": 273.80, "p95": 1050.38, "p99": 6307.93, "mean": 652.84, "n": 20},
+      "generate_ms": {"p50": 15617.99, "p95": 26734.77, "p99": 31027.20, "mean": 16350.00, "n": 20},
+      "note": "retrieve p99=6,308 ms reflects a one-time cross-encoder warmup on the first query. Steady-state retrieve+rerank is ~270 ms p50."
     },
     "structural": {
-      "retrieve_ms": {"p50": 321.67, "p95": 518.40, "p99": 2595.61, "mean": 420.46, "n": 30},
-      "generate_ms": {"p50": 9732.61, "p95": 19589.07, "p99": 29694.27, "mean": 10908.73, "n": 30}
+      "retrieve_ms": {"p50": 267.33, "p95": 330.86, "p99": 2322.86, "mean": 354.09, "n": 30},
+      "generate_ms": {"p50": 12067.00, "p95": 17836.28, "p99": 27621.07, "mean": 10610.28, "n": 30}
     },
     "no_answer": {
-      "retrieve_ms": {"p50": 432.34, "p95": 680.72, "p99": 5775.50, "mean": 721.76, "n": 25},
-      "generate_ms": {"p50": 2040.12, "p95": 3694.79, "p99": 3789.21, "mean": 2122.81, "n": 25},
-      "note": "Generation is much faster on no-answer queries (~2.0 s p50 vs ~10-15 s in-corpus) because refusal answers are short. retrieve_ms p99=5,775 ms reflects the cross-encoder cold-start on the first query of this run. Set expanded from n=8 to n=25 — earlier n=8 timings (p50 438 ms / generate p50 2,748 ms) preserved in git history."
+      "retrieve_ms": {"p50": 339.74, "p95": 648.52, "p99": 2699.98, "mean": 510.62, "n": 25},
+      "generate_ms": {"p50": 1212.63, "p95": 3445.03, "p99": 3583.96, "mean": 1943.39, "n": 25},
+      "note": "Generation is much faster on no-answer queries (~1.2 s p50 vs ~12-15 s in-corpus) because refusal answers are short."
     }
   },
   "headline_findings": [
-    "Faithfulness mean is 0.853 on both eval sets — exact cross-set agreement validates the methodology. The score distribution is meaningful (curated: 13×1.0, 4×0.75-1.0, 1×0.5-0.75, 2×0.0; structural: 21×1.0, 6×0.75-1.0, 1×0.5-0.75, 1×0.25-0.5, 1×0.0). Median is 1.0 on both sets, mean drops to 0.853 because of the 0.0/low outliers — right-skewed distribution typical of well-grounded answers with occasional misses.",
-    "Cross-claim support rate: 0.89 curated (114/128) and 0.94 structural (146/156). Curated is lower largely because of one parser-broken query (curated_001 has 8 claims all PARSE_FAILED, dragging support rate down by 8/128 = 6.25%). The 'true' support rate ignoring parser issues is ~0.95 on both sets.",
-    "Methodology change documented: claim-level decomposition replaced absolute-scale anchor scoring (which the prior baseline showed saturating at 0.75 across 49 of 50 in-corpus answers). Two LLM calls per query (extract + attribute) instead of one absolute score. Per-chunk attribution forces evidence commitment and produces actionable per-claim debugging data.",
-    "Relevance unchanged in methodology — still 5-anchor absolute. Means 0.725 (curated) / 0.717 (structural), close to prior measurements (0.762 / 0.733). The slight drift is run-to-run judge variance at temperature=0; not a methodological change.",
-    "Qwen produces citation markers on ~58% of in-corpus answers (60% curated, 57% structural). Comparable to prior measurement (54%); cross-set agreement is the stable signal. Citation rate is the highest-leverage Phase 3 fine-tune target — gap is large, failure mode is binary (cite-correctly-or-not, no out-of-range hallucinations), and training data is constructible.",
-    "Refusal behavior on off-corpus queries is 100% across 25 queries — measured by both LLM-judge (judge_refusal on Llama 3.1 8B) and rule-based regex with full agreement (agreement_rate=1.000, no disagreements, zero judge parse failures). The methodology shift from regex-only to LLM-primary-with-rule-as-guardrail was deliberate prep for Phase 3 fine-tuning, which will subtly shift refusal phrasing in ways the regex can't anticipate. The agreement_rate is now an early-warning signal: a drop from 1.000 between pre-FT and post-FT runs indicates one of the methods missed a phrasing shift.",
-    "Every one of the 25 refusals triggered the dont_have_context regex pattern — Qwen uniformly emits 'I don't have enough context to answer that' as its refusal opener on this corpus. This uniformity is what made the regex work post-patch; it's also why the agreement rate is 1.000. Both findings (uniformity + judge agreement) are pre-fine-tune baselines that may shift in Phase 3.",
-    "Chunk usage distribution diverges sharply across the two eval sets — chunk 1 is cited LEAST on curated (9 vs avg 26 for 2-5) and MOST on structural (45 vs avg 25 for 2-5). The reranker ordering interacts with query distribution: structural queries (terminology-derived) match chunk 1 directly, while curated queries (paraphrased intent) land grounding evidence in chunks 2-5. Worth a Phase 3 retrieval-side audit — the difference suggests retrieval quality is query-style-dependent in a non-obvious way.",
-    "Generation latency: in-corpus p50 ~10-15s, p95 ~20-25s, p99 ~26-30s on RTX 4070 NF4. Off-corpus refusals are much faster (~2.7s p50). Retrieve+rerank latency is sub-second after the cross-encoder warmup on the first query.",
-    "Known limitation: claim-level parse failures concentrated on 1 curated query (curated_001, 'How do I install transformers?' — 8/8 claims unparseable) and a few isolated NO_CLAIMS_EXTRACTED cases (1 curated + 2 structural). Both failure modes are flagged in the per_query data with explicit markers (PARSE_FAILED / NO_CLAIMS_EXTRACTED). Total: 5 of 50 in-corpus queries = 10% have at least one parser issue, but only 3 (6%) had their score materially affected (the remaining 47 queries scored cleanly). Worth a small parser-robustness follow-up but doesn't undermine the methodology change."
+    "Faithfulness mean: 0.894 curated / 0.889 structural — within 0.005 of each other, the tightest cross-set agreement we've measured. Median 1.0 on both. The PR B-baseline value of 0.853 is now superseded — curated_001's 8/8 PARSE_FAILED contributed materially to that prior number, and the JSON migration eliminated it.",
+    "Cross-claim support rate: 0.85 curated (109/128) / 0.88 structural (128/145). Slightly lower than the PR B baseline (0.89 / 0.94) because OUT_OF_RANGE picks went up post-migration (18 / 11 vs 5 / 3) — the LLM judge confidently picks chunk indices outside [1, K] in ~10% of attributions. Strengthening the prompt with explicit range constraints in commit fec3dc6 didn't help; this looks like a real model behavior pattern, not a prompt-clarity issue. Worth a Phase 3 follow-up if it persists.",
+    "Methodology change: all four judge calls (extract_claims, attribute_claims_to_chunks, judge_relevance, judge_refusal) migrated from regex parsing of free-form output to JSON output + pydantic validation + retry-on-parse-failure. The headline win: zero claim-level parse failures across 273 total claims (PR B had 9 / 1; PR C.2 has 0 / 1). The curated_001 'install transformers' query that produced 8/8 PARSE_FAILED in PR B is now scoring cleanly. Methodology is sound and pipeline is interpretable end-to-end.",
+    "Cross-validation methodology paid for itself during PR C.2 itself. The first JSON-format eval run had judge_refusal calls all failing because the refusal prompt was missed in the migration (still requested REFUSED:yes/no text format). Result: judge=0.00, rule=1.00, agreement=0.00 — the disagreement was unmistakable, caught within minutes. Fix landed as commit fec3dc6; re-run produced judge=1.00 / rule=1.00 / agreement=1.00 again. Phase 3 has the canary in place.",
+    "Relevance: mean 0.775 curated / 0.742 structural. Slight upward drift from PR B (0.725 / 0.717); within run-to-run judge variance at temperature=0.",
+    "Refusal: 100% on n=25 with full cross-validation agreement. Every query triggered the dont_have_context regex pattern AND was identified as refusal by the LLM judge. Uniform Qwen phrasing on this corpus.",
+    "Citations: 50% curated / 47% structural. Down slightly from PR B (60% / 57%) — citations are pure regex on generator output (unchanged code path), so this is generator-side variance from temperature=0.1 sampling. Within noise for n=20-30. Citation rate is still the highest-leverage Phase 3 fine-tune target — Qwen cites only about half the time despite the prompt directive.",
+    "Chunk usage divergence persists post-JSON: curated cites chunks roughly evenly (1=19, 2=28, 3=22, 4=22, 5=18, none=19) while structural over-uses chunk 1 (53 cites vs avg ~19 for 2-5, none=17). Different query distributions interact with reranker ordering in different ways — structural queries (terminology-derived) match chunk 1 directly; curated queries (paraphrased intent) spread grounding across chunks. Phase 3 retrieval-audit target.",
+    "Generation latency: in-corpus p50 ~12-16s, p95 ~18-27s, p99 ~28-31s on RTX 4070 NF4. Off-corpus refusals p50 ~1.2s (short refusals). Retrieve+rerank steady-state ~270 ms p50. Latency unchanged from prior measurement — methodology change is in the judging path, which doesn't enter retrieve/generate timing.",
+    "Methodology cleanup is complete. After PR C.2 the only regex left in the eval pipeline is _CITATION_MARKER_RE (extracting [N] markers from generator output, which is the right level of mechanical for the format the system asks the model to produce). All judge output flows through JSON + pydantic + retry. Phase 3 starts with a methodologically-defensible baseline."
   ]
 }

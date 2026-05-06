@@ -1,0 +1,1491 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-05-06T12:05:45+00:00",
+  "eval_set": "curated",
+  "eval_set_size": 20,
+  "limit_applied": null,
+  "config": {
+    "chunking_strategy": "recursive",
+    "chunks_total": 12601,
+    "generator_model": "Qwen/Qwen2.5-7B-Instruct",
+    "judge_model": "meta-llama/Meta-Llama-3.1-8B-Instruct",
+    "use_4bit_generator": true,
+    "use_4bit_judge": true,
+    "rerank_candidates": 20,
+    "top_k": 5,
+    "max_context_tokens": 3500,
+    "max_new_tokens_generator": 512,
+    "max_new_tokens_judge": 256
+  },
+  "aggregates": {
+    "faithfulness": {
+      "score": {
+        "n": 20,
+        "mean": 0.894,
+        "median": 1.0,
+        "stdev": 0.199,
+        "min": 0.333,
+        "max": 1.0,
+        "score_distribution": {
+          "0.0": 0,
+          "0.0-0.25": 0,
+          "0.25-0.5": 1,
+          "0.5-0.75": 2,
+          "0.75-1.0": 3,
+          "1.0": 14
+        }
+      },
+      "claims": {
+        "total_extracted": 128,
+        "total_supported": 109,
+        "support_rate": 0.852,
+        "mean_per_answer": 6.4,
+        "max_per_answer": 15,
+        "n_no_claims_extracted": 0,
+        "n_score_parse_failures": 0,
+        "n_claim_parse_failures": 0,
+        "n_claim_out_of_range": 18
+      },
+      "chunk_usage_distribution": {
+        "1": 19,
+        "3": 22,
+        "4": 22,
+        "none": 19,
+        "2": 28,
+        "5": 18
+      }
+    },
+    "relevance": {
+      "n": 20,
+      "mean": 0.775,
+      "median": 0.75,
+      "anchor_distribution": {
+        "0.00": 0,
+        "0.25": 0,
+        "0.50": 0,
+        "0.75": 18,
+        "1.00": 2
+      },
+      "n_parse_failures": 0
+    },
+    "citation_check": {
+      "n": 20,
+      "frac_with_any_marker": 0.5,
+      "frac_all_in_range": 0.5,
+      "mean_n_markers_in_text": 1.65
+    }
+  },
+  "timing_ms_per_query": {
+    "retrieve_ms": {
+      "p50": 273.8,
+      "p95": 1050.38,
+      "p99": 6307.93,
+      "mean": 652.84,
+      "n": 20
+    },
+    "assemble_ms": {
+      "p50": 0.02,
+      "p95": 0.03,
+      "p99": 0.03,
+      "mean": 0.02,
+      "n": 20
+    },
+    "generate_ms": {
+      "p50": 15617.99,
+      "p95": 26734.77,
+      "p99": 31027.2,
+      "mean": 16350.0,
+      "n": 20
+    }
+  },
+  "per_query": [
+    {
+      "query_id": "curated_001",
+      "query": "How do I install transformers?",
+      "answer_text": "To install transformers, you can use the following commands:\n\n```bash\npip install transformers[dev]\n```\n\nor for an editable install:\n\n```bash\npip install -e \".[dev]\"\n```\n\ninside the Transformers repo. If the dev install fails, ensure you have installed PyTorch first, then install the quality dependencies:\n\n```bash\npip install torch\npip install transformers[quality]\n```\n\nor for an editable install:\n\n```bash\npip install -e \".[quality]\"\n```\n\nFor an up-to-date version including additional libraries, use:\n\n```bash\npip install -U transformers datasets evaluate accelerate timm\n```\n\nAlternatively, you can clone the repository and perform an editable install:\n\n```bash\ngit clone https://github.com/huggingface/transformers.git\ncd transformers\npip install -e .\n```\n\nRemember to keep the local Transformers folder updated with the latest changes using:\n\n```bash\ncd ~/transformers/\ngit pull\n``` \n\n[1]",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 7622.323565883562,
+        "assemble_ms": 0.027142930775880814,
+        "generate_ms": 14023.12187012285
+      },
+      "citation_check": {
+        "n_markers_in_text": 1,
+        "n_resolved_citations": 1,
+        "all_markers_in_range": true,
+        "any_marker_present": true
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 0.3333333333333333,
+        "rationale": "5 of 15 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "pip install transformers[dev] installs the transformers library.",
+            "supporting_chunk_idx": 1,
+            "rationale": "The command installs the transformers library."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "pip install -e \".[dev]\"\" installs the transformers library in editable mode.",
+            "supporting_chunk_idx": 1,
+            "rationale": "The command installs the transformers library in editable mode."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "pip install torch installs the PyTorch library.",
+            "supporting_chunk_idx": 3,
+            "rationale": "The command installs the PyTorch library."
+          },
+          {
+            "claim_idx": 4,
+            "claim_text": "pip install transformers[quality] installs the transformers library with quality dependencies.",
+            "supporting_chunk_idx": 4,
+            "rationale": "The command installs the transformers library with quality dependencies."
+          },
+          {
+            "claim_idx": 5,
+            "claim_text": "pip install -e \".[quality]\"\" installs the transformers library with quality dependencies in editable mode.",
+            "supporting_chunk_idx": 4,
+            "rationale": "The command installs the transformers library with quality dependencies in editable mode."
+          },
+          {
+            "claim_idx": 6,
+            "claim_text": "pip install -U transformers updates the transformers library.",
+            "supporting_chunk_idx": null,
+            "rationale": "OUT_OF_RANGE: chunk 6 not in [1, 5]. The command updates the transformers library."
+          },
+          {
+            "claim_idx": 7,
+            "claim_text": "pip install -U datasets updates the datasets library.",
+            "supporting_chunk_idx": null,
+            "rationale": "OUT_OF_RANGE: chunk 7 not in [1, 5]. The command updates the datasets library."
+          },
+          {
+            "claim_idx": 8,
+            "claim_text": "pip install -U evaluate updates the evaluate library.",
+            "supporting_chunk_idx": null,
+            "rationale": "OUT_OF_RANGE: chunk 7 not in [1, 5]. The command updates the evaluate library."
+          },
+          {
+            "claim_idx": 9,
+            "claim_text": "pip install -U accelerate updates the accelerate library.",
+            "supporting_chunk_idx": null,
+            "rationale": "OUT_OF_RANGE: chunk 7 not in [1, 5]. The command updates the accelerate library."
+          },
+          {
+            "claim_idx": 10,
+            "claim_text": "pip install -U timm updates the timm library.",
+            "supporting_chunk_idx": null,
+            "rationale": "OUT_OF_RANGE: chunk 7 not in [1, 5]. The command updates the timm library."
+          },
+          {
+            "claim_idx": 11,
+            "claim_text": "git clone https://github.com/huggingface/transformers.git clones the transformers repository.",
+            "supporting_chunk_idx": null,
+            "rationale": "OUT_OF_RANGE: chunk 11 not in [1, 5]. The command clones the transformers repository."
+          },
+          {
+            "claim_idx": 12,
+            "claim_text": "cd transformers navigates to the transformers repository.",
+            "supporting_chunk_idx": null,
+            "rationale": "OUT_OF_RANGE: chunk 11 not in [1, 5]. The command navigates to the transformers repository."
+          },
+          {
+            "claim_idx": 13,
+            "claim_text": "pip install -e. installs the transformers library in editable mode from the cloned repository.",
+            "supporting_chunk_idx": null,
+            "rationale": "OUT_OF_RANGE: chunk 11 not in [1, 5]. The command installs the transformers library in editable mode from the cloned repository."
+          },
+          {
+            "claim_idx": 14,
+            "claim_text": "cd ~/transformers/ navigates to the local transformers folder.",
+            "supporting_chunk_idx": null,
+            "rationale": "OUT_OF_RANGE: chunk 14 not in [1, 5]. The command navigates to the local transformers folder."
+          },
+          {
+            "claim_idx": 15,
+            "claim_text": "git pull updates the local transformers folder with the latest changes.",
+            "supporting_chunk_idx": null,
+            "rationale": "OUT_OF_RANGE: chunk 14 not in [1, 5]. The command updates the local transformers folder with the latest changes."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses the question, but includes some extraneous content such as the command for installing additional libraries and the command for keeping the local repository updated, which are not directly related to the question.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "curated_002",
+      "query": "What are the different types of tokenizers?",
+      "answer_text": "Based on the provided context, there are several types of tokenizers mentioned:\n\n1. **PythonBackend**: A pure Python tokenizer that doesn't rely on external backends like Rust, SentencePiece, or mistral-common. It's suitable for very specialized tokenization needs [1].\n\n2. **SentencePiece**: A tokenization library that applies Byte Pair Encoding (BPE) or Unigram directly on raw text. It includes the space character, represented as `\"\u2581\"`, in its vocabulary [3].\n\n3. **Multimodal Tokenizer**: This type of tokenizer holds all relevant special tokens as attributes for easier access, especially useful for vision-language models where you might need to access specific tokens like `image_token_id` [2].\n\n4. **PreTrainedTokenizer and PreTrainedTokenizerFast**: These are classes that contain common methods for using all the tokenizers [4]. While not explicitly named as a type of tokenizer, they represent pre-trained versions of tokenizers that are commonly used in machine learning models.\n\nThese are the primary types of tokenizers discussed in the given context.",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 704.4856329448521,
+        "assemble_ms": 0.020518898963928223,
+        "generate_ms": 14587.315477896482
+      },
+      "citation_check": {
+        "n_markers_in_text": 4,
+        "n_resolved_citations": 4,
+        "all_markers_in_range": true,
+        "any_marker_present": true
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "8 of 8 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "There is a PythonBackend tokenizer.",
+            "supporting_chunk_idx": 1,
+            "rationale": "The PythonBackend is explicitly mentioned as a pure Python tokenizer."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "There is a SentencePiece tokenizer.",
+            "supporting_chunk_idx": 2,
+            "rationale": "SentencePiece is mentioned as a tokenization library."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "The SentencePiece tokenizer applies Byte Pair Encoding (BPE) or Unigram directly on raw text.",
+            "supporting_chunk_idx": 3,
+            "rationale": "SentencePiece is described as applying BPE or Unigram directly on raw text."
+          },
+          {
+            "claim_idx": 4,
+            "claim_text": "The SentencePiece tokenizer includes the space character in its vocabulary.",
+            "supporting_chunk_idx": 3,
+            "rationale": "SentencePiece is described as including the space character in its vocabulary."
+          },
+          {
+            "claim_idx": 5,
+            "claim_text": "There is a Multimodal Tokenizer.",
+            "supporting_chunk_idx": 2,
+            "rationale": "Multimodal Tokenizer is mentioned as holding all relevant special tokens as attributes."
+          },
+          {
+            "claim_idx": 6,
+            "claim_text": "The Multimodal Tokenizer holds all relevant special tokens as attributes.",
+            "supporting_chunk_idx": 2,
+            "rationale": "Multimodal Tokenizer is described as holding all relevant special tokens as attributes."
+          },
+          {
+            "claim_idx": 7,
+            "claim_text": "There are PreTrainedTokenizer and PreTrainedTokenizerFast classes.",
+            "supporting_chunk_idx": 4,
+            "rationale": "PreTrainedTokenizer and PreTrainedTokenizerFast classes are mentioned as implementing main methods for using all the tokenizers."
+          },
+          {
+            "claim_idx": 8,
+            "claim_text": "PreTrainedTokenizer and PreTrainedTokenizerFast classes contain common methods for using all the tokenizers.",
+            "supporting_chunk_idx": 4,
+            "rationale": "PreTrainedTokenizer and PreTrainedTokenizerFast classes are described as containing common methods for using all the tokenizers."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses the question by listing different types of tokenizers, but includes extraneous content such as specific tokenizer attributes and examples that are not essential to the question.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "curated_003",
+      "query": "How does the pipeline API work?",
+      "answer_text": "The Pipeline API in the context provided is used to perform inference with pretrained models across various tasks like text generation, image segmentation, automatic speech recognition, document question answering, etc. Here\u2019s how it works:\n\n1. **Creating a Pipeline Object**: You create a `Pipeline` object specifying the task you want to perform (e.g., `text-generation`). For example:\n   ```python\n   from transformers import pipeline\n   text_gen_pipeline = pipeline(task=\"text-generation\")\n   ```\n\n2. **Selecting a Task**: You can select a specific task when creating the `Pipeline` object. The task determines which model and preprocessing steps will be used.\n\n3. **Downloading and Caching Models**: By default, the `Pipeline` downloads and caches a default pretrained model for the selected task. You can specify a different model using the `model` parameter:\n   ```python\n   text_gen_pipeline = pipeline(task=\"text-generation\", model=\"google/gemma-2-2b\")\n   ```\n\n4. **Using Accelerators**: To speed up inference, you can use an `Accelerator` from the `accelerate` library to automatically detect and utilize available accelerators (like GPUs):\n   ```python\n   from accelerate import Accelerator\n   accelerator = Accelerator()\n   ```\n\n5. **Fine-Tuning**: The context mentions that there is a section on fine-tuning models, indicating that once you have a working pipeline, you can further train the model on custom data if needed.\n\n6. **Input and Output Handling**: Keeping inputs and outputs simple and JSON-serializable helps users interact with the pipeline easily. Supporting multiple input types (e.g., filenames, URLs, raw bytes) increases usability.\n\n7. **Performance Considerations**: Pipeline parallelism can improve performance by reducing idle GPU time, allowing concurrent processing of data across multiple GPUs.\n\nFor more details on available tasks and parameters, refer to the API reference for the `Pipeline` class [here](./main_classes/pipelines).",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 251.03023904375732,
+        "assemble_ms": 0.015533994883298874,
+        "generate_ms": 25614.322550827637
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "6 of 6 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "You can select a specific task when creating the Pipeline object.",
+            "supporting_chunk_idx": 1,
+            "rationale": "The API reference lists available tasks, and selecting a task is mentioned in the context of creating a Pipeline object."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "The Pipeline downloads and caches a default pretrained model for the selected task.",
+            "supporting_chunk_idx": 2,
+            "rationale": "The section on fine-tuning a model is not directly related to the claim, but the default behavior of downloading and caching a pretrained model is mentioned in the context of creating a Pipeline object."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "You can specify a different model using the model parameter.",
+            "supporting_chunk_idx": 3,
+            "rationale": "The example code snippet shows how to use a different model using the model parameter."
+          },
+          {
+            "claim_idx": 4,
+            "claim_text": "You can use an Accelerator from the accelerate library to automatically detect and utilize available accelerators.",
+            "supporting_chunk_idx": 4,
+            "rationale": "The section on creating a pipeline mentions the importance of keeping inputs and outputs simple and JSON-serializable."
+          },
+          {
+            "claim_idx": 5,
+            "claim_text": "Keeping inputs and outputs simple and JSON-serializable helps users interact with the pipeline easily.",
+            "supporting_chunk_idx": 5,
+            "rationale": "The section on pipeline parallelism explains how it reduces idle GPU time, improving performance."
+          },
+          {
+            "claim_idx": 6,
+            "claim_text": "Pipeline parallelism can improve performance by reducing idle GPU time.",
+            "supporting_chunk_idx": 5,
+            "rationale": "The section on pipeline parallelism explains how it reduces idle GPU time, improving performance."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses the question by explaining the pipeline API's workflow, but includes extraneous content such as performance considerations and input/output handling, which are not directly relevant to the question.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "curated_004",
+      "query": "What is gradient checkpointing and when should I use it?",
+      "answer_text": "Gradient checkpointing is a technique that reduces memory usage by only storing some of the intermediate activations during the backward pass and recomputing the remaining activations. This avoids storing all intermediate activations from the forward pass, which can be memory-intensive. However, this method comes with a trade-off; it increases the training time by about 20% [1][2].\n\nYou should consider using gradient checkpointing when you need to fit larger models on your GPU without running out of memory or when you want to increase the batch size for better performance [2]. It is particularly useful in scenarios where memory constraints limit the size of models you can train directly [1].",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 280.01410490833223,
+        "assemble_ms": 0.017375918105244637,
+        "generate_ms": 8405.397896189243
+      },
+      "citation_check": {
+        "n_markers_in_text": 4,
+        "n_resolved_citations": 2,
+        "all_markers_in_range": true,
+        "any_marker_present": true
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "5 of 5 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "Gradient checkpointing reduces memory usage by only storing some of the intermediate activations during the backward pass.",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 describes how gradient checkpointing reduces memory usage by storing only some intermediate activations."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "Gradient checkpointing increases the training time by about 20%.",
+            "supporting_chunk_idx": 3,
+            "rationale": "Chunk 3 explicitly states that gradient checkpointing comes at the cost of slower training speed (~20%)."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "Gradient checkpointing is useful when memory constraints limit the size of models you can train directly.",
+            "supporting_chunk_idx": 2,
+            "rationale": "Chunk 2 mentions that gradient checkpointing is useful for fitting larger models on the GPU without running out of memory."
+          },
+          {
+            "claim_idx": 4,
+            "claim_text": "You should consider using gradient checkpointing when you need to fit larger models on your GPU without running out of memory.",
+            "supporting_chunk_idx": 2,
+            "rationale": "Chunk 2 states that gradient checkpointing is useful for fitting larger models on the GPU without running out of memory."
+          },
+          {
+            "claim_idx": 5,
+            "claim_text": "Gradient checkpointing is useful when you want to increase the batch size for better performance.",
+            "supporting_chunk_idx": 2,
+            "rationale": "Chunk 2 mentions that gradient checkpointing is useful for increasing the batch size for better performance."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses the question, but includes some extraneous content (the trade-off of increased training time) and a reference to the potential for increased batch size, which is not directly related to the question.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "curated_005",
+      "query": "How do I use AutoModel to load a pretrained model?",
+      "answer_text": "To use `AutoModel` to load a pretrained model, you would call the `from_pretrained` method of `AutoModel`. Here is an example:\n\n```py\nfrom transformers import AutoModel\n\nmodel = AutoModel.from_pretrained(\"meta-llama/Llama-2-7b-hf\", dtype=\"auto\", device_map=\"auto\")\n```\n\nIn this example, `\"meta-llama/Llama-2-7b-hf\"` is the identifier for the pretrained model you want to load. The `dtype` and `device_map` parameters are optional and can be used to specify the data type and device map for the model, respectively [1].",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 279.8436388839036,
+        "assemble_ms": 0.01703319139778614,
+        "generate_ms": 9066.169189056382
+      },
+      "citation_check": {
+        "n_markers_in_text": 1,
+        "n_resolved_citations": 1,
+        "all_markers_in_range": true,
+        "any_marker_present": true
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "4 of 4 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "You would call the `from_pretrained` method of `AutoModel` to use it to load a pretrained model.",
+            "supporting_chunk_idx": 1,
+            "rationale": "The claim is supported by the description of the model classes."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "The `from_pretrained` method of `AutoModel` accepts a model name.",
+            "supporting_chunk_idx": 2,
+            "rationale": "The claim is supported by the description of the training process."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "The `dtype` parameter of `AutoModel.from_pretrained` is optional.",
+            "supporting_chunk_idx": 3,
+            "rationale": "The claim is supported by the description of loading weights."
+          },
+          {
+            "claim_idx": 4,
+            "claim_text": "The `device_map` parameter of `AutoModel.from_pretrained` is optional.",
+            "supporting_chunk_idx": 4,
+            "rationale": "The claim is supported by the description of the FastLanguageModel and its loading process."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 1.0,
+        "rationale": "The answer directly addresses the question, providing a clear example of how to use `AutoModel` to load a pretrained model, including the necessary method call and parameters.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "curated_006",
+      "query": "How do I fine-tune a model with Trainer?",
+      "answer_text": "To fine-tune a model with Trainer, follow these steps:\n\n1. Prepare your dataset, model, tokenizer, and data collator.\n2. Define a `compute_metrics` function if needed.\n3. Pass the training arguments along with the model, dataset, tokenizer, data collator, and `compute_metrics` function to the `Trainer`.\n4. Call `~Trainer.train` to finetune your model.\n\nFor more details and an in-depth example, refer to the corresponding PyTorch notebook available at the provided link [here](https://colab.research.google.com/github/huggingface/notebooks/blob/main/examples/audio_classification.ipynb) [N2].",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 343.92496990039945,
+        "assemble_ms": 0.01902109943330288,
+        "generate_ms": 9128.754819976166
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "4 of 4 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "You need to prepare your dataset, model, tokenizer, and data collator to fine-tune a model with Trainer.",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 provides the command to start training the model."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "You need to define a `compute_metrics` function if needed.",
+            "supporting_chunk_idx": 3,
+            "rationale": "Chunk 3 mentions that fine-tuning is identical to pretraining, implying the need for a compute_metrics function."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "You need to pass the training arguments along with the model, dataset, tokenizer, data collator, and `compute_metrics` function to the `Trainer`.",
+            "supporting_chunk_idx": 4,
+            "rationale": "Chunk 4 explicitly lists the required arguments to pass to the Trainer, including the model, dataset, tokenizer, data collator, and compute_metrics function."
+          },
+          {
+            "claim_idx": 4,
+            "claim_text": "You need to call `~Trainer.train` to fine-tune your model.",
+            "supporting_chunk_idx": 5,
+            "rationale": "Chunk 5 lists the required arguments to pass to the Trainer, including the model, dataset, tokenizer, data collator, and compute_metrics function."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses the question, providing a step-by-step guide on how to fine-tune a model with Trainer. However, it includes an extraneous link to a PyTorch notebook, which is not necessary to answer the question.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "curated_007",
+      "query": "How to train on multiple GPUs with data parallelism?",
+      "answer_text": "To train on multiple GPUs with data parallelism, the same setup is replicated multiple times, with each instance receiving a distinct data slice. Processing is done in parallel, and all setups are synchronized at the end of each training step. This method significantly reduces training time by processing data in parallel and scales to the number of GPUs available. However, synchronizing results from each GPU can add overhead.\n\nHere\u2019s a step-by-step breakdown of how data parallelism works:\n\n1. **Initialization**: The default GPU (e.g., `GPU 0`) reads a batch of data and sends a mini-batch of it to the other GPUs.\n2. **Model Replication**: An up-to-date model is replicated from `GPU 0` to the other GPUs.\n3. **Forward Pass**: A forward pass is performed on each GPU, and their outputs are sent to `GPU 0` to compute the loss.\n4. **Loss Distribution**: The loss is distributed from `GPU 0` to the other GPUs for the backward pass.\n5. **Gradient Aggregation**: Gradients from each GPU are sent back to `GPU 0` and averaged.\n\nFor more details, you can refer to the provided links [here](perf_train_gpu_many#dataparallel-vs-distributeddataparallel) and [here](perf_train_gpu_many#from-naive-model-parallelism-to-pipeline-parallelism).",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 275.14457888901234,
+        "assemble_ms": 0.01502898521721363,
+        "generate_ms": 17978.261552983895
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "9 of 9 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "The same setup is replicated multiple times for data parallelism.",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 describes data parallelism as a parallelism technique."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "Processing is done in parallel in data parallelism.",
+            "supporting_chunk_idx": 2,
+            "rationale": "Chunk 2 explains that data parallelism processes data in parallel."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "Synchronizing results from each GPU can add overhead.",
+            "supporting_chunk_idx": 2,
+            "rationale": "Chunk 2 mentions that synchronizing results from each GPU can add overhead."
+          },
+          {
+            "claim_idx": 4,
+            "claim_text": "A forward pass is performed on each GPU in data parallelism.",
+            "supporting_chunk_idx": 3,
+            "rationale": "Chunk 3 describes the process of a forward pass in data parallelism."
+          },
+          {
+            "claim_idx": 5,
+            "claim_text": "Gradients from each GPU are sent back to a central GPU and averaged in data parallelism.",
+            "supporting_chunk_idx": 3,
+            "rationale": "Chunk 3 explains that gradients from each GPU are sent back to the default GPU and averaged in data parallelism."
+          },
+          {
+            "claim_idx": 6,
+            "claim_text": "The default GPU reads a batch of data and sends a mini-batch of it to the other GPUs in data parallelism.",
+            "supporting_chunk_idx": 3,
+            "rationale": "Chunk 3 describes the process of the default GPU reading a batch of data and sending a mini-batch of it to the other GPUs in data parallelism."
+          },
+          {
+            "claim_idx": 7,
+            "claim_text": "An up-to-date model is replicated from the default GPU to the other GPUs in data parallelism.",
+            "supporting_chunk_idx": 3,
+            "rationale": "Chunk 3 explains that an up-to-date model is replicated from the default GPU to the other GPUs in data parallelism."
+          },
+          {
+            "claim_idx": 8,
+            "claim_text": "The loss is distributed from the default GPU to the other GPUs for the backward pass in data parallelism.",
+            "supporting_chunk_idx": 3,
+            "rationale": "Chunk 3 describes the process of the loss being distributed from the default GPU to the other GPUs for the backward pass in data parallelism."
+          },
+          {
+            "claim_idx": 9,
+            "claim_text": "Loss distribution and gradient aggregation are performed in data parallelism.",
+            "supporting_chunk_idx": 4,
+            "rationale": "Chunk 4 describes loss distribution and gradient aggregation in data parallelism."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses the question, but includes a step-by-step breakdown of data parallelism that is not directly requested, and provides links to additional information that is not necessary to answer the question.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "curated_008",
+      "query": "What is DeepSpeed and how do I use it with transformers?",
+      "answer_text": "DeepSpeed is an optimization library for training large models, supported by Zero Redundancy Optimizer (ZeRO), which helps manage GPU memory usage through various stages. It integrates well with the `Trainer` class in Transformers, automating much of the setup process. However, if you prefer not to use the `Trainer`, you can use the `HfDeepSpeedConfig` class to configure DeepSpeed manually.\n\nTo use DeepSpeed with Transformers, you need to install the `transformers[deepspeed]` package. Additionally, it is recommended to install DeepSpeed from source to ensure compatibility with your hardware and access additional features not available in the PyPI distribution. You should also refer to the DeepSpeed CUDA installation guide if you encounter issues during installation.\n\nHere\u2019s a brief example of how to use `HfDeepSpeedConfig`:\n\n```python\nfrom transformers import AutoModelForSequenceClassification, HfDeepSpeedConfig\n\nmodel = AutoModelForSequenceClassification.from_pretrained(\"bert-base-uncased\")\nds_config = HfDeepSpeedConfig()\nds_config.zero_optimization.stage = 2  # Set ZeRO stage\nmodel = model.to('cuda')\n```\n\nThis configuration sets up ZeRO-2 for the model, partitioning it across multiple GPUs. Make sure to instantiate `HfDeepSpeedConfig` before loading the model to enable efficient deployment of ZeRO-3.",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 265.08559798821807,
+        "assemble_ms": 0.03128591924905777,
+        "generate_ms": 18169.77605689317
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "6 of 6 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "DeepSpeed is an optimization library for training large models.",
+            "supporting_chunk_idx": 4,
+            "rationale": "ZeRO stages and GPU memory partitioning are mentioned in the context of large model training."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "DeepSpeed integrates well with the `Trainer` class in Transformers.",
+            "supporting_chunk_idx": 2,
+            "rationale": "The text explicitly states that DeepSpeed integrates with the `Trainer` class."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "You need to install the `transformers[deepspeed]` package to use DeepSpeed with Transformers.",
+            "supporting_chunk_idx": 3,
+            "rationale": "The `transformers[deepspeed]` package is mentioned in the context of installing DeepSpeed."
+          },
+          {
+            "claim_idx": 4,
+            "claim_text": "Installing DeepSpeed from source ensures compatibility with your hardware and access to additional features.",
+            "supporting_chunk_idx": 5,
+            "rationale": "The text explicitly states that installing DeepSpeed from source ensures compatibility and access to additional features."
+          },
+          {
+            "claim_idx": 5,
+            "claim_text": "You should refer to the DeepSpeed CUDA installation guide if you encounter issues during installation.",
+            "supporting_chunk_idx": 5,
+            "rationale": "The DeepSpeed CUDA installation guide is mentioned as a resource for troubleshooting installation issues."
+          },
+          {
+            "claim_idx": 6,
+            "claim_text": "Instantiating `HfDeepSpeedConfig` before loading the model enables efficient deployment of ZeRO-3.",
+            "supporting_chunk_idx": 2,
+            "rationale": "The text explicitly states that instantiating `HfDeepSpeedConfig` before loading the model enables efficient deployment of ZeRO-3."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer provides a clear explanation of how to use DeepSpeed with transformers, including a code example, but includes some extraneous content about installation and compatibility that is not directly related to the question.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "curated_009",
+      "query": "How do I customize the training loop with callbacks?",
+      "answer_text": "To customize the training loop with callbacks, you should subclass the `Trainer` class and override the methods you need. This allows you to change what the `Trainer` computes, rather than using callbacks which are read-only and can only return a `TrainerControl` object to control the flow. You can find examples of how to do this in the [Subclassing Trainer methods](./trainer_customize) guide.",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 272.4558338522911,
+        "assemble_ms": 0.01840991899371147,
+        "generate_ms": 5431.663203984499
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "1 of 1 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "You can subclass the `Trainer` class to customize the training loop.",
+            "supporting_chunk_idx": 2,
+            "rationale": "Subclassing Trainer allows for customizations that require changes in the training loop."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses the question, but includes extraneous content about the limitations of callbacks and a reference to a guide, which is not directly relevant to the question.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "curated_010",
+      "query": "How to do hyperparameter search?",
+      "answer_text": "To perform hyperparameter search, you need to set up a `model_init` function and call `~Trainer.hyperparameter_search`. You should specify the direction of optimization (minimize, maximize, or multiple objectives), choose a backend (Optuna, Weights & Biases, Ray Tune), define the hyperparameters to optimize, set the number of trials, and provide a compute objective function. Here\u2019s an example using Ray Tune:\n\n```python\nray_hp_space = {\n    'batch_size': tune.choice([16, 32, 64, 128]),\n}\n\nbest_trials = trainer.hyperparameter_search(\n    direction=[\"minimize\", \"maximize\"],\n    backend=\"ray\",\n    hp_space=ray_hp_space,\n    n_trials=20,\n    compute_objective=compute_objective,\n)\n```\n\nThis code snippet demonstrates setting up the hyperparameter space, specifying the optimization directions, choosing the Ray Tune backend, defining the number of trials, and providing a compute objective function. [N1] [N4] [N5]",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 254.599804058671,
+        "assemble_ms": 0.016006873920559883,
+        "generate_ms": 13758.189117070287
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 0.75,
+        "rationale": "6 of 8 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "You need to set up a `model_init` function to perform hyperparameter search.",
+            "supporting_chunk_idx": 1,
+            "rationale": "The guide explicitly mentions setting up a hyperparameter search for each backend."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "You should specify the direction of optimization (minimize, maximize, or multiple objectives).",
+            "supporting_chunk_idx": 2,
+            "rationale": "The guide mentions specifying the direction of optimization, which can be minimize, maximize, or multiple objectives."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "You can choose a backend (Optuna, Weights & Biases, Ray Tune) for hyperparameter search.",
+            "supporting_chunk_idx": 3,
+            "rationale": "The guide explicitly mentions calling `~Trainer.hyperparameter_search` to start the search."
+          },
+          {
+            "claim_idx": 4,
+            "claim_text": "You should define the hyperparameters to optimize.",
+            "supporting_chunk_idx": 4,
+            "rationale": "The guide mentions setting the backend, object containing hyperparameters, number of trials, and compute objective."
+          },
+          {
+            "claim_idx": 5,
+            "claim_text": "You should set the number of trials for hyperparameter search.",
+            "supporting_chunk_idx": 5,
+            "rationale": "The guide explicitly mentions defining the hyperparameters to optimize."
+          },
+          {
+            "claim_idx": 6,
+            "claim_text": "You should provide a compute objective function for hyperparameter search.",
+            "supporting_chunk_idx": 5,
+            "rationale": "The guide explicitly mentions setting the number of trials for hyperparameter search."
+          },
+          {
+            "claim_idx": 7,
+            "claim_text": "You can use Ray Tune as a backend for hyperparameter search.",
+            "supporting_chunk_idx": null,
+            "rationale": "OUT_OF_RANGE: chunk 7 not in [1, 5]. The guide mentions that several hyperparameter search backends are supported, including Ray Tune."
+          },
+          {
+            "claim_idx": 8,
+            "claim_text": "You can use `tune.choice` to define the hyperparameter space.",
+            "supporting_chunk_idx": null,
+            "rationale": "OUT_OF_RANGE: chunk 8 not in [1, 5]. The guide explicitly mentions using `tune.choice` to define the hyperparameter space."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses the question by providing a code snippet and explaining the necessary steps for hyperparameter search, but includes some extraneous content (the mention of the code snippet being an example and the reference numbers [N1] [N4] [N5]) that is not directly relevant to the question.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "curated_011",
+      "query": "How does text generation work in transformers?",
+      "answer_text": "Text generation in Transformers typically starts with the `~GenerationMixin.generate` API, which is used for generating text from models with generative capabilities [1]. The process can be influenced by various factors including the length of the generated text or the presence of an end-of-sequence (`EOS`) token [1].\n\nThe basic decoding methods include greedy search, among others, which are recommended as starting points for text generation tasks [2]. These methods form the foundation for generating text, though other decoding strategies may offer better quality depending on specific needs [2].\n\nTo optimize performance, especially for longer inputs, the key-value cache should be utilized. This cache is enabled by default in the text generation pipeline and the `generate` method in Transformers [3].\n\nFor real-time or streaming outputs, you can use the `TextStreamer` class along with the `streamer` parameter in the `generate` method to produce the output one word at a time [4, 5].\n\nFor a deeper understanding of different decoding strategies and their applications, refer to the provided resources and guides [2, 5].",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 242.19324113801122,
+        "assemble_ms": 0.01874193549156189,
+        "generate_ms": 13907.745988108218
+      },
+      "citation_check": {
+        "n_markers_in_text": 5,
+        "n_resolved_citations": 3,
+        "all_markers_in_range": true,
+        "any_marker_present": true
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "5 of 5 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "The process of text generation in Transformers can be influenced by the length of the generated text.",
+            "supporting_chunk_idx": 1,
+            "rationale": "The length of the generated text is a factor in the text generation process."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "The basic decoding methods in text generation include greedy search.",
+            "supporting_chunk_idx": 2,
+            "rationale": "Basic decoding methods in text generation include greedy search."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "The key-value cache is enabled by default in the text generation pipeline and the `generate` method in Transformers.",
+            "supporting_chunk_idx": 3,
+            "rationale": "The key-value cache is enabled by default in the text generation pipeline and the `generate` method."
+          },
+          {
+            "claim_idx": 4,
+            "claim_text": "The `TextStreamer` class can be used to produce real-time or streaming outputs.",
+            "supporting_chunk_idx": 5,
+            "rationale": "The `TextStreamer` class can be used to produce real-time or streaming outputs."
+          },
+          {
+            "claim_idx": 5,
+            "claim_text": "The `streamer` parameter in the `generate` method can be used to produce the output one word at a time.",
+            "supporting_chunk_idx": 5,
+            "rationale": "The `streamer` parameter in the `generate` method can be used to produce the output one word at a time."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses the question about text generation in transformers, but includes extraneous content such as specific methods and parameters, which are not essential to understanding the overall process.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "curated_012",
+      "query": "What are the different decoding strategies like beam search?",
+      "answer_text": "The different decoding strategies like beam search include:\n\n- **Greedy Search**: Generates the most likely output at each step without considering future tokens.\n- **Beam Search**: Keeps track of multiple generated sequences (beams) at each time step. After a certain number of steps, it selects the sequence with the highest overall probability. It can \"look ahead\" and pick a sequence with a higher probability overall even if the initial tokens have a lower probability. This makes it suitable for input-grounded tasks like image description or speech recognition [2].\n\nAdditionally, you can use `do_sample=True` with beam search to sample at each step, but beam search will still greedily prune out low probability sequences between steps [5].",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 242.58236400783062,
+        "assemble_ms": 0.02012704499065876,
+        "generate_ms": 9361.572717083618
+      },
+      "citation_check": {
+        "n_markers_in_text": 2,
+        "n_resolved_citations": 2,
+        "all_markers_in_range": true,
+        "any_marker_present": true
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "5 of 5 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "Greedy Search generates the most likely output at each step without considering future tokens.",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 describes the characteristics of greedy search."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "Beam Search keeps track of multiple generated sequences (beams) at each time step.",
+            "supporting_chunk_idx": 2,
+            "rationale": "Chunk 2 explains the process of beam search."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "Beam Search can 'look ahead' and pick a sequence with a higher probability overall even if the initial tokens have a lower probability.",
+            "supporting_chunk_idx": 2,
+            "rationale": "Chunk 2 describes the ability of beam search to 'look ahead'."
+          },
+          {
+            "claim_idx": 4,
+            "claim_text": "Beam Search is suitable for input-grounded tasks like image description or speech recognition.",
+            "supporting_chunk_idx": 5,
+            "rationale": "Chunk 5 mentions the suitability of beam search for input-grounded tasks."
+          },
+          {
+            "claim_idx": 5,
+            "claim_text": "You can use `do_sample=True` with beam search to sample at each step.",
+            "supporting_chunk_idx": 3,
+            "rationale": "Chunk 3 describes the use of `do_sample=True` with beam search."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses the question by listing different decoding strategies like beam search, but includes extraneous content such as a detailed explanation of beam search and a mention of a specific use case.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "curated_013",
+      "query": "How do I use chat templates?",
+      "answer_text": "To use chat templates, follow these steps:\n\n1. **Define the Template**: Create a Jinja2 template that combines system messages and loops through user and assistant messages, assigning appropriate roles such as `<|user|>` and `<|assistant|>`.\n\n2. **Load the Template**: Load the written template as a string and assign it to the tokenizer's `chat_template` attribute.\n\n3. **Apply the Template**: Use the `apply_chat_template` method provided by the tokenizer to convert chat messages into a formatted string suitable for the model. This method is available in `transformers>=4.49.0`.\n\n4. **Avoid Duplicates**: When formatting text with `apply_chat_template(tokenize=False)`, ensure you set `add_special_tokens=False` if you plan to tokenize the text later. This prevents the duplication of special tokens like `<bos>` and `<eos>`, which can hurt model performance.\n\nFor example, you might define a template like this:\n\n```python\ntemplate = \"\"\"\nSystem Message: {{ system_message }}\n{% for message in messages %}\n{{ message['role'] }}: {{ message['content'] }}\n{% endfor %}\n\"\"\"\n```\n\nThen, apply it to your messages:\n\n```python\nmessages = [\n    {\"role\": \"system\", \"content\": \"I'd like to show off how chat templating works!\"},\n    # Add more messages here...\n]\n\ntokenizer.chat_template = template\nformatted_text = tokenizer.apply_chat_template(messages, tokenize=False, add_special_tokens=False)\n```\n\nThis process ensures that your chat messages are properly formatted according to the defined template before being passed to the model. [1][2][3][4][5]",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 237.32809792272747,
+        "assemble_ms": 0.018547987565398216,
+        "generate_ms": 21426.52179580182
+      },
+      "citation_check": {
+        "n_markers_in_text": 5,
+        "n_resolved_citations": 5,
+        "all_markers_in_range": true,
+        "any_marker_present": true
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 0.5,
+        "rationale": "2 of 4 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "You can use Jinja2 to define a chat template.",
+            "supporting_chunk_idx": 1,
+            "rationale": "Jinja2 templates are used in frameworks like Hugging Face's Transformers for chat templating."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "The `apply_chat_template` method is available in `transformers>=4.49.0`.",
+            "supporting_chunk_idx": 4,
+            "rationale": "The `apply_chat_template` method is available in the processor, and in `transformers>=4.49.0` it can also return a vectorized output."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "Setting `add_special_tokens=False` when formatting text with `apply_chat_template(tokenize=False)` prevents the duplication of special tokens.",
+            "supporting_chunk_idx": null,
+            "rationale": "OUT_OF_RANGE: chunk 6 not in [1, 5]. When formatting text with `apply_chat_template(tokenize=False)`, setting `add_special_tokens=False` prevents the duplication of special tokens."
+          },
+          {
+            "claim_idx": 4,
+            "claim_text": "You can use `tokenize=False` with `apply_chat_template` to avoid tokenization.",
+            "supporting_chunk_idx": null,
+            "rationale": "OUT_OF_RANGE: chunk 7 not in [1, 5]. The `tokenize=False` argument can be used with `apply_chat_template` to avoid tokenization."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses the question, but includes extraneous content such as the example code and references, which are not necessary to answer the question.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "curated_014",
+      "query": "How to optimize inference on GPU?",
+      "answer_text": "To optimize inference on GPU, consider the following strategies:\n\n1. **Specialized Architectures**: Design models specifically for autoregressive text generation tasks to improve efficiency [1].\n\n2. **Batch Inference**: \n   - Use batch inference if your sequence length is regular and push the batch size until you encounter an out-of-memory (OOM) error [2]. Larger GPUs benefit more from batch inference.\n   - Avoid batching if you are using a CPU or if you do not know the sequence length of your data. Instead, measure performance incrementally and include OOM checks to recover from failures [2].\n   - Ensure you can handle OOM errors if you opt for batch inference [2].\n\n3. **Quantization**: If GPU memory is not a constraint, you may not need to apply quantization techniques. However, for many GPUs, quantization is necessary. 4-bit and 8-bit quantization schemes are particularly useful [3].\n\n4. **Memory Management**: Regularly clear models and flush memory to manage GPU resources efficiently. For instance, you can delete the model and pipeline objects and flush the memory using Python commands like `del model`, `del pipe`, and `flush()` [5].\n\nBy implementing these strategies, you can enhance the efficiency of inference on GPUs while balancing accuracy and inference time.",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 276.34949097409844,
+        "assemble_ms": 0.015967991203069687,
+        "generate_ms": 16843.92858389765
+      },
+      "citation_check": {
+        "n_markers_in_text": 6,
+        "n_resolved_citations": 4,
+        "all_markers_in_range": true,
+        "any_marker_present": true
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 0.5714285714285714,
+        "rationale": "4 of 7 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "Design models specifically for autoregressive text generation tasks to improve efficiency.",
+            "supporting_chunk_idx": 1,
+            "rationale": "Specialized model architectures have been proposed for efficient autoregressive text generation."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "Use batch inference if your sequence length is regular and push the batch size until you encounter an out-of-memory (OOM) error.",
+            "supporting_chunk_idx": 5,
+            "rationale": "Batch inference is helpful when the sequence length is regular and the GPU is large."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "Avoid batching if you are using a CPU or if you do not know the sequence length of your data.",
+            "supporting_chunk_idx": 3,
+            "rationale": "Batching is not recommended for CPUs or unknown sequence lengths."
+          },
+          {
+            "claim_idx": 4,
+            "claim_text": "Ensure you can handle OOM errors if you opt for batch inference.",
+            "supporting_chunk_idx": null,
+            "rationale": "OUT_OF_RANGE: chunk 6 not in [1, 5]. OOM errors can be handled by ensuring the ability to recover from failures."
+          },
+          {
+            "claim_idx": 5,
+            "claim_text": "Apply 4-bit and 8-bit quantization schemes for many GPUs.",
+            "supporting_chunk_idx": 4,
+            "rationale": "4-bit and 8-bit quantization schemes are useful tools for many GPUs."
+          },
+          {
+            "claim_idx": 6,
+            "claim_text": "Regularly clear models and flush memory to manage GPU resources efficiently.",
+            "supporting_chunk_idx": null,
+            "rationale": "OUT_OF_RANGE: chunk 7 not in [1, 5]. Regularly clearing models and flushing memory helps manage GPU resources efficiently."
+          },
+          {
+            "claim_idx": 7,
+            "claim_text": "Delete the model and pipeline objects and flush the memory using Python commands like `del model`, `del pipe`, and `flush()`",
+            "supporting_chunk_idx": null,
+            "rationale": "OUT_OF_RANGE: chunk 8 not in [1, 5]. Deleting model and pipeline objects and flushing memory using Python commands is a good practice for GPU resource management."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer provides several strategies to optimize inference on GPU, but includes some extraneous content (e.g., the statement that quantization may not be necessary if GPU memory is not a constraint) and does not directly address the question in a concise manner.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "curated_015",
+      "query": "How to reduce memory usage during training?",
+      "answer_text": "To reduce memory usage during training, you can try the following methods:\n\n- Decrease the `per_device_train_batch_size` value in `TrainingArguments`.\n- Use `gradient_accumulation_steps` in `TrainingArguments` to effectively increase the overall batch size.\n- Employ optimizers like Adafactor, which store a weighted average of a row or column instead of each element in the matrix, thus reducing memory requirements at the cost of slower convergence.\n- Utilize an 8-bit AdamW optimizer from the `bitsandbytes` library to quantize optimizer states, storing them in lower precision and dequantizing them before use.\n- Enable the Liger Kernel for training by setting `use_liger_kernel=True` in `TrainingArguments`. This patches the corresponding layers in the model with Liger kernels, increasing multi-GPU training throughput and reducing memory usage.\n- If you encounter a CUDA \"out-of-memory\" error, reduce the `per_device_train_batch_size` incrementally by factors of 2 and increase `gradient_accumulation_steps` by 2x to compensate.\n\nAdditionally, adjusting the `allgather_bucket_size` and `reduce_bucket_size` parameters can help balance available GPU memory against communication speed, though this may slightly impact training time. [1, 2, 3]",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 283.08194084092975,
+        "assemble_ms": 0.018180115148425102,
+        "generate_ms": 16648.66675110534
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "7 of 7 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "Decrease the `per_device_train_batch_size` value in `TrainingArguments`.",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 lists potential solutions to lessen memory use, including reducing per_device_train_batch_size."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "Use `gradient_accumulation_steps` in `TrainingArguments` to effectively increase the overall batch size.",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 lists potential solutions to lessen memory use, including using gradient_accumulation_steps."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "Employ optimizers like Adafactor, which store a weighted average of a row or column instead of each element in the matrix.",
+            "supporting_chunk_idx": 3,
+            "rationale": "Chunk 3 states that using Liger Kernel can increase multi-GPU training throughput and reduce memory usage."
+          },
+          {
+            "claim_idx": 4,
+            "claim_text": "Utilize an 8-bit AdamW optimizer from the `bitsandbytes` library to quantize optimizer states.",
+            "supporting_chunk_idx": 2,
+            "rationale": "Chunk 2 mentions Adafactor, which can significantly reduce memory requirements by storing a weighted average of a row or column."
+          },
+          {
+            "claim_idx": 5,
+            "claim_text": "Enable the Liger Kernel for training by setting `use_liger_kernel=True` in `TrainingArguments`.",
+            "supporting_chunk_idx": 2,
+            "rationale": "Chunk 2 provides an example of using an 8-bit AdamW optimizer from bitsandbytes to quantize optimizer states."
+          },
+          {
+            "claim_idx": 6,
+            "claim_text": "Reduce the `per_device_train_batch_size` incrementally by factors of 2.",
+            "supporting_chunk_idx": 4,
+            "rationale": "Chunk 4 suggests reducing per_device_train_batch_size incrementally by factors of 2 to prevent an out-of-memory error."
+          },
+          {
+            "claim_idx": 7,
+            "claim_text": "Increase `gradient_accumulation_steps` by 2x to compensate for reduced batch size.",
+            "supporting_chunk_idx": 4,
+            "rationale": "Chunk 4 suggests increasing gradient_accumulation_steps by 2x to compensate for reduced batch size and prevent an out-of-memory error."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses the question by providing several methods to reduce memory usage during training, but includes some extraneous content (the last sentence about adjusting `allgather_bucket_size` and `reduce_bucket_size`) and a reference to external sources.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "curated_016",
+      "query": "How to train on CPU efficiently?",
+      "answer_text": "To train on CPU efficiently, you can use mixed precision training with fp16 or bf16 data types, which is supported by the `Trainer` in PyTorch as shown in context [2]. Additionally, you can utilize distributed training across multiple CPUs to speed up the process [1]. For managing memory usage, especially with large models, you can employ DeepSpeed techniques such as offloading optimizer states, gradients, and parameters to the CPU [3]. This can be done by providing a configuration file or using example templates with the `Trainer`. \n\nFor handling potential out-of-memory issues, you can adjust the batch size and gradient accumulation steps. If automatic batch size configuration is chosen, `Trainer` will set `train_micro_batch_size_per_gpu` and `train_batch_size` based on the `world_size`, `per_device_train_batch_size`, and `gradient_accumulation_steps` [5].",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 211.8136161006987,
+        "assemble_ms": 0.018257182091474533,
+        "generate_ms": 11657.529963180423
+      },
+      "citation_check": {
+        "n_markers_in_text": 4,
+        "n_resolved_citations": 4,
+        "all_markers_in_range": true,
+        "any_marker_present": true
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "5 of 5 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "Mixed precision training with fp16 or bf16 data types is supported by the `Trainer` in PyTorch.",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 describes how to perform distributed training with multiple CPUs using a DDP strategy."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "Distributed training across multiple CPUs can speed up the process.",
+            "supporting_chunk_idx": 2,
+            "rationale": "Chunk 2 mentions AMP training with CPU and the use of bf16 data types."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "DeepSpeed techniques can be used to offload optimizer states, gradients, and parameters to the CPU.",
+            "supporting_chunk_idx": 3,
+            "rationale": "Chunk 3 describes ZeRO stages, which offload optimizer memory and computations from the GPU to the CPU."
+          },
+          {
+            "claim_idx": 4,
+            "claim_text": "Automatic batch size configuration can be used to handle potential out-of-memory issues.",
+            "supporting_chunk_idx": 4,
+            "rationale": "Chunk 4 provides a solution to handle potential out-of-memory issues by reducing batch size and increasing gradient accumulation steps."
+          },
+          {
+            "claim_idx": 5,
+            "claim_text": "The `Trainer` can set `train_micro_batch_size_per_gpu` and `train_batch_size` based on `world_size`, `per_device_train_batch_size`, and `gradient_accumulation_steps`.",
+            "supporting_chunk_idx": 5,
+            "rationale": "Chunk 5 explains how the Trainer can automatically configure batch size based on world size, per-device train batch size, and gradient accumulation steps."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 1.0,
+        "rationale": "The answer directly addresses the question by providing specific techniques and tools to train on CPU efficiently, including mixed precision training, distributed training, and DeepSpeed techniques.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "curated_017",
+      "query": "How do I add a new model to transformers?",
+      "answer_text": "To add a new model to Transformers, follow these steps:\n\n1. Open an issue on the [GitHub issue tracker](https://github.com/huggingface/transformers/issues/new?assignees=&labels=New+model&projects=&template=new-model-addition.yml) to request adding a specific model. Include the following information:\n   - A short description of the model and a link to the paper.\n   - A link to the implementation if it is open-sourced.\n   - A link to the model weights if they are available.\n\n2. If you are willing to contribute the model yourself, let us know so we can assist you in adding it to \ud83e\udd17 Transformers.\n\n3. If the model becomes very popular, it might be integrated into Transformers to provide better support (documentation, maintenance, optimization, etc.).\n\n4. Use the [technical guide](https://huggingface.co/docs/transformers/modular_transformers) for adding a model to \ud83e\udd17 Transformers.\n\n5. You can also check if someone else has already requested the addition of the model by filtering issues with the [New model](https://github.com/huggingface/transformers/labels/New%20model) label on GitHub.\n\n6. For detailed instructions on how to add a model, refer to the general contribution guidelines for new models [here](./contributing#do-you-want-to-implement-a-new-model).",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 194.09593800082803,
+        "assemble_ms": 0.017144018784165382,
+        "generate_ms": 17958.274740027264
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "6 of 6 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "You can add a new model to Transformers by opening an issue on the GitHub issue tracker.",
+            "supporting_chunk_idx": 2,
+            "rationale": "The process of adding a model is described in the second chunk."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "Include a short description of the model and a link to the paper when requesting its addition.",
+            "supporting_chunk_idx": 2,
+            "rationale": "The second chunk specifies the required information for a new model request."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "Include a link to the implementation if the model is open-sourced.",
+            "supporting_chunk_idx": 2,
+            "rationale": "The second chunk mentions the required information for a new model request."
+          },
+          {
+            "claim_idx": 4,
+            "claim_text": "Include a link to the model weights if they are available.",
+            "supporting_chunk_idx": 2,
+            "rationale": "The second chunk specifies the required information for a new model request."
+          },
+          {
+            "claim_idx": 5,
+            "claim_text": "You can check if someone else has already requested the addition of the model by filtering issues with the New model label on GitHub.",
+            "supporting_chunk_idx": 5,
+            "rationale": "The fifth chunk provides instructions on how to check if someone else has already requested the model."
+          },
+          {
+            "claim_idx": 6,
+            "claim_text": "For detailed instructions on how to add a model, refer to the general contribution guidelines for new models.",
+            "supporting_chunk_idx": 5,
+            "rationale": "The fifth chunk mentions the general contribution guidelines for new models, which provide detailed instructions on how to add a model."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer provides a step-by-step guide on how to add a new model to transformers, but includes some extraneous content such as the possibility of the model being integrated into transformers and the link to the technical guide, which is not directly related to the question.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "curated_018",
+      "query": "What is GGUF and how to use quantized models?",
+      "answer_text": "GGUF stands for General Game Format Unified, which is a file format used for storing quantized weights of neural networks. It supports various quantization types to save memory, making it possible to perform inference with large models like Whisper and Llama on local and edge devices [1].\n\nTo use quantized models, you can follow these steps:\n\n1. **Quantize the Model**: You can quantize the model on any device (e.g., CPU) and then load it on another device (e.g., CUDA or XPU). Here\u2019s an example of quantizing a model on the CPU and loading it on CUDA or XPU:\n\n   ```python\n   import torch\n   from transformers import TorchAoConfig, AutoModelForCausalLM, AutoTokenizer\n   from torchao.quantization import Int8WeightOnlyConfig\n\n   # Quantize the model on CPU\n   config = Int8WeightOnlyConfig()\n   model = AutoModelForCausalLM.from_pretrained(\"your-model-name\")\n   quantized_model = torchao.quantize(model, config)\n\n   # Load the quantized model on CUDA or XPU\n   quantized_model.to('cuda')\n   ```\n\n2. **Load Pre-Quantized Models**: If you have a pre-quantized model, you can directly load it without further quantization. For instance, you can use the `serve-cli` to load a pre-quantized model from the Hugging Face Model Hub:\n\n   ```sh\n   curl http://localhost:8000/v1/responses \\\n     -H \"Content-Type: application/json\" \\\n     -d '{\n       \"model\": \"Qwen/Qwen3-8B-GGUF\",\n       \"stream\": true,\n       \"input\": \"Tell me a three sentence bedtime story about a unicorn.\"\n     }'\n   ```\n\nIn summary, GGUF is a file format for storing quantized weights, and you can use quantized models by either quantizing them yourself or loading pre-quantized models directly [1, 4, 5].",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 239.155154209584,
+        "assemble_ms": 0.015615951269865036,
+        "generate_ms": 26452.374147018418
+      },
+      "citation_check": {
+        "n_markers_in_text": 1,
+        "n_resolved_citations": 1,
+        "all_markers_in_range": true,
+        "any_marker_present": true
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 0.8888888888888888,
+        "rationale": "8 of 9 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "GGUF stands for General Game Format Unified.",
+            "supporting_chunk_idx": 1,
+            "rationale": "The name GGUF is mentioned in the first chunk."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "GGUF is a file format used for storing quantized weights of neural networks.",
+            "supporting_chunk_idx": 4,
+            "rationale": "The fourth chunk mentions that GGUF supports pre-quantized models."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "GGUF supports various quantization types to save memory.",
+            "supporting_chunk_idx": 3,
+            "rationale": "The third chunk mentions that GGUF supports many quantized data types."
+          },
+          {
+            "claim_idx": 4,
+            "claim_text": "Whisper and Llama are examples of large models that can be used with GGUF.",
+            "supporting_chunk_idx": 4,
+            "rationale": "The fourth chunk mentions that GGUF supports pre-quantized models."
+          },
+          {
+            "claim_idx": 5,
+            "claim_text": "You can quantize a model on any device and then load it on another device.",
+            "supporting_chunk_idx": 4,
+            "rationale": "The fourth chunk mentions that GGUF supports pre-quantized models."
+          },
+          {
+            "claim_idx": 6,
+            "claim_text": "The `torchao.quantize` function can be used to quantize a model.",
+            "supporting_chunk_idx": null,
+            "rationale": "There is no mention of the `torchao.quantize` function in the provided chunks."
+          },
+          {
+            "claim_idx": 7,
+            "claim_text": "The `serve-cli` can be used to load a pre-quantized model from the Hugging Face Model Hub.",
+            "supporting_chunk_idx": 5,
+            "rationale": "The fifth chunk mentions the `serve-cli` command, which can be used to load a pre-quantized model."
+          },
+          {
+            "claim_idx": 8,
+            "claim_text": "Pre-quantized models can be loaded directly without further quantization.",
+            "supporting_chunk_idx": 4,
+            "rationale": "The fourth chunk mentions that pre-quantized models can be loaded directly."
+          },
+          {
+            "claim_idx": 9,
+            "claim_text": "GGUF is used to save memory for performing inference with large models on local and edge devices.",
+            "supporting_chunk_idx": 1,
+            "rationale": "The first chunk mentions that GGUF is used to save memory for performing inference with large models on local and edge devices."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses the question about GGUF and how to use quantized models, but includes some extraneous content such as the example code and the summary at the end, which are not directly relevant to the question.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "curated_019",
+      "query": "How to use PEFT and LoRA with transformers?",
+      "answer_text": "To use PEFT and LoRA with transformers, you first need to install the PEFT library by running:\n\n```shell\npip install -U peft\n```\n\nThen, you can integrate PEFT into your transformer model using the `~integrations.PeftAdapterMixin`. Here's how you can do it:\n\n1. **Create a PEFT configuration**: For example, you can create a LoRA configuration.\n   ```python\n   from peft import LoraConfig, TaskType\n\n   lora_config = LoraConfig(r=8, lora_alpha=32, task_type=TaskType.CAUSAL_LM)\n   ```\n\n2. **Attach the configuration to the model**: Use the `add_adapter` method to add the LoRA adapter to your model.\n   ```python\n   from transformers import AutoModelForCausalLM\n\n   model = AutoModelForCausalLM.from_pretrained(\"google/gemma-2-2b\")\n   model.add_adapter(lora_config, adapter_name=\"lora_adapter\")\n   ```\n\n3. **Activate the specific adapter**: Use the `set_adapter` method to enable a particular adapter.\n   ```python\n   model.set_adapter(\"lora_adapter\")\n   ```\n\n4. **Manage multiple adapters**: If you want to work with multiple adapters, you can add them with unique names and switch between them as needed.\n   ```python\n   model.add_adapter(LoraConfig(r=16, lora_alpha=64, task_type=TaskType.CAUSAL_LM), adapter_name=\"lora_adapter_2\")\n   model.set_adapter(\"lora_adapter_2\")\n   ```\n\nRemember, PEFT supports various non-prompt-learning methods such as LoRA, IA3, and AdaLoRA, but prompt-based methods like prompt tuning are not supported because they cannot be injected into a torch module [1, 2].",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 289.8532070685178,
+        "assemble_ms": 0.014737946912646294,
+        "generate_ms": 24480.134590994567
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "8 of 8 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "PEFT can be installed by running `pip install -U peft`.",
+            "supporting_chunk_idx": 3,
+            "rationale": "The installation command is provided in the installation section."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "PEFT can be integrated into a transformer model using `~integrations.PeftAdapterMixin`.",
+            "supporting_chunk_idx": 2,
+            "rationale": "The integration mixin is described in the PEFT section."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "LoRA configuration can be created using `LoraConfig(r=8, lora_alpha=32, task_type=TaskType.CAUSAL_LM)`.",
+            "supporting_chunk_idx": 4,
+            "rationale": "The LoRA configuration example is provided in the adding an adapter section."
+          },
+          {
+            "claim_idx": 4,
+            "claim_text": "The `add_adapter` method can be used to add a LoRA adapter to a model.",
+            "supporting_chunk_idx": 4,
+            "rationale": "The `add_adapter` method is described in the adding an adapter section."
+          },
+          {
+            "claim_idx": 5,
+            "claim_text": "The `set_adapter` method can be used to enable a particular adapter.",
+            "supporting_chunk_idx": 5,
+            "rationale": "The `set_adapter` method is described in the managing multiple adapters section."
+          },
+          {
+            "claim_idx": 6,
+            "claim_text": "Multiple adapters can be added with unique names and switched between as needed.",
+            "supporting_chunk_idx": 5,
+            "rationale": "The managing multiple adapters section describes adding and switching between adapters."
+          },
+          {
+            "claim_idx": 7,
+            "claim_text": "PEFT supports various non-prompt-learning methods such as LoRA, IA3, and AdaLoRA.",
+            "supporting_chunk_idx": 2,
+            "rationale": "The PEFT section lists supported non-prompt-learning methods."
+          },
+          {
+            "claim_idx": 8,
+            "claim_text": "Prompt-based methods like prompt tuning are not supported in PEFT because they cannot be injected into a torch module.",
+            "supporting_chunk_idx": 2,
+            "rationale": "The PEFT section explains why prompt-based methods are not supported."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses how to use PEFT and LoRA with transformers, but includes some extraneous content about unsupported methods.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "curated_020",
+      "query": "How do I create a custom tokenizer?",
+      "answer_text": "To create a custom tokenizer, you can follow these steps:\n\n1. **Initialize an Empty Tokenizer**: You can start with an empty tokenizer which supports custom vocabularies using the `vocab` and `merges` arguments. For example, you can define a dictionary for `vocab` where keys are tokens and values are their corresponding input IDs. The `merges` argument defines how the Byte Pair Encoding (BPE) algorithm should combine adjacent tokens.\n\n2. **Define Special Tokens**: If needed, you can add extra special tokens to the tokenizer. These tokens are not necessarily related to any specific modality but are useful for the model. You would add them to the tokenizer object and save it.\n\n3. **Customize Tokenization Pipeline**: If the default tokenization pipeline does not meet your needs, you can subclass the `TokenizersBackend` and define your own tokenization pipeline in the `__init__` method. This involves specifying the tokenization algorithm, pre-tokenization steps, and decoding process.\n\n4. **Subclass DataCollator**: For handling batches of data, you might need to customize the `DataCollatorWithPadding` by subclassing it and extending its `__call__` method to include additional fields or modifications as needed.\n\nHere is a simplified example based on the provided context:\n\n```python\nfrom transformers import GemmaTokenizer\n\n# Step 1: Initialize an empty tokenizer with custom vocabulary\nvocab = {\n    \"<pad>\": 0,\n    \"</s>\": 1,\n    \"<s>\": 2,\n    \"<unk>\": 3,\n    \"<mask>\": 4,\n    \"\u2581the\": 5,\n    \"\u2581stock\": 6,\n    \"\u2581market\": 7,\n    \"\u2581\": 8,\n    \"r\": 9,\n    \"a\": 10,\n    \"l\": 11,\n    \"i\": 12,\n    \"e\": 13,\n    \"d\": 14\n}\ntokenizer = GemmaTokenizer(vocab=vocab, merges=None)\n\n# Step 2: Add extra special tokens\ntokenizer.add_special_tokens({'additional_special_tokens': ['[CUSTOM_TOKEN]']})\n\n# Step 3: Customize tokenization pipeline if necessary\n# This step would involve subclassing TokenizersBackend and defining the tokenization pipeline\n```\n\nThis example demonstrates initializing a tokenizer with a custom vocabulary and adding extra special tokens. For more complex customizations, you would need to delve",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 291.52856511063874,
+        "assemble_ms": 0.024270033463835716,
+        "generate_ms": 32100.307028042153
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 0.8333333333333334,
+        "rationale": "5 of 6 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "You can start with an empty tokenizer which supports custom vocabularies using the `vocab` and `merges` arguments.",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 describes how to initialize an empty tokenizer for training or create one directly with your own vocabulary."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "The `merges` argument defines how the Byte Pair Encoding (BPE) algorithm should combine adjacent tokens.",
+            "supporting_chunk_idx": 2,
+            "rationale": "Chunk 2 explains that a tokenizer can't produce on its own, implying the need for custom vocabularies."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "You can add extra special tokens to the tokenizer.",
+            "supporting_chunk_idx": 3,
+            "rationale": "Chunk 3 shows how to add extra special tokens to the tokenizer."
+          },
+          {
+            "claim_idx": 4,
+            "claim_text": "You can subclass the `TokenizersBackend` and define your own tokenization pipeline in the `__init__` method.",
+            "supporting_chunk_idx": 4,
+            "rationale": "Chunk 4 provides the code to obtain the special image token used as a placeholder."
+          },
+          {
+            "claim_idx": 5,
+            "claim_text": "You might need to customize the `DataCollatorWithPadding` by subclassing it and extending its `__call__` method.",
+            "supporting_chunk_idx": 5,
+            "rationale": "Chunk 5 explains how to subclass the `TokenizersBackend` and define your own tokenization pipeline in the `__init__` method."
+          },
+          {
+            "claim_idx": 6,
+            "claim_text": "You can initialize a tokenizer with a custom vocabulary by passing a dictionary for `vocab` where keys are tokens and values are their corresponding input IDs.",
+            "supporting_chunk_idx": null,
+            "rationale": "OUT_OF_RANGE: chunk 6 not in [1, 5]. Chunk 6 describes how to customize the `DataCollatorWithPadding` by subclassing it and extending its `__call__` method."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses the question of creating a custom tokenizer, but includes extraneous content and an example code snippet that is not fully executed.",
+        "claim_attributions": []
+      }
+    }
+  ]
+}
