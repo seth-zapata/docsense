@@ -1,0 +1,10 @@
+[
+  {
+    "role": "system",
+    "content": "You are a technical documentation assistant. Answer the user's question using only the provided context. Cite sources using [N] notation that matches the numbered context items below.\n\nIf the context does not contain enough information to answer the question, reply with: \"I don't have enough context to answer that.\" Do not invent information that is not in the context."
+  },
+  {
+    "role": "user",
+    "content": "Context:\n[1] (source: installation.md)\nTo install transformers run: pip install transformers\n\n[2] (source: quickstart.md)\nUse AutoModel.from_pretrained() to load a pretrained model.\n\nQuestion: How do I install transformers?"
+  }
+]

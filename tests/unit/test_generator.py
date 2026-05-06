@@ -102,7 +102,7 @@ class TestGeneratorGenerate:
         )
 
         class _StubGenerator(Generator):
-            def _run_inference(self, prompt: str) -> tuple[str, dict]:
+            def _run_inference(self, messages: list[dict[str, str]]) -> tuple[str, dict]:
                 meta = raw_meta or {
                     "latency_ms": 42.0,
                     "prompt_tokens": 100,
@@ -112,29 +112,35 @@ class TestGeneratorGenerate:
 
         return _StubGenerator(config)
 
+    @staticmethod
+    def _msgs(query: str = "?") -> list[dict[str, str]]:
+        """Minimal valid messages list for tests. Content doesn't matter
+        because _run_inference is stubbed; we just need the right type."""
+        return [{"role": "user", "content": query}]
+
     def test_generate_returns_answer_with_text(self):
         gen = self._make_generator("Per [1], install with pip.")
         chunks = [_ref(1, "install.md")]
-        answer = gen.generate("how to install?", chunks)
+        answer = gen.generate(self._msgs("how to install?"), chunks)
         assert isinstance(answer, Answer)
         assert answer.text == "Per [1], install with pip."
 
     def test_generate_strips_whitespace_from_text(self):
         gen = self._make_generator("\n  hello world  \n")
-        answer = gen.generate("?", [])
+        answer = gen.generate(self._msgs(), [])
         assert answer.text == "hello world"
 
     def test_generate_populates_citations_from_text(self):
         gen = self._make_generator("Use [1] for setup, then [2] for examples.")
         chunks = [_ref(1, "setup.md"), _ref(2, "examples.md")]
-        answer = gen.generate("how do I get started?", chunks)
+        answer = gen.generate(self._msgs("how do I get started?"), chunks)
         assert len(answer.citations) == 2
         assert {c.doc_id for c in answer.citations} == {"setup.md", "examples.md"}
 
     def test_generate_returns_empty_citations_when_text_has_none(self):
         gen = self._make_generator("Plain answer with no citations.")
         chunks = [_ref(1)]
-        answer = gen.generate("?", chunks)
+        answer = gen.generate(self._msgs(), chunks)
         assert answer.citations == []
 
     def test_generate_attaches_retrieved_chunks_to_answer(self):
@@ -142,7 +148,7 @@ class TestGeneratorGenerate:
         consumers can inspect what the LLM actually saw."""
         gen = self._make_generator("Some answer.")
         chunks = [_ref(1, "a.md"), _ref(2, "b.md")]
-        answer = gen.generate("?", chunks)
+        answer = gen.generate(self._msgs(), chunks)
         assert len(answer.retrieved_chunks) == 2
         assert {c.doc_id for c in answer.retrieved_chunks} == {"a.md", "b.md"}
 
@@ -151,7 +157,7 @@ class TestGeneratorGenerate:
             "ok",
             raw_meta={"latency_ms": 123.4, "prompt_tokens": 256, "completion_tokens": 32},
         )
-        answer = gen.generate("?", [])
+        answer = gen.generate(self._msgs(), [])
         assert answer.metadata.model_name == "test-model"
         assert answer.metadata.latency_ms == pytest.approx(123.4)
         assert answer.metadata.prompt_tokens == 256
@@ -161,7 +167,7 @@ class TestGeneratorGenerate:
         """If _run_inference omits prompt/completion token counts (e.g.,
         a tokenizer-free mock), metadata still constructs with None."""
         gen = self._make_generator("ok", raw_meta={"latency_ms": 50.0})
-        answer = gen.generate("?", [])
+        answer = gen.generate(self._msgs(), [])
         assert answer.metadata.prompt_tokens is None
         assert answer.metadata.completion_tokens is None
 
@@ -170,7 +176,7 @@ class TestGeneratorGenerate:
         caller mutations to the original don't reach into the Answer."""
         gen = self._make_generator("ok")
         chunks = [_ref(1, "a.md")]
-        answer = gen.generate("?", chunks)
+        answer = gen.generate(self._msgs(), chunks)
         chunks.clear()  # caller mutates after generate()
         assert len(answer.retrieved_chunks) == 1
         assert answer.retrieved_chunks[0].doc_id == "a.md"
@@ -204,6 +210,10 @@ class TestGeneratorContractViaPatch:
     def _ref(self, doc_id: str = "d.md") -> ChunkRef:
         return ChunkRef(doc_id=doc_id, chunk_id=f"{doc_id}::chunk_0", score=0.5, text="t")
 
+    @staticmethod
+    def _msgs(content: str = "anything") -> list[dict[str, str]]:
+        return [{"role": "user", "content": content}]
+
     def test_run_inference_called_exactly_once_per_generate(self):
         """Pin the contract: one inference call per generate(). A
         future refactor that does retry-on-empty or re-tokenizes
@@ -212,23 +222,24 @@ class TestGeneratorContractViaPatch:
         with patch.object(
             gen, "_run_inference", return_value=("text", {"latency_ms": 1.0})
         ) as mock_inf:
-            gen.generate("prompt-here", [])
+            gen.generate(self._msgs(), [])
         assert mock_inf.call_count == 1
 
-    def test_run_inference_receives_prompt_argument(self):
-        """The prompt passed to generate() flows directly to
+    def test_run_inference_receives_messages_argument(self):
+        """The messages list passed to generate() flows directly to
         _run_inference. Catches refactors that wrap, format, or
-        re-build the prompt before passing it through."""
+        re-build messages before passing them through."""
         gen = Generator(self._config())
+        sentinel = [{"role": "user", "content": "the-exact-content"}]
         with patch.object(
             gen, "_run_inference", return_value=("text", {"latency_ms": 1.0})
         ) as mock_inf:
-            gen.generate("the-exact-prompt", [self._ref()])
+            gen.generate(sentinel, [self._ref()])
 
-        # Inspect the call: prompt is the first positional arg
+        # Inspect the call: messages is the first positional arg
         args, kwargs = mock_inf.call_args
-        actual_prompt = args[0] if args else kwargs.get("prompt")
-        assert actual_prompt == "the-exact-prompt"
+        actual = args[0] if args else kwargs.get("messages")
+        assert actual == sentinel
 
     def test_run_inference_output_drives_answer_text(self):
         """Whatever _run_inference returns becomes the Answer's text.
@@ -242,7 +253,7 @@ class TestGeneratorContractViaPatch:
             "_run_inference",
             return_value=(canned, {"latency_ms": 5.0}),
         ):
-            answer = gen.generate("p", [self._ref("d.md")])
+            answer = gen.generate(self._msgs(), [self._ref("d.md")])
 
         assert answer.text == canned  # text passes through unchanged
 
@@ -259,7 +270,7 @@ class TestGeneratorContractViaPatch:
                 {"latency_ms": 999.0, "prompt_tokens": 7, "completion_tokens": 3},
             ),
         ):
-            answer = gen.generate("p", [])
+            answer = gen.generate(self._msgs(), [])
 
         assert answer.metadata.latency_ms == pytest.approx(999.0)
         assert answer.metadata.prompt_tokens == 7
@@ -274,7 +285,7 @@ class TestGeneratorContractViaPatch:
         with patch.object(
             gen, "_run_inference", return_value=("plain answer", {"latency_ms": 1.0})
         ):
-            answer = gen.generate("p", [])
+            answer = gen.generate(self._msgs(), [])
 
         assert isinstance(answer, Answer)
         assert answer.citations == []
