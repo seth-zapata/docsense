@@ -5,11 +5,12 @@ docsense system. Per-experiment JSON in `reports/`, narrative
 interpretations in `analyses/`, raw smoke artifacts in `manual-runs/` —
 this file is the dashboard that points into them.
 
-**Last updated:** 2026-05-06 (faithfulness methodology refactored
-to RAGAS-style claim-level decomposition with per-chunk attribution;
-prior absolute-scale numbers superseded. See the
-[baseline](baselines/pre_phase3_generation_base.json) and
-[analysis](analyses/2026-05-06-baseline-generation-eval.md)).
+**Last updated:** 2026-05-06 (refusal detection moved from regex-only
+to LLM-judge-primary with regex as guardrail; no-answer eval set
+expanded from n=8 to n=25). Earlier same-day update: faithfulness
+methodology refactored to RAGAS-style claim-level decomposition.
+See the [baseline](baselines/pre_phase3_generation_base.json) and
+[analysis](analyses/2026-05-06-baseline-generation-eval.md).
 
 **Status legend:**
 
@@ -32,7 +33,7 @@ prior absolute-scale numbers superseded. See the
 | Generation faithfulness (claim-level, Llama judge) | ✅ mean 0.853 / median 1.0 (cross-set agreement) | — | RAGAS-style; support rate 0.89 curated / 0.94 structural |
 | Generation answer relevance (Llama judge, 5-anchor) | ✅ mean 0.72 (curated 0.725, structural 0.717) | — | 4 low-relevance outliers across sets |
 | Generation citation rate | ⚠️ ~58% (cross-set agreement) | — | Qwen cites about half the time despite directive |
-| Generation refusal on off-corpus | ✅ 100% (8/8) | ✅ p50 2.4 s (refusals are short) | post-pattern-fix; see analysis |
+| Generation refusal on off-corpus | ✅ 100% (25/25) — judge & rule agree | ✅ p50 2.0 s (refusals are short) | LLM-judge primary + regex guardrail; cross-validation in place for Phase 3 |
 | End-to-end (in-corpus) | ✅ measured n=50 | ✅ generate p50 10–15 s, p95 20–25 s, p99 26–30 s | RTX 4070 NF4 |
 | System fit on RTX 4070 12 GB | ✅ Qwen 7B + Llama 8B at NF4 ≈ 5–6 GB each | — | sequential load; both verified |
 
@@ -93,7 +94,7 @@ dominated by single-event outliers — read it as "tail signal" not
 |---|---:|---:|---:|---:|---:|---|
 | Hybrid retrieve + rerank (curated, top_k=5) | 315 ms | 1,277 ms | 8,714 ms | 855 ms | 20 | [`baselines/pre_phase3_generation_base.json`](baselines/pre_phase3_generation_base.json) |
 | Hybrid retrieve + rerank (structural, top_k=5) | 322 ms | 518 ms | 2,596 ms | 420 ms | 30 | same |
-| Hybrid retrieve + rerank (no-answer, top_k=5) | 438 ms | 6,453 ms | 8,988 ms | 1,586 ms | 8 | same |
+| Hybrid retrieve + rerank (no-answer, top_k=5) | 432 ms | 681 ms | 5,776 ms | 722 ms | 25 | same |
 | Per-stage breakdown (dense / sparse / RRF / rerank) | ◻️ followup | | | | | |
 
 The p99 outliers on curated (8.7 s) and no-answer (9.0 s) are both
@@ -162,7 +163,7 @@ Source data: [`baselines/pre_phase3_generation_base.json`](baselines/pre_phase3_
 | **Faithfulness — claim support** | ✅ | **0.89** curated (114/128 claims) / **0.94** structural (146/156) | per-chunk attribution; only ~10% of unsupported are real, rest are parser issues |
 | **Answer relevance** (Llama, 5-anchor) | ✅ | mean **0.725** curated / **0.717** structural | structural: 3×0.25, 25×0.75, 2×1.0; curated: 1×0.25, 19×0.75 |
 | **Citation rate** (`[N]` markers in text) | ⚠️ | **~58%** of in-corpus answers (60% curated, 57% structural) | cross-set agreement; highest-leverage Phase 3 fine-tune target |
-| **Refusal on off-corpus** (rule-based) | ✅ | **100%** (8/8) | Qwen reliably refuses with "I don't have enough context"; pattern coverage gap caught + fixed |
+| **Refusal on off-corpus** (LLM-judge primary + regex guardrail) | ✅ | **100%** (25/25 — judge and rule agree on all queries) | every refusal triggered `dont_have_context` regex; cross-validation in place to catch Phase 3 phrasing drift |
 | Generated answer quality (eyeball) | ✅ | technically correct on the smoke run | smoke.md §Generated answer |
 | Claim-level parser robustness | ⚠️ | 10 of 50 in-corpus queries (20%) have at least one parser issue; only 3 (6%) had scores materially affected | curated_001 alone has 8/8 PARSE_FAILED; followup |
 | Prompt-tuning sweep for citation rate | ◻️ followup | — | the citation gap is documented and Phase 3 fine-tune may target it |
@@ -173,7 +174,7 @@ Source data: [`baselines/pre_phase3_generation_base.json`](baselines/pre_phase3_
 |---|---:|---:|---:|---:|---:|---|
 | Generate (curated in-corpus) | 15,125 ms | 25,148 ms | 26,282 ms | 16,255 ms | 20 | [`baselines/pre_phase3_generation_base.json`](baselines/pre_phase3_generation_base.json) |
 | Generate (structural in-corpus) | 9,733 ms | 19,589 ms | 29,694 ms | 10,909 ms | 30 | same |
-| Generate (no-answer / refusal) | 2,748 ms | 3,728 ms | 3,865 ms | 2,629 ms | 8 | same |
+| Generate (no-answer / refusal) | 2,040 ms | 3,695 ms | 3,789 ms | 2,123 ms | 25 | same |
 | Model load (cold, one-time per process) | ~163 s | — | — | — | 1 | smoke.md |
 
 Refusals are short (≤ 50 tokens) so generation is much faster — ~2.7 s
