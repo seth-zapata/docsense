@@ -37,10 +37,14 @@ src/docsense/
 ## Commands
 
 ```bash
-# Install (dev)
+# Install (dev — no real model loads, all tests use mocks)
 pip install -e ".[dev]"
 pre-commit install                                   # commit hooks: ruff, mypy
 pre-commit install --hook-type pre-push              # pre-push hook: pytest
+
+# Install (dev + GPU — adds bitsandbytes for NF4 quantization).
+# Required when actually loading the LLM via Generator on a CUDA host.
+pip install -e ".[dev,gpu]"
 
 # Lint and type-check
 ruff check src/ tests/
@@ -52,6 +56,30 @@ pytest                                               # all tests
 pytest -m "not slow and not gpu"                     # fast tests only
 pytest --cov=docsense --cov-report=term              # with coverage
 ```
+
+### Model cache location (`HF_HOME`)
+
+The HuggingFace transformers stack caches model weights at
+`~/.cache/huggingface/hub/` by default — which on WSL lives inside
+the WSL2 ext4 virtual disk on the C: drive. The 7-8B Instruct models
+docsense uses (Qwen 2.5 7B for generation, Llama 3.1 8B for the
+LLM-judge) are ~15-16 GB each on disk at BF16, plus ~80 MB each for
+the cross-encoder and embedder. Total ~31 GB just for the LLMs.
+
+If C: is constrained, redirect the cache to a roomier drive **before**
+any model loads:
+
+```bash
+mkdir -p /mnt/e/hf-cache
+echo 'export HF_HOME=/mnt/e/hf-cache' >> ~/.bashrc   # persists across sessions
+source ~/.bashrc
+```
+
+`HF_HOME` covers `transformers`, `sentence-transformers`, and the
+HuggingFace CLI uniformly. Trade-off: WSL2 → Windows-mounted-drive
+I/O is slower than native ext4, so cold model loads (per-session,
+~once) take ~30-60 s longer. Inference latency is unaffected — once
+weights are in VRAM, where they came from doesn't matter.
 
 ## Workflow
 
