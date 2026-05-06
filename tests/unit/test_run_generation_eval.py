@@ -247,6 +247,44 @@ class TestAggregateFaithfulnessScores:
         assert result["claims"]["n_no_claims_extracted"] == 1
         assert result["claims"]["total_extracted"] == 0
 
+    def test_per_claim_parse_failures_counted(self):
+        """If individual claim attributions carry PARSE_FAILED markers
+        (e.g., from max_new_tokens truncation cutting off attribution
+        output mid-list), the aggregate must count them. Previously
+        n_parse_failures only counted score-level rationales and
+        invisibly missed per-claim failures."""
+        rec = _record("q1", is_no_answer=False)
+        rec.faithfulness = JudgeScore(
+            metric="faithfulness",
+            score=0.0,
+            rationale="0 of 3 claims supported.",
+            claim_attributions=[
+                ClaimAttribution(
+                    claim_idx=1,
+                    claim_text="a",
+                    supporting_chunk_idx=None,
+                    rationale="PARSE_FAILED: no attribution line for claim 1",
+                ),
+                ClaimAttribution(
+                    claim_idx=2,
+                    claim_text="b",
+                    supporting_chunk_idx=None,
+                    rationale="PARSE_FAILED: no attribution line for claim 2",
+                ),
+                ClaimAttribution(
+                    claim_idx=3,
+                    claim_text="c",
+                    supporting_chunk_idx=None,
+                    rationale="OUT_OF_RANGE: chunk 9 not in [1, 5]",
+                ),
+            ],
+        )
+        result = driver._aggregate_faithfulness_scores([rec])
+        assert result["claims"]["n_claim_parse_failures"] == 2
+        assert result["claims"]["n_claim_out_of_range"] == 1
+        # Score-level parse failure is separate; this case has no score-level marker.
+        assert result["claims"]["n_score_parse_failures"] == 0
+
 
 class TestBuildReport:
     def test_in_corpus_report_has_all_sections(self):
