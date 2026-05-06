@@ -14,6 +14,10 @@ Modules:
   classifier — given a chunk's text, returns the set of
   ``QuestionType``s it has affinity for. Foundation for the
   type-stratified query seeder in Block 3B.2.
+- ``query_generation``: (Block 3B.2.b) ``TypeAwareQueryGenerator``
+  wrapping Haiku 4.5 — given a chunk + question type, generates a
+  realistic query grounded in the chunk. Also handles off-corpus
+  refusal queries from topic seeds.
 
 See ``docs/phase-3-scope.md`` and ``docs/phase-3-block-3b2-plan.md``
 for the full Phase 3 plan.
