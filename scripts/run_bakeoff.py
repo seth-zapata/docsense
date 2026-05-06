@@ -71,9 +71,36 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 INDEX_DIR = DATA_DIR / "index"
 DEFAULT_BASELINE = PROJECT_ROOT / "evaluations" / "baselines" / "phase1_chunking.json"
 DEFAULT_REPORTS_DIR = PROJECT_ROOT / "evaluations" / "reports"
+EVAL_SETS_DIR = PROJECT_ROOT / "evaluations" / "eval_sets"
 
 ALL_STRATEGIES = ("fixed", "recursive", "header")
 METRIC_KS = (1, 3, 5, 10)
+
+
+def _load_eval_set(name: str) -> list[EvalQuery]:
+    """Return the named eval set as a list of (query, [doc_id_prefix]) pairs.
+
+    `curated` is the hand-authored 20-query set in
+    `evaluation/eval_queries.py`; `structural` is the programmatically-
+    generated set at `evaluations/eval_sets/structural.json` (regenerate
+    via `scripts/generate_structural_queries.py`). Running both sets gives
+    independent signal: agreement between them strengthens conclusions,
+    disagreement is itself a finding worth investigating.
+    """
+    if name == "curated":
+        return list(CURATED_QUERIES)
+    if name == "structural":
+        path = EVAL_SETS_DIR / "structural.json"
+        if not path.exists():
+            msg = (
+                f"Structural eval set not found at {path}. Generate it with: "
+                "python scripts/generate_structural_queries.py"
+            )
+            raise FileNotFoundError(msg)
+        raw = json.loads(path.read_text())
+        return [(item["query"], item["relevant"]) for item in raw]
+    msg = f"Unknown eval set: {name!r}"
+    raise ValueError(msg)
 
 
 def _load_settings(config_path: Path | None) -> Settings:
@@ -310,6 +337,18 @@ def main() -> int:
         help="Which chunking strategies to evaluate (default: all three).",
     )
     parser.add_argument(
+        "--eval-set",
+        choices=("curated", "structural"),
+        default="curated",
+        help=(
+            "Which eval set to use. curated = hand-authored 20 queries in "
+            "evaluation/eval_queries.py (selection-biased toward docs the "
+            "curator knew existed). structural = programmatically derived "
+            "from doc headings at evaluations/eval_sets/structural.json "
+            "(unbiased complement). Run both for cross-validation."
+        ),
+    )
+    parser.add_argument(
         "--baseline",
         type=Path,
         default=DEFAULT_BASELINE,
@@ -358,8 +397,11 @@ def main() -> int:
     pipeline = args.pipeline  # one of: dense, hybrid, hybrid-rerank
     uses_hybrid = pipeline in ("hybrid", "hybrid-rerank")
     uses_rerank = pipeline == "hybrid-rerank"
+    eval_set = _load_eval_set(args.eval_set)
+    logger.info("eval_set=%s, %d queries", args.eval_set, len(eval_set))
+
     out_path = args.out or DEFAULT_REPORTS_DIR / (
-        f"bakeoff-{datetime.now(tz=UTC).strftime('%Y%m%d')}-{pipeline}.json"
+        f"bakeoff-{datetime.now(tz=UTC).strftime('%Y%m%d')}-{pipeline}-{args.eval_set}.json"
     )
 
     results: dict = {
@@ -374,23 +416,23 @@ def main() -> int:
             "dense_weight": settings.retrieval.dense_weight if uses_hybrid else None,
             "sparse_weight": settings.retrieval.sparse_weight if uses_hybrid else None,
         },
-        "eval_set": "curated",
-        "eval_set_size": len(CURATED_QUERIES),
+        "eval_set": args.eval_set,
+        "eval_set_size": len(eval_set),
         "strategies": {},
     }
     for strategy in args.strategies:
         logger.info("Evaluating %s ...", strategy)
         if pipeline == "dense":
             results["strategies"][strategy] = _eval_strategy_dense(
-                strategy, embedder, CURATED_QUERIES, eval_k=args.eval_k
+                strategy, embedder, eval_set, eval_k=args.eval_k
             )
         elif pipeline == "hybrid":
             results["strategies"][strategy] = _eval_strategy_hybrid(
-                strategy, embedder, CURATED_QUERIES, eval_k=args.eval_k, settings=settings
+                strategy, embedder, eval_set, eval_k=args.eval_k, settings=settings
             )
         else:  # hybrid-rerank
             results["strategies"][strategy] = _eval_strategy_hybrid_rerank(
-                strategy, embedder, CURATED_QUERIES, eval_k=args.eval_k, settings=settings
+                strategy, embedder, eval_set, eval_k=args.eval_k, settings=settings
             )
 
     out_path.parent.mkdir(parents=True, exist_ok=True)

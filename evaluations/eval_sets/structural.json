@@ -1,0 +1,182 @@
+[
+  {
+    "query": "Prefill a cache (prefix caching)",
+    "relevant": [
+      "kv_cache.md"
+    ]
+  },
+  {
+    "query": "Using `apply_chat_template`",
+    "relevant": [
+      "chat_templating_multimodal.md"
+    ]
+  },
+  {
+    "query": "Lxmert specific outputs",
+    "relevant": [
+      "model_doc/lxmert.md"
+    ]
+  },
+  {
+    "query": "Usage example",
+    "relevant": [
+      "model_doc/herbert.md"
+    ]
+  },
+  {
+    "query": "Usage examples",
+    "relevant": [
+      "model_doc/glm_image.md"
+    ]
+  },
+  {
+    "query": "Albert specific outputs",
+    "relevant": [
+      "model_doc/albert.md"
+    ]
+  },
+  {
+    "query": "Per-Layer-Type RoPE Configuration",
+    "relevant": [
+      "internal/rope_utils.md"
+    ]
+  },
+  {
+    "query": "Load IMDb dataset",
+    "relevant": [
+      "tasks/sequence_classification.md"
+    ]
+  },
+  {
+    "query": "Audio Transformations",
+    "relevant": [
+      "internal/audio_utils.md"
+    ]
+  },
+  {
+    "query": "Key Features",
+    "relevant": [
+      "model_doc/voxtral.md"
+    ]
+  },
+  {
+    "query": "Transformers integration",
+    "relevant": [
+      "community_integrations/candle.md"
+    ]
+  },
+  {
+    "query": "Transformers integration",
+    "relevant": [
+      "community_integrations/axolotl.md"
+    ]
+  },
+  {
+    "query": "Image Transformations",
+    "relevant": [
+      "internal/image_processing_utils.md"
+    ]
+  },
+  {
+    "query": "Support Model",
+    "relevant": [
+      "model_doc/glm46v.md"
+    ]
+  },
+  {
+    "query": "Combining Starcoder and Flash Attention 2",
+    "relevant": [
+      "model_doc/gpt_bigcode.md"
+    ]
+  },
+  {
+    "query": "Custom dataset",
+    "relevant": [
+      "run_scripts.md"
+    ]
+  },
+  {
+    "query": "Template writing tips",
+    "relevant": [
+      "chat_templating_writing.md"
+    ]
+  },
+  {
+    "query": "Text-prompted zero-shot object detection by hand",
+    "relevant": [
+      "tasks/zero_shot_object_detection.md"
+    ]
+  },
+  {
+    "query": "Architecture Info",
+    "relevant": [
+      "model_doc/eomt.md"
+    ]
+  },
+  {
+    "query": "Initialising `VisionEncoderDecoderModel` from a pretrained encoder and a pretrained decoder",
+    "relevant": [
+      "model_doc/vision-encoder-decoder.md"
+    ]
+  },
+  {
+    "query": "Support Model",
+    "relevant": [
+      "model_doc/glm4v.md"
+    ]
+  },
+  {
+    "query": "Models and configurations",
+    "relevant": [
+      "models.md"
+    ]
+  },
+  {
+    "query": "Usage: MarkupLMProcessor",
+    "relevant": [
+      "model_doc/markuplm.md"
+    ]
+  },
+  {
+    "query": "Register a pipeline",
+    "relevant": [
+      "add_new_pipeline.md"
+    ]
+  },
+  {
+    "query": "CANINE specific outputs",
+    "relevant": [
+      "model_doc/canine.md"
+    ]
+  },
+  {
+    "query": "Model Architecture",
+    "relevant": [
+      "model_doc/pp_doclayout_v3.md"
+    ]
+  },
+  {
+    "query": "Usage tips and examples",
+    "relevant": [
+      "model_doc/bridgetower.md"
+    ]
+  },
+  {
+    "query": "Funnel specific outputs",
+    "relevant": [
+      "model_doc/funnel.md"
+    ]
+  },
+  {
+    "query": "Model Architecture",
+    "relevant": [
+      "model_doc/pp_chart2table.md"
+    ]
+  },
+  {
+    "query": "Usage example",
+    "relevant": [
+      "model_doc/sam3_video.md"
+    ]
+  }
+]
