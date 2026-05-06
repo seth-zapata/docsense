@@ -502,3 +502,126 @@ the absolute-scale methodology and why we changed. Anyone reading
 in the future should treat the original findings as
 "under absolute-scale scoring" and the numbers in this update as
 the canonical baseline going forward.
+
+---
+
+## Update 2 — refusal detection moved from regex-only to LLM-judge with cross-validation (later same day)
+
+After the claim-level faithfulness refactor landed, the user
+identified a parallel problem: refusal detection on the no-answer
+set was using a regex (`check_no_answer_behavior`) against Qwen's
+free-form output. That works today on the patched regex set, but
+**Phase 3 fine-tuning will subtly shift Qwen's refusal phrasing in
+ways the regex can't anticipate**. A coverage gap post-fine-tune
+would silently produce wrong numbers for exactly the comparison
+(pre-FT vs post-FT) we need to be confident about. So fix now
+while we have a working baseline, before complexity compounds.
+
+The user also articulated the deeper conceptual point that came
+out of this discussion: **regex on free-form generator output and
+regex on tool-controlled output are different mistakes with
+different right answers**:
+
+- **Generator output (free-form, we don't control it)**: regex is
+  the wrong tool. Use an LLM-judge for natural-language interpretation.
+  This is Problem A (refusal detection).
+- **Judge output (we own the prompt and format)**: regex is also
+  the wrong tool, but the right answer is *structured output*
+  (JSON, function calling, constrained decoding). We're entitled
+  to dictate the shape. This is Problem B (claim extraction,
+  attribution, score parsing).
+
+We addressed Problem A in this update; Problem B is the next PR.
+
+### What changed (PR C.1)
+
+1. **New `RefusalJudgment(refused: bool, rationale: str)` type**.
+   Naturally categorical; doesn't force into `JudgeScore`'s `[0, 1]`
+   shape.
+2. **New `LLMJudge.judge_refusal` ABC method + LlamaJudge impl.**
+   Single LLM call. Prompt explicitly distinguishes refusal from
+   hedging ("I'm not sure but I think...") and from quality failures
+   (wrong/off-topic answers); examples block teaches the judge what
+   we mean. Conservative parser fallback: malformed output →
+   `refused=False` with a `PARSE_FAILED` marker, so a parse failure
+   can't accidentally inflate the refusal rate.
+3. **Cross-validation in the eval driver.** The rule-based check
+   (`check_no_answer_behavior`) is NOT removed — it runs alongside
+   the LLM judge for every no-answer query. The aggregate surfaces
+   `frac_refused_judge`, `frac_refused_rule`, and an
+   `agreement_rate`. Disagreement query IDs are captured for
+   debugging.
+4. **No-answer eval set expanded from n=8 to n=25** spanning broader
+   domains: real-time data (sports, finance, economic indicators),
+   different tech stacks (nginx, MySQL, React, JS), lifestyle,
+   math/chemistry/geography facts, entertainment, and one
+   hedging-prone stock-prediction question. The smaller set was
+   partly constrained by the regex maintenance burden — each new
+   query was a potential pattern coverage-gap risk. With the LLM
+   judge that constraint is gone, and the tighter confidence
+   interval matters for Phase 3 Δ-comparisons (n=8 100% true rate
+   could be 70-100%; n=25 100% pins it tighter).
+
+Some of the new queries are deliberate parametric-memory tempters
+(caffeine formula, Inception director, MySQL JOIN syntax). The
+model "knows" these from training data — the right behavior is
+still refusal because the *retrieved context* doesn't contain them.
+A generator answering from parametric memory rather than from
+retrieved evidence is exactly the failure mode refusal eval should
+catch. This is a stricter test than the original "completely
+unrelated topics" set.
+
+### Re-run results
+
+```
+no-answer (n=25):
+  judge=1.00  rule=1.00  agreement=1.00  disagreements=0  judge-parse-fails=0
+  rule_matched_patterns: {"dont_have_context": 25}
+```
+
+**Perfect cross-validation: 100% / 100% / 100% agreement on n=25,
+zero parse failures.** This is the ideal post-fix-and-validate
+state:
+
+- The regex catches current Qwen phrasing perfectly (every refusal
+  fired the `dont_have_context` pattern; no other patterns
+  triggered).
+- The LLM judge agrees, validating its calibration on this
+  distribution.
+- Both methods are now in place to detect divergence when Phase 3
+  fine-tuning shifts the phrasing distribution.
+
+The uniformity of the regex match is itself a finding: Qwen 2.5 7B
+Instruct on the docsense corpus emits "I don't have enough context
+to answer that" as a near-canonical refusal opening. Whether that
+holds post-fine-tune is exactly what the agreement-rate metric
+will surface.
+
+### Updated implications for Phase 3
+
+1. **Refusal robustness is measurably 100% on n=25, with both
+   methods agreeing.** Phase 3 must preserve this — fine-tuning
+   that regresses refusal behavior is one of the most concerning
+   regressions a RAG fine-tune can introduce. Watch
+   `agreement_rate` as the early-warning signal.
+2. **Cross-validation methodology pattern established.** When two
+   independent measurement methods agree, we're confident in the
+   number. When they disagree, the disagreement is itself a
+   high-signal data point — actionable, not noise. Phase 3 should
+   adopt this pattern more broadly (e.g., cross-judge calibration
+   for faithfulness when the deferred AnthropicJudge follow-up
+   lands).
+3. **The "two regex problems" insight generalizes.** Wherever the
+   eval pipeline parses LLM output, the question to ask is "do we
+   own the format?" — if yes, structured output; if no, LLM-judge.
+   Regex is a band-aid in both cases.
+
+### What's next
+
+PR C.2 (immediately following): refactor judge output parsers to
+JSON. Eliminates the `curated_001` 8-of-8-PARSE_FAILED edge case
+documented in Update 1, and aligns with industry-standard
+LLM-as-judge practice. After C.2, the only regex left in the eval
+pipeline will be `_CITATION_MARKER_RE` (extracting `[N]` from
+generator output, which is the right level of mechanical for the
+input format the system asks the model to produce).

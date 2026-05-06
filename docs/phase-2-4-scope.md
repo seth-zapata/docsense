@@ -656,6 +656,72 @@ produces plausible output. No automated quality measurement yet.
 are now empirically measured end-to-end. Phase 3 fine-tuning has a
 real baseline to improve on.
 
+### Pre-Phase-3 Block 2 — eval methodology hardening (added 2026-05-06)
+
+After Block 1B's first end-to-end eval landed, two methodology
+flaws surfaced that warranted fixing before Phase 3 (rather than
+"defer until they bite"). Phase 3 will fine-tune Qwen, which will
+shift behavior in ways that compound silent measurement errors.
+Cheaper to fix the methodology while we have a working baseline.
+
+The two fixes break along the same conceptual line: **regex on
+free-form generator output and regex on tool-controlled judge
+output are different mistakes with different right answers**.
+
+#### Block 2A — Latency reporting + observability conventions (PR A, closed 2026-05-06)
+
+Switched latency schema from p50/p90/max to AWS-standard
+p50/p95/p99 + mean + n. Re-aggregated existing eval reports from
+preserved per_query timing data; no eval re-run needed. Added a
+cross-cutting `Latency & observability conventions` section to
+this scope doc (below) capturing the convention plus broader
+observability standards (cold-start vs steady-state, per-stage
+breakdowns, throughput, error-rate categories, anti-patterns).
+
+#### Block 2B — Claim-level faithfulness with per-chunk attribution (PR B, closed 2026-05-06)
+
+Replaced absolute-scale anchor-based faithfulness scoring (which
+saturated at 0.75 in 49 of 50 in-corpus answers) with RAGAS-style
+claim-level decomposition + per-chunk attribution. Two LLM calls
+per query: extract atomic claims, then attribute each claim to a
+specific chunk or "none". Score = `n_supported / n_total`,
+continuous in [0, 1], no anchor snapping. Per-claim attributions
+preserved on the JudgeScore. Surfaced one new finding: chunk usage
+diverges sharply across eval sets (chunk 1 cited least on curated,
+most on structural), suggesting query-style-dependent retrieval
+behavior worth a Phase 3 audit. Cross-set faithfulness mean is
+exactly 0.853 on both — methodology-validation signal.
+
+#### Block 2C — Refusal detection via LLM-judge with cross-validation (PR C.1, closed 2026-05-06)
+
+Replaced regex-only refusal detection (which had a phrasing-coverage
+treadmill) with a `judge_refusal` LLM primitive. Critically, the
+rule-based regex still runs alongside as a guardrail — both verdicts
+are surfaced in the report, plus an `agreement_rate` metric that
+becomes the early-warning signal for Phase 3 phrasing drift. Also
+expanded the no-answer eval set from n=8 to n=25 (with the regex
+maintenance burden removed, the size constraint went away). First
+run of the new methodology: judge=1.000, rule=1.000,
+agreement=1.000 across 25 queries — perfect cross-validation.
+
+`RefusalJudgment(refused: bool, rationale: str)` is a new typed
+result alongside `JudgeScore` — refusal is naturally categorical,
+not a [0, 1] score.
+
+#### Block 2D — Judge output → JSON, eliminate regex parsers (PR C.2, queued)
+
+Final piece of the methodology cleanup. Refactor judge output
+parsing for `extract_claims`, `attribute_claims_to_chunks`, and
+`parse_relevance_response` from regex to JSON + pydantic
+validation + retry-on-parse-failure. Eliminates the `curated_001`
+8-of-8-PARSE_FAILED edge case documented in the baseline analysis
+and aligns with industry-standard LLM-as-judge practice.
+
+After PR C.2, the only regex left in the eval pipeline will be
+`_CITATION_MARKER_RE` — extracting `[N]` markers from the
+generator's output, which is the right level of mechanical for
+the input shape we ask the model to produce.
+
 ### Optional follow-up — AnthropicJudge calibration mode
 
 Not in Block 1 by default. Add later as a separate small PR if/when
