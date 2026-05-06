@@ -377,3 +377,128 @@ The honest framing for what Phase 3 will measure:
 > Llama judge anchors at 0.75 in a way that limits absolute-faithfulness
 > claims. Phase 3 fine-tunes the citation gap and validates the
 > faithfulness signal against a cross-judge calibration.
+
+---
+
+## Update — methodology change to claim-level faithfulness (later same day)
+
+After this analysis was first written, we acted on the
+"judge anchors at 0.75" finding rather than deferring it to Phase 3.
+The user's reasoning was that downstream complexity compounds the
+cost of fixing measurement flaws later, and that the system is
+small enough now that the right architecture is cheap to adopt.
+
+**What changed:** faithfulness scoring was refactored from a
+single absolute-scale call to a two-call RAGAS-style decomposition:
+
+1. ``extract_claims(question, answer)`` decomposes the answer into
+   atomic factual claims (numbered list).
+2. ``attribute_claims_to_chunks(claims, chunks)`` — single batched
+   call — assigns each claim a 1-indexed chunk that supports it,
+   or "none."
+
+Score is now ``n_supported / n_total``, continuous in ``[0, 1]``
+with no anchor snapping. The per-claim attribution data is preserved
+on the JudgeScore so the report carries grounded evidence rather
+than just an aggregate number. Relevance kept the absolute-scale
+approach — its distribution had real spread already, and decomposing
+"does the answer address the question?" into sub-questions doesn't
+improve the measurement.
+
+**Re-run results (n=50 in-corpus, same queries, same generator):**
+
+| Metric | Old (absolute) | New (claim-level) |
+|---|---:|---:|
+| Faithfulness mean (curated) | 0.750 (49/50 = exactly 0.75) | **0.853** |
+| Faithfulness mean (structural) | 0.758 | **0.853** (exact cross-set agreement) |
+| Median faithfulness | 0.75 (saturated) | **1.0 on both sets** |
+| Score distribution | uninformative — 49 of 50 at 0.75 | curated: 13×1.0, 4×0.75-1.0, 1×0.5-0.75, 2×0.0; structural: 22×1.0, 4×0.75-1.0, 1×0.25-0.5, 3×0.0 |
+| Cross-claim support rate | n/a (no per-claim data) | curated 0.89, structural 0.94 |
+| Per-claim debugging data | none | full per-query breakdown with chunk attribution |
+
+**Why exact cross-set agreement on the mean (0.853 = 0.853) is the
+key methodology-validation signal:** two independent query
+distributions, judged by the same model with the same parser, land
+at the same aggregate value. That doesn't happen by coincidence at
+this sample size. It means the claim-level approach measures
+something stable about the system rather than something specific
+to one eval set.
+
+**Process surfaced one real bug along the way.** The first
+post-refactor run on curated produced three queries scoring exactly
+0.0 with substantial answers (8/12/16 claims each). Investigation
+revealed all the per-claim rationales said
+``PARSE_FAILED: no attribution line for claim X`` — the LLM was
+producing output truncated mid-list by ``max_new_tokens=256`` (the
+JudgeConfig default sized for relevance, not for attribution which
+needs ~75 tokens per claim line). Fix was a per-call ``max_new_tokens``
+override on ``LlamaJudge._run_inference``: extraction gets 768,
+attribution gets 2048, relevance keeps the default. Re-running
+curated post-fix produced the cleaner numbers above.
+
+The aggregate also previously hid this issue — ``n_parse_failures``
+only counted score-level rationales, not per-claim ones. Split into
+three explicit counters now (``n_score_parse_failures``,
+``n_claim_parse_failures``, ``n_claim_out_of_range``) so the next
+truncation-style bug is immediately visible at run completion.
+
+**Per-chunk attribution surfaced a new finding the absolute-scale
+approach couldn't have produced.** Chunk-usage distribution diverges
+sharply across the two eval sets:
+
+- **Curated**: chunk 1 cited 9 times, average chunk 2-5 cited 26 times.
+  Chunk 1 (the top reranker pick) is the *least* cited grounding source.
+- **Structural**: chunk 1 cited 45 times, average chunk 2-5 cited 25 times.
+  Chunk 1 is the *most* cited grounding source.
+
+Different query distributions interact with reranker ordering in
+opposite directions. Curated queries (paraphrased intent) land
+grounding evidence in chunks 2-5; structural queries (terminology
+literal) match chunk 1 directly. This is a real Phase 3 retrieval-side
+audit target — the difference suggests retrieval quality varies
+non-trivially with query style. Couldn't see this with the old
+methodology.
+
+**Known limitations of the new method (5 of 50 in-corpus queries,
+10%, with at least one parser issue):**
+
+- ``curated_001`` ("How do I install transformers?"): 8 of 8 claims
+  PARSE_FAILED. Persists post-token-budget-fix — the LLM output is
+  malformed in some way the regex doesn't match. Worth a small
+  parser-robustness follow-up. Drags curated support rate from
+  ~0.95 down to 0.89.
+- ``curated_010`` ("How to do hyperparameter search?") and 2
+  structural queries: ``NO_CLAIMS_EXTRACTED``. The extraction step
+  decided the answer had no factual content to extract. May be
+  borderline cases (heavy code, generic statements) — the prompt
+  might need a few-shot example to clarify what counts.
+- 9 sporadic claim-level parse failures + 8 out-of-range chunk
+  picks across the rest of the data. Each surfaced explicitly in
+  the per_query records; no silent inflation.
+
+**Implications for Phase 3 (revised):**
+
+1. **Faithfulness is now usable as a primary signal.** The earlier
+   recommendation ("Δ-only because the judge anchor is suspect") is
+   superseded — the new methodology produces a real distribution
+   with grounded evidence. Phase 3 can target absolute faithfulness
+   improvements, not just relative ones.
+2. **Citation rate is still the highest-leverage fine-tune target.**
+   ~58% across both eval sets, comparable to the prior measurement
+   (54%). Methodology change didn't affect citations.
+3. **New retrieval signal worth acting on.** The chunk-1-usage
+   divergence between curated and structural suggests the reranker
+   ordering interacts with query style in a way we hadn't measured.
+   May warrant a Phase 3 retrieval-side audit alongside the
+   generation fine-tune.
+4. **AnthropicJudge calibration deferred but optional.** The
+   Llama-judge's saturation problem is solved by the methodology
+   change — pairwise/calibration was the alternative path, and we
+   took the more direct one.
+
+This update preserves the original analysis above intact for
+historical reading: it captures what the system looked like under
+the absolute-scale methodology and why we changed. Anyone reading
+in the future should treat the original findings as
+"under absolute-scale scoring" and the numbers in this update as
+the canonical baseline going forward.
