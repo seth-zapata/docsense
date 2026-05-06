@@ -41,6 +41,7 @@ from docsense.evaluation.judge import (
     JudgeMetric,
     JudgeScore,
     LLMJudge,
+    RefusalJudgment,
 )
 
 if TYPE_CHECKING:
@@ -252,6 +253,80 @@ _RELEVANCE_SYSTEM = (
 )
 
 _RELEVANCE_USER_TEMPLATE = "QUESTION:\n{question}\n\nANSWER:\n{answer}"
+
+
+# --- Refusal detection (added 2026-05-06) -----------------------------
+
+_REFUSAL_SYSTEM = (
+    "You are evaluating whether an answer indicates the model could "
+    "NOT answer the question because the necessary information wasn't "
+    "in the retrieved context. This is *acknowledged inability*, not "
+    "answer quality. We're detecting whether the model recognized the "
+    "context didn't have what it needed and said so — not whether the "
+    "answer is correct or wrong.\n\n"
+    "Important distinctions:\n"
+    "- A refusal is acknowledged inability: 'I don't have enough "
+    "context.' / 'The provided context doesn't cover this.' / "
+    "'I'm unable to answer based on the documentation.'\n"
+    "- A *hedged but attempted* answer is NOT a refusal: 'I'm not "
+    "sure, but I think it's around 1 GB.' / 'Based on the docs, this "
+    "appears to be...' — these attempt an answer with uncertainty, "
+    "not refuse.\n"
+    "- A wrong or off-topic answer is NOT a refusal — that's a "
+    "quality failure, separate from refusal.\n"
+    "- A safety/policy refusal ('I can't help with that') is also "
+    "NOT what we're measuring; we're specifically about "
+    "context-availability refusals.\n\n"
+    "Examples:\n"
+    "- 'I don't have enough context to answer that.' → REFUSED: yes\n"
+    "- 'The context discusses tokenizers, but I don't have specific "
+    "information about that topic.' → REFUSED: yes\n"
+    "- 'AutoModel.from_pretrained takes a model name string.' → "
+    "REFUSED: no\n"
+    "- 'I'm not sure, but typically this is around 1 GB.' → "
+    "REFUSED: no\n"
+    "- 'The answer would require knowledge outside what's provided.' "
+    "→ REFUSED: yes\n\n"
+    "Respond in EXACTLY this format and nothing else:\n"
+    "REFUSED: <yes or no>\n"
+    "RATIONALE: <one short sentence explaining your decision>"
+)
+
+_REFUSAL_USER_TEMPLATE = "QUESTION:\n{question}\n\nANSWER:\n{answer}"
+
+# "REFUSED: yes" or "REFUSED: no" — case-insensitive, optional colon.
+_REFUSAL_RE = re.compile(
+    r"REFUSED\s*:?\s*(yes|no|y|n|true|false)\b",
+    re.IGNORECASE,
+)
+
+
+def parse_refusal_response(text: str) -> RefusalJudgment:
+    """Extract REFUSED yes/no + RATIONALE from the refusal-judge response.
+
+    Falls back to ``refused=False`` on parse failure. The conservative
+    default is intentional: a parse failure shouldn't accidentally
+    flag a confabulated answer as a refusal — that would silently
+    inflate the refusal rate. The rationale carries a PARSE_FAILED
+    marker so reviewers can spot the cases.
+    """
+    match = _REFUSAL_RE.search(text)
+    if match is None:
+        return RefusalJudgment(
+            refused=False,
+            rationale=f"PARSE_FAILED: no REFUSED verdict in response. Raw: {text[:200]!r}",
+        )
+
+    verdict = match.group(1).lower()
+    refused = verdict in ("yes", "y", "true")
+
+    rationale_match = _RATIONALE_RE.search(text)
+    rationale = (
+        rationale_match.group(1).strip()
+        if rationale_match is not None
+        else "(no RATIONALE produced)"
+    )
+    return RefusalJudgment(refused=refused, rationale=rationale)
 
 
 def _snap_to_anchor(raw: float) -> float:
@@ -534,3 +609,26 @@ class LlamaJudge(LLMJudge):
         ]
         text = self._run_inference(messages)
         return parse_relevance_response(text, "relevance")
+
+    def judge_refusal(self, question: str, answer: str) -> RefusalJudgment:
+        """Decide whether ``answer`` indicates context-unavailability refusal.
+
+        Single LLM call. Output format is ``REFUSED: yes/no`` plus a
+        one-sentence RATIONALE. Default JudgeConfig.max_new_tokens (256)
+        is plenty — the response is at most ~50 tokens.
+
+        Replaces the regex-based ``check_no_answer_behavior`` heuristic
+        as the primary measurement. The rule-based check is still run
+        alongside in the eval driver as a guardrail and cross-validation
+        signal — see ``run_judging_phase`` in
+        ``scripts/run_generation_eval.py``.
+        """
+        messages = [
+            {"role": "system", "content": _REFUSAL_SYSTEM},
+            {
+                "role": "user",
+                "content": _REFUSAL_USER_TEMPLATE.format(question=question, answer=answer),
+            },
+        ]
+        text = self._run_inference(messages)
+        return parse_refusal_response(text)
