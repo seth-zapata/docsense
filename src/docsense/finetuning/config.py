@@ -86,6 +86,17 @@ class FineTuningConfig(BaseSettings):
     # --- Eval split -------------------------------------------------
     val_fraction: float = Field(default=0.1, gt=0.0, lt=1.0)
 
+    # --- Device placement -------------------------------------------
+    # device_map controls where the base model's weights land. The
+    # default "auto" lets accelerate distribute across visible GPUs
+    # (and CPU as last resort). On a 12 GB shared GPU (RTX 4070 with
+    # display) "auto" can spill weights to CPU and tank training
+    # throughput; force ``{"": 0}`` (everything on GPU 0) in that case
+    # via the CLI ``--device cuda:0`` flag. On Modal A10G (24 GB) "auto"
+    # is fine. Stored as str | dict to accept either ``"auto"``,
+    # ``"cuda:0"`` (string form), or an explicit ``{"": 0}`` mapping.
+    device_map: str = "auto"
+
     @model_validator(mode="after")
     def _warn_if_alpha_far_from_2x_rank(self) -> FineTuningConfig:
         """Soft sanity: alpha ≪ rank or alpha ≫ 4×rank is unusual.
