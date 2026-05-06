@@ -378,11 +378,12 @@ runs (PR / nightly / manual), and where artifacts live — is in
 
 | | |
 |---|---|
-| **Current phase** | Phase 2 closed; pre-Phase-3 work next |
+| **Current phase** | Pre-Phase-3 Block 1B closed; Phase 3 (QLoRA fine-tuning) up next |
 | **Phase 1 finding** | Recursive chunking wins under dense-only retrieval (MRR 0.692). Established the eval set + corrected metrics. |
 | **Phase 2 finding** | The "fixed wins under hybrid+rerank" result on the curated set didn't replicate on the structural set — exposed eval-set bias as a real issue. Production default: hybrid+rerank with `chunking.strategy=recursive`. |
-| **Next experiment** | LLM-judge eval scaffolding (faithfulness, answer relevance, citation grounding); first end-to-end run of the pipeline with a real Mistral 7B / Llama 3 8B base model. |
-| **Test coverage** | 203 tests, 90% CI gate enforced |
+| **Pre-Phase-3 finding** | Qwen 2.5 7B Instruct cites correctly on ~54% of in-corpus answers (cross-set agreement) and refuses 100% of off-corpus queries. Llama 3.1 8B as judge anchors faithfulness at 0.75 — calibration prerequisite for absolute-faithfulness claims. **Citation rate is the highest-leverage Phase 3 fine-tune target.** Full analysis: [`evaluations/analyses/2026-05-06-baseline-generation-eval.md`](../evaluations/analyses/2026-05-06-baseline-generation-eval.md). |
+| **Next experiment** | Phase 3 QLoRA fine-tune targeting the citation-rate gap; AnthropicJudge calibration if absolute faithfulness becomes load-bearing. |
+| **Test coverage** | 266 tests, 90% CI gate enforced |
 | **Workflow** | PR-based, branch-protected `main`, auto-merge with rebase on passing CI; pre-push pytest hook locally. |
 | **Recent commit** | See `git log` for the canonical state |
 | **Metric-level view** | See [`evaluations/performance.md`](../evaluations/performance.md) for the per-subsystem report card with measurement provenance and explicit gaps |
