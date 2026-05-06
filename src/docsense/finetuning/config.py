@@ -97,6 +97,17 @@ class FineTuningConfig(BaseSettings):
     # ``"cuda:0"`` (string form), or an explicit ``{"": 0}`` mapping.
     device_map: str = "auto"
 
+    # --- Mixed precision --------------------------------------------
+    # bf16 mixed-precision training. Default True matches the NF4
+    # ``compute_dtype=bfloat16`` for numerical stability. SFTConfig
+    # validates this at construction time and rejects True if no
+    # CUDA-capable bf16 device is available — so tests running on
+    # CPU-only CI override to False. RTX 4070 (sm_89) and Modal A10G
+    # (sm_86) both support bf16 natively; production paths get the
+    # default. Setting this to False on a GPU-capable machine isn't
+    # a useful configuration but the option exists for completeness.
+    bf16: bool = True
+
     @model_validator(mode="after")
     def _warn_if_alpha_far_from_2x_rank(self) -> FineTuningConfig:
         """Soft sanity: alpha ≪ rank or alpha ≫ 4×rank is unusual.

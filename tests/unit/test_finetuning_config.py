@@ -105,6 +105,24 @@ class TestDefaults:
         config = FineTuningConfig()
         assert config.output_dir == Path("models/fine-tunes/qwen-docsense-v1")
 
+    def test_bf16_default_true(self):
+        """Production default: bf16 mixed-precision on, matching the
+        NF4 compute_dtype=bfloat16. RTX 4070 (sm_89) and Modal A10G
+        (sm_86) both support bf16 natively. Tests override to False
+        on CPU-only CI runners (TRL SFTConfig rejects bf16=True there)
+        but the production default stays True — pinned here so a
+        flip to False is a deliberate, reviewable change."""
+        config = FineTuningConfig()
+        assert config.bf16 is True
+
+    def test_device_map_default_auto(self):
+        """device_map default 'auto' lets accelerate distribute. On
+        a 12 GB shared GPU (RTX 4070 with display) override to 'cuda:0'
+        via CLI to force all-GPU placement; pinned default here so
+        the override remains the explicit choice."""
+        config = FineTuningConfig()
+        assert config.device_map == "auto"
+
 
 class TestFieldValidation:
     def test_lora_rank_bounds(self):
