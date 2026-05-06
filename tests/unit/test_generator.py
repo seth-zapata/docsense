@@ -1,19 +1,26 @@
 """Tests for the Generator wrapper.
 
-Covers two surfaces:
+Covers three surfaces:
 
 1. ``parse_citations()`` — the standalone helper that extracts ``[N]``
    notation from generated text and resolves it to retrieved chunks.
-2. ``Generator.generate()`` end-to-end with ``_run_inference`` stubbed.
-   The actual HuggingFace model is never loaded; we verify the wiring
-   that turns inference output + retrieved chunks into a typed
-   ``Answer``.
+2. ``Generator.generate()`` end-to-end with ``_run_inference`` stubbed
+   via subclassing. The actual HuggingFace model is never loaded; we
+   verify the wiring that turns inference output + retrieved chunks
+   into a typed ``Answer``.
+3. ``Generator.generate()`` contract via ``patch.object`` mocking —
+   different test technique from #2 (subclass-based stub). Verifies
+   call shape: ``_run_inference`` is invoked exactly once per
+   ``generate()``, with the prompt argument, and its return value
+   drives the constructed ``Answer``.
 
 Real LLM inference is exercised in Phase 3 / pre-Phase-3 LLM-judge
 evals — not here. These are contract tests for the wrapper.
 """
 
 from __future__ import annotations
+
+from unittest.mock import patch
 
 import pytest
 
@@ -175,3 +182,100 @@ class TestGeneratorLazyLoad:
         gen = Generator(config)
         assert gen._model is None
         assert gen._tokenizer is None
+
+
+class TestGeneratorContractViaPatch:
+    """Block D.3: contract assertions on Generator.generate() using
+    patch.object instead of subclassing. The subclass-based stub in
+    TestGeneratorGenerate exercises the same code path but doesn't
+    let us inspect HOW _run_inference was called. patch.object turns
+    the override into a Mock object, so we can assert call count, the
+    exact arguments passed, and that the mock's return value drives
+    the resulting Answer.
+
+    These tests catch a different category of regression: refactors
+    that, e.g., accidentally call _run_inference twice, swap the
+    prompt and chunks arguments, or ignore the inference output.
+    """
+
+    def _config(self) -> GenerationConfig:
+        return GenerationConfig(model_name="contract-test", device="cpu")
+
+    def _ref(self, doc_id: str = "d.md") -> ChunkRef:
+        return ChunkRef(doc_id=doc_id, chunk_id=f"{doc_id}::chunk_0", score=0.5, text="t")
+
+    def test_run_inference_called_exactly_once_per_generate(self):
+        """Pin the contract: one inference call per generate(). A
+        future refactor that does retry-on-empty or re-tokenizes
+        would silently break latency and cost expectations."""
+        gen = Generator(self._config())
+        with patch.object(
+            gen, "_run_inference", return_value=("text", {"latency_ms": 1.0})
+        ) as mock_inf:
+            gen.generate("prompt-here", [])
+        assert mock_inf.call_count == 1
+
+    def test_run_inference_receives_prompt_argument(self):
+        """The prompt passed to generate() flows directly to
+        _run_inference. Catches refactors that wrap, format, or
+        re-build the prompt before passing it through."""
+        gen = Generator(self._config())
+        with patch.object(
+            gen, "_run_inference", return_value=("text", {"latency_ms": 1.0})
+        ) as mock_inf:
+            gen.generate("the-exact-prompt", [self._ref()])
+
+        # Inspect the call: prompt is the first positional arg
+        args, kwargs = mock_inf.call_args
+        actual_prompt = args[0] if args else kwargs.get("prompt")
+        assert actual_prompt == "the-exact-prompt"
+
+    def test_run_inference_output_drives_answer_text(self):
+        """Whatever _run_inference returns becomes the Answer's text.
+        The mock's return value is the only source of generated text;
+        any text appearing on the Answer that isn't from the mock is
+        a leak."""
+        gen = Generator(self._config())
+        canned = "the-exact-llm-output [1]"
+        with patch.object(
+            gen,
+            "_run_inference",
+            return_value=(canned, {"latency_ms": 5.0}),
+        ):
+            answer = gen.generate("p", [self._ref("d.md")])
+
+        assert answer.text == canned  # text passes through unchanged
+
+    def test_run_inference_metadata_drives_answer_metadata(self):
+        """Latency and token counts on Answer.metadata come from the
+        raw_metadata dict _run_inference returns. Catches a regression
+        where defaults silently mask real values."""
+        gen = Generator(self._config())
+        with patch.object(
+            gen,
+            "_run_inference",
+            return_value=(
+                "ok",
+                {"latency_ms": 999.0, "prompt_tokens": 7, "completion_tokens": 3},
+            ),
+        ):
+            answer = gen.generate("p", [])
+
+        assert answer.metadata.latency_ms == pytest.approx(999.0)
+        assert answer.metadata.prompt_tokens == 7
+        assert answer.metadata.completion_tokens == 3
+        assert answer.metadata.model_name == "contract-test"
+
+    def test_zero_chunks_and_no_citation_in_text_still_produces_valid_answer(self):
+        """Edge case: model produces text without citations and no
+        chunks were retrieved. The Answer is still constructable
+        (vacuous citation-preservation) and minimal."""
+        gen = Generator(self._config())
+        with patch.object(
+            gen, "_run_inference", return_value=("plain answer", {"latency_ms": 1.0})
+        ):
+            answer = gen.generate("p", [])
+
+        assert isinstance(answer, Answer)
+        assert answer.citations == []
+        assert answer.retrieved_chunks == []
