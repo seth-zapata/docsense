@@ -211,18 +211,23 @@ _ATTRIBUTE_CLAIMS_SYSTEM = (
     "for the claim via reasonable inference. Direct quotation is not "
     "required — paraphrasing and reasonable inference are fine. If no "
     "chunk supports the claim, set supporting_chunk_idx to null.\n\n"
+    "**Constraints:**\n"
+    "- supporting_chunk_idx MUST be either null or an integer in the "
+    "range [1, N] where N is the number of chunks shown to you. Do "
+    "not invent chunk numbers beyond what was provided.\n"
+    "- claim_idx values MUST match the numbered claims you were given "
+    "(1-indexed, in order).\n"
+    "- Output one entry per claim, no more, no less.\n\n"
     "Respond with ONLY a JSON object matching this schema (no other "
     "text, no markdown fences):\n"
     "{\n"
     '  "attributions": [\n'
     '    {"claim_idx": <int, 1-indexed>, '
-    '"supporting_chunk_idx": <int 1..K or null>, '
+    '"supporting_chunk_idx": <int in [1, N] or null>, '
     '"rationale": "<one short sentence>"},\n'
     "    ...\n"
     "  ]\n"
-    "}\n\n"
-    "Output one entry per claim, in numerical order. claim_idx values "
-    "must match the numbered claims you were given."
+    "}"
 )
 
 _ATTRIBUTE_CLAIMS_USER_TEMPLATE = "CHUNKS:\n{chunks_block}\n\nCLAIMS:\n{claims_block}"
@@ -344,19 +349,20 @@ _REFUSAL_SYSTEM = (
     "- A safety/policy refusal ('I can't help with that') is also "
     "NOT what we're measuring; we're specifically about "
     "context-availability refusals.\n\n"
-    "Examples:\n"
-    "- 'I don't have enough context to answer that.' → REFUSED: yes\n"
+    "Examples (showing the verdict that should be produced):\n"
+    "- 'I don't have enough context to answer that.' → refused: true\n"
     "- 'The context discusses tokenizers, but I don't have specific "
-    "information about that topic.' → REFUSED: yes\n"
+    "information about that topic.' → refused: true\n"
     "- 'AutoModel.from_pretrained takes a model name string.' → "
-    "REFUSED: no\n"
+    "refused: false\n"
     "- 'I'm not sure, but typically this is around 1 GB.' → "
-    "REFUSED: no\n"
+    "refused: false\n"
     "- 'The answer would require knowledge outside what's provided.' "
-    "→ REFUSED: yes\n\n"
-    "Respond in EXACTLY this format and nothing else:\n"
-    "REFUSED: <yes or no>\n"
-    "RATIONALE: <one short sentence explaining your decision>"
+    "→ refused: true\n\n"
+    "Respond with ONLY a JSON object matching this schema (no other "
+    "text, no markdown fences):\n"
+    '{"refused": <true or false>, '
+    '"rationale": "<one short sentence explaining your decision>"}'
 )
 
 _REFUSAL_USER_TEMPLATE = "QUESTION:\n{question}\n\nANSWER:\n{answer}"
