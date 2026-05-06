@@ -10,6 +10,11 @@ Modules:
   hyperparameter defaults for QLoRA on Qwen 2.5 7B Instruct.
 - ``trainer``: (Block 3A.2) ``LoRAFineTuner`` wrapping PEFT model
   prep + LoRA config + TRL SFTTrainer construction.
+- ``chunk_classifier``: (Block 3B.2.a) heuristic chunk-affinity
+  classifier — given a chunk's text, returns the set of
+  ``QuestionType``s it has affinity for. Foundation for the
+  type-stratified query seeder in Block 3B.2.
 
-See ``docs/phase-3-scope.md`` for the full Phase 3 plan.
+See ``docs/phase-3-scope.md`` and ``docs/phase-3-block-3b2-plan.md``
+for the full Phase 3 plan.
 """
