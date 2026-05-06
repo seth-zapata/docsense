@@ -38,22 +38,23 @@ question, has different metrics, and benefits from different
 optimizations.
 
 ```
-                                    Phase 1 ✅       Phase 2          Phase 2-3        Phase 4
+                                    Phase 1 ✅       Phase 2 ✅      Phase 2 ✅        Phase 4
                                   ┌──────────┐   ┌──────────┐    ┌────────────┐   ┌─────────┐
    User query  ─────────────────► │ Retrieve │ ──►│ Re-rank  │ ──►│  Generate  │ ──► Answer
                                   └──────────┘   └──────────┘    └────────────┘   └─────────┘
                                        ▲              ▲                ▲
                                        │              │                │
                                   BM25+FAISS+RRF  cross-encoder  LLM (Mistral 7B
-                                  hybrid          re-ranking      or Llama 3 8B,
-                                                                  optional QLoRA)
+                                  hybrid          re-ranking      or Llama 3 8B;
+                                                                  scaffolded,
+                                                                  fine-tune in P3)
 ```
 
 | Stage | Question it answers | Status |
 |-------|---------------------|--------|
 | **Retrieve** | Of all chunks in the corpus, which are *plausibly* relevant to this query? | Phase 1 ✅ |
-| **Re-rank** | Of the candidates retrieval found, which is *most* relevant for *this specific* query? | Phase 2 |
-| **Generate** | Given the relevant chunks, what's the actual answer? | Phase 2 (base) + Phase 3 (fine-tuned) |
+| **Re-rank** | Of the candidates retrieval found, which is *most* relevant for *this specific* query? | Phase 2 ✅ |
+| **Generate** | Given the relevant chunks, what's the actual answer? | Phase 2 ✅ (scaffold, mockable) · Phase 3 (real LLM + fine-tune) |
 | **Serve** | How do users actually interact with this system? | Phase 4 |
 
 The reason this is a pipeline of separate stages — rather than one
@@ -135,44 +136,125 @@ matters for Phase 2" below.
 - Docs/architecture.md (this file), engineering journal at
   `docs/journal/` (gitignored).
 
-## Phase 2 — re-ranking + generation
+## Phase 2 — re-ranking + generation (closed)
 
-### Why the bakeoff result matters for Phase 2
+### What got built
 
-The bakeoff revealed that header-based chunking *was* held back by the
-bi-encoder's compression problem — but cross-encoders are
-**fundamentally different**. A cross-encoder takes the query and the
-chunk text *together* and computes a similarity score directly, no
-single-vector summary in between. The compression handicap goes away.
+```
+src/docsense/
+├── retrieval/hybrid.py        CHANGE — HybridRetriever now accepts
+│                              an optional CrossEncoderReranker; over-
+│                              retrieves rerank_candidates from the
+│                              fused list and trims to top_k after
+│                              cross-encoder scoring.
+├── reranking/reranker.py      CHANGE — rerank() takes explicit top_k
+│                              (required); RerankingConfig.batch_size
+│                              is now exclusively the cross-encoder
+│                              inference batch size.
+├── generation/
+│   ├── types.py               NEW — Answer, Citation, ChunkRef,
+│   │                          GenerationMetadata. Pydantic models with
+│   │                          a model_validator enforcing that every
+│   │                          Citation references a chunk in
+│   │                          retrieved_chunks.
+│   ├── context.py             NEW — ContextAssembler. Greedy fill under
+│   │                          a strict token budget. Tokenize_fn is
+│   │                          injectable; budget check tokenizes the
+│   │                          candidate joined string each iteration
+│   │                          to handle non-additive (BPE) tokenizers.
+│   ├── prompt.py              NEW — PromptBuilder with default system
+│   │                          prompt (cite-by-[N], refusal directive)
+│   │                          and template. Snapshot-tested against
+│   │                          tests/snapshots/prompt_default.txt.
+│   └── generator.py           NEW — Generator wrapping HuggingFace
+│                              AutoModelForCausalLM. _run_inference
+│                              is the override point for tests.
+│                              parse_citations() resolves [N] notation
+│                              against retrieved chunks.
+configs/                       NEW — YAML preset files for the bakeoff:
+                               default, no-rerank, header-strategy.
+evaluations/
+├── baselines/phase1_chunking.json  NEW — corrected Phase 1 numbers
+├── eval_sets/structural.json       NEW — 30 programmatic queries
+├── reports/bakeoff-*.json          NEW — committed reports per run
+└── analyses/2026-05-06-bakeoff-investigation.md  NEW — Block B+ writeup
+scripts/run_bakeoff.py         NEW — reproducible bakeoff runner with
+                               --pipeline {dense,hybrid,hybrid-rerank}
+                               and --eval-set {curated,structural}.
+```
 
-So Phase 2's first experiment is to re-run the chunking bakeoff with
-cross-encoder re-ranking enabled. The hypothesis: header recovers
-significantly, possibly overtakes recursive. The interview-quality
-finding either way: "the optimal chunking strategy depends on whether
-you have a re-ranker downstream, and here's the empirical evidence."
+### The Block B+ ablation revealed eval-set bias
 
-### Phase 2 work, in order
+Phase 2's headline experimental finding wasn't about chunking — it was
+about *eval methodology*. The full hybrid+rerank pipeline gave
+contradictory results across two eval sets:
 
-1. **Wire the cross-encoder re-ranker into HybridRetriever.** The
-   class already exists at `src/docsense/reranking/reranker.py` with
-   tests; it just needs to be invoked after RRF fusion. Hybrid takes
-   the top-N (default 20) candidates → cross-encoder scores each
-   → trim to top-k (default 5).
-2. **Re-run the chunking bakeoff with re-ranking on.** Update the
-   notebook, capture the corrected numbers, write a journal coda.
-   This is *the* interesting Phase 2 experiment.
-3. **Context assembly.** Take the reranked top-k chunks and format
-   them into LLM-ready context: token-budget management, source
-   attribution, deduplication. Lives in `src/docsense/generation/`.
-4. **Prompt construction.** System prompt + assembled context + user
-   query. This is where "answer only from these sources" instructions
-   and citation directives live.
-5. **Base-model generation.** Wire up Mistral 7B Instruct or Llama 3
-   8B (decision pending; depends on QLoRA fit on 16 GB VRAM). End-to-end
-   query → answer working with the off-the-shelf model.
+| pipeline | curated MRR winner | structural MRR winner |
+|---|---|---|
+| dense (Phase 1) | recursive (0.692) | header (0.518) |
+| hybrid (no rerank) | recursive (0.667) | header (0.611) |
+| hybrid+rerank | **fixed (0.701)** | **recursive (0.685)** |
 
-By end of Phase 2, the system answers questions about HF Transformers
-docs using a base LLM — no fine-tuning yet, no API yet.
+The "fixed-size chunking wins under hybrid+rerank" result that surfaced
+on the curated 20-query set **didn't replicate** on the unbiased
+30-query structural set, where recursive wins. The Block B
+hypothesis-confirming finding was a curated-eval artifact.
+
+The full ablation analysis lives at
+[`evaluations/analyses/2026-05-06-bakeoff-investigation.md`](../evaluations/analyses/2026-05-06-bakeoff-investigation.md).
+
+**Takeaways carried into Phase 3+:**
+- Always run both eval sets going forward; single-set conclusions are
+  unreliable.
+- Recall@10 improves universally with the cross-encoder (every
+  cell of the 3×2 grid). The reranker is doing real work.
+- Production default: hybrid+rerank pipeline with `chunking.strategy=recursive`.
+  Recursive wins on structural under hybrid+rerank; isn't worst on
+  curated either. Phase 1's choice still holds — for refined reasons.
+
+### Generation surface scaffolded, real LLM deferred
+
+Block C built the generation layer end-to-end:
+
+- **Types** define what an `Answer` is — text, citations, retrieved
+  chunks (audit trail), and metadata. Citation-preservation is a
+  pydantic invariant, not just a parser-side property: an Answer
+  with a Citation pointing at a non-retrieved chunk fails validation
+  at construction time.
+- **Context assembly** budgets retrieved chunks under
+  `GenerationConfig.max_context_tokens`. Greedy fill with a strict
+  invariant: `tokenize(final_text) <= max_tokens` for any monotonic
+  tokenizer. Block D's parameterized test caught an additive-token-
+  drift bug here that would have manifested as silent budget
+  violations in production with real BPE tokenizers; fix landed
+  alongside the test.
+- **Prompt construction** is template-based with a snapshot test.
+  Default system prompt instructs the LLM to cite by `[N]` and to
+  refuse when context is insufficient.
+- **Generator** wraps HuggingFace `AutoModelForCausalLM` with the
+  same lazy-load pattern as `Embedder` and `CrossEncoderReranker`.
+  `_run_inference` is the override point for tests — subclassing or
+  `patch.object` both work without touching the model load path.
+- **Citation parser** turns `[N]` notation in generated text into
+  typed `Citation` objects. Hallucinated indices (`[99]` when only
+  3 chunks exist) and zero-indices are silently dropped, not raised.
+
+**What's not done in Phase 2:** loading a real LLM and running real
+inference end-to-end. The wiring exists; behavioral evaluation
+(faithfulness, answer relevance, real no-answer behavior, citation
+grounding) is **deliberately deferred** to pre-Phase-3 LLM-judge
+evals. See [`docs/eval-methodology.md`](eval-methodology.md) for the
+full breakdown of what runs where.
+
+### Infrastructure landed alongside
+
+- **PR-based workflow** — branch protection on `main`, CI gates
+  (lint, typecheck, test), auto-merge with rebase on `gh pr merge`.
+- **Pre-push pytest hook** — `pytest -m "not slow and not gpu and
+  not integration"` runs locally before every push, catches the
+  bulk of CI failures before they hit GitHub.
+- **194 tests, 90% CI coverage gate.** Two of the new tests
+  (D.2, D.3) caught real bugs in production-relevant code paths.
 
 ## Phase 3 — QLoRA fine-tuning
 
@@ -238,56 +320,68 @@ entry going deeper.
 
 ```
 src/docsense/                  Source code (per-stage modules)
-tests/unit/                    Unit tests (115 currently, 98% coverage)
-tests/integration/             Reserved for end-to-end tests in Phase 2+
-notebooks/                     Experiments — chunking_comparison.ipynb
-                               is the headline Phase 1 artifact
+tests/unit/                    Unit tests (~190, 90% CI gate)
+tests/integration/             End-to-end tests with mocked LLM
+tests/snapshots/               prompt_default.txt — pinned default prompt
+notebooks/                     chunking_comparison.ipynb (rendered Phase 1)
 scripts/                       Pipeline scripts:
-                                 fetch_docs.py    — pull HF docs
-                                 build_index.py   — build a FAISS index
-                                                    for one chunking strategy
-                                 search.py        — CLI search interface
+                                 fetch_docs.py     — pull HF docs
+                                 build_index.py    — build a FAISS index
+                                                     for one chunking strategy
+                                 search.py         — CLI search interface
+                                 run_bakeoff.py    — reproducible bakeoff runner
+                                                     (--pipeline / --eval-set)
                                  generate_structural_queries.py
-                                                  — produce unbiased
-                                                    eval set from doc
-                                                    headings
-configs/                       (Reserved) per-environment YAML configs
+                                                   — produce unbiased
+                                                     structural eval set
+configs/                       YAML presets for run_bakeoff.py:
+                                 default.yaml, no-rerank.yaml,
+                                 header-strategy.yaml
+evaluations/                   Committed eval artifacts:
+├── README.md                   conventions for the directory
+├── baselines/                  immutable reference numbers
+├── eval_sets/                  versioned query distributions
+├── reports/                    bakeoff results per run
+└── analyses/                   markdown interpretations of reports
 data/                          (gitignored) raw docs, embeddings, indices
 docs/journal/                  (gitignored) personal engineering journal —
                                decisions, surprises, debug logs
 docs/architecture.md           This file
+docs/phase-2-4-scope.md        Phase 2-4 scope + block-paced plan
+docs/eval-methodology.md       What's measured where; PR vs nightly vs manual
 CLAUDE.md                      Dev/Claude instructions + active roadmap
+.claude/settings.json          Project Claude permissions (workflow allowlist)
 .github/workflows/ci.yml       CI: lint, typecheck, test+coverage
-.pre-commit-config.yaml        Pre-commit hooks
+.pre-commit-config.yaml        Pre-commit hooks (commit + pre-push)
 pyproject.toml                 Build + tool config (ruff, mypy, pytest,
                                coverage)
 ```
 
 ## Evaluation methodology
 
-What's measured at each phase, and how:
+The full breakdown — what's measured, on which eval sets, where it
+runs (PR / nightly / manual), and where artifacts live — is in
+[`docs/eval-methodology.md`](eval-methodology.md). Quick orientation:
 
-- **Retrieval (Phase 1):** P@k, Recall@k, MRR, nDCG against a
-  20-query hand-curated set. Will add a structural eval set
-  (`evaluation/structural_queries.py`, generated from doc headings)
-  in Phase 2 for an unbiased complement. LLM-generated eval set
-  ("5c") deferred to Phase 3.
-- **Reranking (Phase 2):** Same metrics as retrieval, run on the
-  *reranked* top-k. Re-runs the bakeoff to compare strategies in the
-  presence of re-ranking.
-- **Generation (Phase 2 base, Phase 3 fine-tuned):** Faithfulness
-  (does the answer follow from the retrieved chunks?), answer
-  relevance (does it actually address the question?), citation
-  accuracy. End-to-end eval on a held-out question set.
-- **Serving (Phase 4):** Latency percentiles, error rate, downstream
-  query traces. SLA-style metrics, not quality metrics.
+- **Retrieval (Phase 1+):** P@k, Recall@k, MRR, nDCG against curated
+  and structural eval sets. Run via `scripts/run_bakeoff.py`.
+- **Generation contracts (Phase 2):** citation-preservation invariant,
+  strict token-budget enforcement, prompt snapshot, generator-flow
+  contract tests. All run on every PR.
+- **Generation behavior (Phase 3+):** faithfulness, answer relevance,
+  citation grounding, real no-answer behavior. LLM-judge evals,
+  manual or nightly. Not in PR CI.
+- **Serving (Phase 4):** latency percentiles, error rate, query
+  traces. Operational metrics, not quality metrics.
 
 ## Status snapshot
 
 | | |
 |---|---|
-| **Current phase** | Phase 2 (just starting) |
-| **Headline Phase 1 result** | Recursive chunking wins on rank-sensitive retrieval metrics; header is competitive enough that re-ranking might flip the order |
-| **Next experiment** | Wire cross-encoder re-ranker into HybridRetriever and re-run the bakeoff |
-| **Test coverage** | 98% with a 90% CI gate |
+| **Current phase** | Phase 2 closed; pre-Phase-3 work next |
+| **Phase 1 finding** | Recursive chunking wins under dense-only retrieval (MRR 0.692). Established the eval set + corrected metrics. |
+| **Phase 2 finding** | The "fixed wins under hybrid+rerank" result on the curated set didn't replicate on the structural set — exposed eval-set bias as a real issue. Production default: hybrid+rerank with `chunking.strategy=recursive`. |
+| **Next experiment** | LLM-judge eval scaffolding (faithfulness, answer relevance, citation grounding); first end-to-end run of the pipeline with a real Mistral 7B / Llama 3 8B base model. |
+| **Test coverage** | 194 tests, 90% CI gate enforced |
+| **Workflow** | PR-based, branch-protected `main`, auto-merge with rebase on passing CI; pre-push pytest hook locally. |
 | **Recent commit** | See `git log` for the canonical state |

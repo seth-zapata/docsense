@@ -95,11 +95,23 @@ gh pr merge --auto --rebase --delete-branch  # merges when CI passes
 - **Phase 1 — closed.** Ingestion, three chunking strategies, hybrid retrieval
   (BM25 + FAISS + RRF), retrieval metrics, chunking bakeoff, eval scaffold,
   CI fortification (test matrix, mypy, pre-commit).
-- **Phase 2 — in progress.** Cross-encoder re-ranker wired into
-  `HybridRetriever`, re-bakeoff with re-ranking, context assembly, prompt
-  construction, base-model generation (Mistral 7B / Llama 3 8B).
+- **Phase 2 — closed (2026-05-06).** Cross-encoder re-ranker wired into
+  `HybridRetriever`. Bakeoff investigation (Block B+) ablated BM25/RRF/rerank
+  separately and added a structural eval set; ablation revealed the original
+  "fixed wins" finding was a curated-eval artifact and surfaced eval-set bias
+  as a real concern. Generation surface scaffolded — `Answer`/`Citation`/
+  `ChunkRef` types, `ContextAssembler` (strict token budget), `PromptBuilder`
+  (snapshot-tested), `Generator` (mockable, with citation parser). Rule-based
+  invariants pinned: citation-preservation as a pydantic model_validator,
+  tokenizer-agnostic budget enforcement (caught and fixed a real
+  non-additive-tokenizer drift bug). 194 tests, 90% CI coverage gate. **The
+  full pipeline is end-to-end runnable; real LLM behavior is exercised in
+  Phase 3 / pre-Phase-3 LLM-judge evals, not yet.**
 - **Phase 3.** QLoRA fine-tuning track — supervised dataset construction,
-  training script, eval against base-model baseline.
+  training script, eval against base-model baseline. Pre-Phase-3 work also
+  includes the LLM-judge eval scaffolding (faithfulness, answer relevance,
+  citation grounding, real no-answer behavior) and the deferred 5c
+  LLM-generated eval set.
 - **Phase 4.** FastAPI serving + `tracing/` (structured query logs), end-to-end
   generation eval (faithfulness, answer relevance), Docker packaging.
 
