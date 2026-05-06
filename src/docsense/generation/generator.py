@@ -153,6 +153,13 @@ class Generator:
                 return_dict=True,
             ),
         )
+        # Move inputs to wherever the model lives. With device_map="auto"
+        # accelerate's hooks would handle this transparently, but explicit
+        # device_map="cuda:0" / "cpu" loads the model strictly without
+        # hooks — inputs default to CPU and trip a device-mismatch
+        # RuntimeError on model.generate(). Always-move is a no-op when
+        # input device == model device, so it's safe under both maps.
+        inputs = inputs.to(self.model.device)
         input_token_count = int(inputs["input_ids"].shape[1])
 
         start = time.perf_counter()
