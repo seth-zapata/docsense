@@ -32,12 +32,21 @@ class StubJudge(LlamaJudge):
         super().__init__(JudgeConfig())
         self._queue: list[str] = []
         self.calls: list[list[dict[str, str]]] = []
+        self.max_new_tokens_seen: list[int | None] = []
 
     def queue(self, *responses: str) -> None:
         self._queue.extend(responses)
 
-    def _run_inference(self, messages: list[dict[str, str]]) -> str:
+    def _run_inference(
+        self,
+        messages: list[dict[str, str]],
+        *,
+        max_new_tokens: int | None = None,
+    ) -> str:
         self.calls.append(messages)
+        # Track per-call max_new_tokens override so tests can pin the
+        # extraction vs attribution sizing contract.
+        self.max_new_tokens_seen.append(max_new_tokens)
         if not self._queue:
             return ""
         return self._queue.pop(0)
@@ -295,6 +304,36 @@ class TestJudgeFaithfulnessClaimLevel:
         judge.judge_faithfulness("Question about X", chunks=_chunks("x"), answer="ans")
         msgs = judge.calls[0]
         assert "Question about X" in msgs[1]["content"]
+
+    def test_extract_and_attribute_use_larger_token_budgets(self):
+        """Pin the per-call max_new_tokens override contract: extraction
+        and attribution need substantially larger token budgets than the
+        default JudgeConfig.max_new_tokens (256). The default is sized for
+        relevance; faithfulness flows would silently truncate output without
+        the override (caught in the first PR-B run — long answers had
+        attribution output cut off mid-list, producing PARSE_FAILED on
+        every claim past the cap)."""
+        judge = StubJudge()
+        judge.queue("1. claim", "CLAIM 1: chunk 1 | RATIONALE: ok.")
+        judge.judge_faithfulness("q", chunks=_chunks("a"), answer="ans")
+        # Two calls: extraction then attribution.
+        assert len(judge.max_new_tokens_seen) == 2
+        extraction_budget, attribution_budget = judge.max_new_tokens_seen
+        assert extraction_budget is not None
+        assert attribution_budget is not None
+        assert extraction_budget > judge.config.max_new_tokens
+        assert attribution_budget > judge.config.max_new_tokens
+        # Attribution needs more headroom than extraction (~75 tok/line × N
+        # claims vs ~30 tok/claim).
+        assert attribution_budget > extraction_budget
+
+    def test_relevance_uses_default_token_budget(self):
+        """Relevance keeps the default JudgeConfig.max_new_tokens budget
+        — single SCORE+RATIONALE response is small."""
+        judge = StubJudge()
+        judge.queue("SCORE: 0.75\nRATIONALE: ok")
+        judge.judge_relevance("q?", "ans")
+        assert judge.max_new_tokens_seen == [None]  # i.e., no override
 
     def test_attribute_call_includes_chunks_and_claims(self):
         """The attribution prompt must include both the chunks block

@@ -445,7 +445,16 @@ def _aggregate_faithfulness_scores(records: list[QueryRecord]) -> dict[str, Any]
     """
     scores: list[float] = []
     n_no_claims = 0
-    n_parse_failed = 0
+    # Two distinct parse-failure signals to surface separately:
+    # - score-level: extraction parser failed to parse the LLM's claim list
+    # - claim-level: attribution parser failed to find a line for some claims
+    # The score-level case is rare (NO_CLAIMS_EXTRACTED is the much more
+    # common path); the claim-level case caught a real bug where attribution
+    # output was truncated by max_new_tokens on long answers. Both worth
+    # surfacing so the aggregate doesn't lie about the eval's quality.
+    n_score_parse_failures = 0
+    n_claim_parse_failures = 0
+    n_claim_out_of_range = 0
     total_claims = 0
     total_supported = 0
     claims_per_answer: list[int] = []
@@ -459,7 +468,7 @@ def _aggregate_faithfulness_scores(records: list[QueryRecord]) -> dict[str, Any]
         if "NO_CLAIMS_EXTRACTED" in score.rationale:
             n_no_claims += 1
         if "PARSE_FAILED" in score.rationale:
-            n_parse_failed += 1
+            n_score_parse_failures += 1
 
         n_claims = len(score.claim_attributions)
         claims_per_answer.append(n_claims)
@@ -471,6 +480,10 @@ def _aggregate_faithfulness_scores(records: list[QueryRecord]) -> dict[str, Any]
                 chunk_citation_counts[key] = chunk_citation_counts.get(key, 0) + 1
             else:
                 chunk_citation_counts["none"] = chunk_citation_counts.get("none", 0) + 1
+            if attr.rationale and "PARSE_FAILED" in attr.rationale:
+                n_claim_parse_failures += 1
+            if attr.rationale and "OUT_OF_RANGE" in attr.rationale:
+                n_claim_out_of_range += 1
 
     if not scores:
         return {"n": 0}
@@ -519,7 +532,14 @@ def _aggregate_faithfulness_scores(records: list[QueryRecord]) -> dict[str, Any]
         else 0.0,
         "max_per_answer": max(claims_per_answer) if claims_per_answer else 0,
         "n_no_claims_extracted": n_no_claims,
-        "n_parse_failures": n_parse_failed,
+        # Score-level parse failures (extraction-step misbehavior) and
+        # claim-level parse failures (attribution-step misbehavior) are
+        # distinct signals — the latter often indicates max_new_tokens
+        # truncation. Surface both so the aggregate honestly reports
+        # eval health.
+        "n_score_parse_failures": n_score_parse_failures,
+        "n_claim_parse_failures": n_claim_parse_failures,
+        "n_claim_out_of_range": n_claim_out_of_range,
     }
     return {
         "score": score_summary,
@@ -703,7 +723,9 @@ def _print_summary(report: dict[str, Any]) -> None:
         print(
             f"  faithfulness: mean={sc['mean']:.3f}  median={sc['median']:.3f}  "
             f"support={cl['total_supported']}/{cl['total_extracted']} claims "
-            f"({cl['support_rate']:.2f})  parse-failures={cl['n_parse_failures']}"
+            f"({cl['support_rate']:.2f})  "
+            f"parse-fails: score={cl['n_score_parse_failures']} "
+            f"claim={cl['n_claim_parse_failures']} oor={cl['n_claim_out_of_range']}"
         )
     if "relevance" in agg and agg["relevance"]["n"] > 0:
         print(

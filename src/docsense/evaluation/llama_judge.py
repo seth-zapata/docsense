@@ -368,8 +368,37 @@ class LlamaJudge(LLMJudge):
             bnb_4bit_use_double_quant=True,
         )
 
-    def _run_inference(self, messages: list[dict[str, str]]) -> str:
-        """Run the judge model and return the generated text."""
+    # Per-call max_new_tokens overrides. The default ``JudgeConfig.max_new_tokens=256``
+    # is sized for the relevance flow (SCORE + 1-2 sentence rationale, typically
+    # ~50 tokens). Faithfulness flows have very different output sizes:
+    #
+    # - Extraction: a numbered list of N claims (avg ~30 tokens/claim).
+    #   For a long answer with 15 claims, that's ~450 tokens.
+    # - Attribution: a numbered list of N attribution lines
+    #   (avg ~75 tokens/line including "CLAIM <i>: chunk <X> | RATIONALE: ..."),
+    #   so a 16-claim answer needs ~1200 tokens.
+    #
+    # The original 256-token cap silently truncated attribution output for
+    # answers with > 4 claims, producing PARSE_FAILED on every claim past the
+    # cap (curated_001/008/010 in the first PR-B run). Sized 4× larger than
+    # the worst observed case so the cap doesn't gate us at the next
+    # eval-set growth step.
+    _EXTRACTION_MAX_TOKENS = 768
+    _ATTRIBUTION_MAX_TOKENS = 2048
+
+    def _run_inference(
+        self,
+        messages: list[dict[str, str]],
+        *,
+        max_new_tokens: int | None = None,
+    ) -> str:
+        """Run the judge model and return the generated text.
+
+        ``max_new_tokens`` overrides ``self.config.max_new_tokens`` for
+        a single call. Used by the faithfulness flow to give extraction
+        and attribution more headroom than relevance (see class-level
+        constants for the rationale).
+        """
         inputs = cast(
             "Any",
             self.tokenizer.apply_chat_template(
@@ -385,7 +414,9 @@ class LlamaJudge(LLMJudge):
 
         output_ids = cast("Any", self.model).generate(
             **inputs,
-            max_new_tokens=self.config.max_new_tokens,
+            max_new_tokens=max_new_tokens
+            if max_new_tokens is not None
+            else self.config.max_new_tokens,
             temperature=self.config.temperature,
             top_p=self.config.top_p,
             do_sample=self.config.temperature > 0,
@@ -409,7 +440,7 @@ class LlamaJudge(LLMJudge):
                 "content": _EXTRACT_CLAIMS_USER_TEMPLATE.format(question=question, answer=answer),
             },
         ]
-        text = self._run_inference(messages)
+        text = self._run_inference(messages, max_new_tokens=self._EXTRACTION_MAX_TOKENS)
         return parse_claims(text)
 
     def attribute_claims_to_chunks(
@@ -422,6 +453,12 @@ class LlamaJudge(LLMJudge):
         one ClaimAttribution per claim, in input order. Out-of-range
         chunk indices and missing attribution lines are surfaced as
         ``supporting_chunk_idx=None`` with a marker in the rationale.
+
+        Uses a much larger ``max_new_tokens`` than the default config —
+        attribution output scales linearly with claim count (~75 tokens
+        per attribution line), and the default 256-token cap was
+        silently truncating output on long answers. See the class-level
+        ``_ATTRIBUTION_MAX_TOKENS`` constant for sizing rationale.
 
         Empty ``claims`` returns an empty list without invoking the
         LLM (no work to do).
@@ -438,7 +475,7 @@ class LlamaJudge(LLMJudge):
                 ),
             },
         ]
-        text = self._run_inference(messages)
+        text = self._run_inference(messages, max_new_tokens=self._ATTRIBUTION_MAX_TOKENS)
         return parse_claim_attributions(text, claims=claims, n_chunks=len(chunks))
 
     def judge_faithfulness(self, question: str, chunks: list[ChunkRef], answer: str) -> JudgeScore:
