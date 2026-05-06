@@ -84,11 +84,36 @@ class Generator:
         if self._model is None:
             from transformers import AutoModelForCausalLM
 
+            kwargs: dict[str, Any] = {"device_map": self.config.device}
+            if self.config.use_4bit_quantization:
+                kwargs["quantization_config"] = self._build_4bit_config()
+
             self._model = AutoModelForCausalLM.from_pretrained(
                 self.config.model_name,
-                device_map=self.config.device,
+                **kwargs,
             )
         return self._model
+
+    @staticmethod
+    def _build_4bit_config() -> Any:
+        """Construct the BitsAndBytesConfig for NF4 4-bit loading.
+
+        Lazy-imports both ``transformers.BitsAndBytesConfig`` and
+        ``torch`` so installs without the ``[gpu]`` extras (no
+        bitsandbytes) can still import the rest of this module — the
+        caller will hit a clear ImportError only when they try to load
+        the model with 4-bit on. This is what we want; module import
+        should never fail on optional deps.
+        """
+        import torch
+        from transformers import BitsAndBytesConfig
+
+        return BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_quant_type="nf4",
+            bnb_4bit_compute_dtype=torch.float16,
+            bnb_4bit_use_double_quant=True,
+        )
 
     @property
     def tokenizer(self) -> PreTrainedTokenizerBase:

@@ -20,7 +20,7 @@ evals — not here. These are contract tests for the wrapper.
 
 from __future__ import annotations
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -188,6 +188,67 @@ class TestGeneratorLazyLoad:
         gen = Generator(config)
         assert gen._model is None
         assert gen._tokenizer is None
+
+
+class TestGeneratorQuantization:
+    """Block 1A.3: pin the wiring of the NF4 4-bit quantization config.
+
+    These tests verify the BitsAndBytesConfig that *would* be passed to
+    AutoModelForCausalLM.from_pretrained, without actually loading a
+    model. The full integration (does the model load, does it generate
+    correctly) is exercised by the manual smoke script — pre-PR-CI
+    territory because it requires a real GPU + ~5 GB download.
+    """
+
+    def test_4bit_config_uses_nf4_with_double_quant(self):
+        """NF4 (NormalFloat-4) is the recommended quant type for LLMs;
+        double quantization saves a further ~0.5 bit/parameter at
+        negligible quality cost. Both pinned here so a well-meaning
+        refactor doesn't silently switch to FP4 or drop double-quant."""
+        bnb_config = Generator._build_4bit_config()
+
+        # bitsandbytes version variations expose the config slightly
+        # differently; check the public attributes that have been stable
+        # across recent releases.
+        assert bnb_config.load_in_4bit is True
+        assert bnb_config.bnb_4bit_quant_type == "nf4"
+        assert bnb_config.bnb_4bit_use_double_quant is True
+
+    def test_use_4bit_quantization_default_true(self):
+        """Default flips to True so the typical 12-GB-VRAM user gets
+        working behavior out of the box; CPU-only / no-bitsandbytes
+        users opt out via use_4bit_quantization=False."""
+        config = GenerationConfig()
+        assert config.use_4bit_quantization is True
+
+    def test_disabling_4bit_skips_quantization_config(self):
+        """When use_4bit_quantization=False, no BitsAndBytesConfig
+        should reach the model loader — verified by patching the
+        AutoModelForCausalLM.from_pretrained call and inspecting kwargs."""
+        config = GenerationConfig(model_name="dummy", use_4bit_quantization=False)
+        gen = Generator(config)
+
+        with patch("transformers.AutoModelForCausalLM") as mock_cls:
+            mock_cls.from_pretrained.return_value = MagicMock()
+            _ = gen.model
+
+        kwargs = mock_cls.from_pretrained.call_args.kwargs
+        assert "quantization_config" not in kwargs
+
+    def test_enabling_4bit_passes_quantization_config(self):
+        """Mirror of the above: when the flag is on, the kwargs include
+        a BitsAndBytesConfig."""
+        config = GenerationConfig(model_name="dummy", use_4bit_quantization=True)
+        gen = Generator(config)
+
+        with patch("transformers.AutoModelForCausalLM") as mock_cls:
+            mock_cls.from_pretrained.return_value = MagicMock()
+            _ = gen.model
+
+        kwargs = mock_cls.from_pretrained.call_args.kwargs
+        assert "quantization_config" in kwargs
+        # Sanity check: the config carries the NF4 marker
+        assert kwargs["quantization_config"].bnb_4bit_quant_type == "nf4"
 
 
 class TestGeneratorContractViaPatch:
