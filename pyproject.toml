@@ -57,6 +57,14 @@ gpu = [
     # in 12 GB VRAM. It's a runtime requirement when
     # GenerationConfig.use_4bit_quantization is True (the default).
     "bitsandbytes>=0.43.0",
+    # Modal: serverless GPU compute for Phase 3 LoRA fine-tuning runs.
+    # Local training on RTX 4070 works (~5-8 hr per run) but locks the
+    # machine for hours; offloading to Modal A10G (~$1.10/hr, 24 GB
+    # VRAM, plenty for 7B QLoRA) cuts wall time to ~30-45 min and keeps
+    # the dev machine usable. CLI auth is browser-based, persisted to
+    # ~/.modal.toml. Optional — local training paths in
+    # `scripts/train_lora.py` will work without modal installed.
+    "modal>=1.0.0",
     # Note: faiss-gpu is intentionally NOT here. The package is
     # chronically unavailable on PyPI for most Python/CUDA combinations
     # (FAISS' GPU wheels have shifted between conda-only, third-party
