@@ -39,6 +39,12 @@ dependencies = [
     "wandb>=0.16.0",
     "numpy>=1.26.0",
     "tqdm>=4.66.0",
+    # Anthropic SDK for Phase 3 distilled training-data generation
+    # (scripts/build_training_dataset.py). Reads ANTHROPIC_API_KEY
+    # from env or, in our scripts, from ``~/.anthropic-key`` (mode 600).
+    # Optional at runtime — only needed when running the distillation
+    # script, not for the inference pipeline.
+    "anthropic>=0.40.0",
 ]
 
 [project.optional-dependencies]

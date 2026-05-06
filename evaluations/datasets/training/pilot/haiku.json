@@ -1,0 +1,290 @@
+{
+  "examples": [
+    {
+      "query": "How do I save a fine-tuned model and load it back later?",
+      "retrieved_chunks": [
+        {
+          "doc_id": "model_doc/vision-encoder-decoder.md",
+          "chunk_id": "model_doc/vision-encoder-decoder.md::chunk_6",
+          "score": 2.1405692100524902,
+          "text": "Yijuan Lu, Dinei Florencio, Cha Zhang,\nZhoujun Li, Furu Wei.\n\nAfter such a [`VisionEncoderDecoderModel`] has been trained/fine-tuned, it can be saved/loaded just like any other models (see the examples below\nfor more information)."
+        },
+        {
+          "doc_id": "deepspeed.md",
+          "chunk_id": "deepspeed.md::chunk_122",
+          "score": 0.03885387256741524,
+          "text": ". pytorch_model.bin\n```\n\n</hfoption>\n<hfoption id=\"online\">\n\nAdding the `--load_best_model_at_end` parameter in [`TrainingArguments`] tracks the best checkpoint so you can finish training first and save the final model explicitly. Reload the model as shown below."
+        },
+        {
+          "doc_id": "quantization/finegrained_fp8.md",
+          "chunk_id": "quantization/finegrained_fp8.md::chunk_8",
+          "score": -0.5987553596496582,
+          "text": "model and reload it with [`~PreTrainedModel.from_pretrained`].\n\n```py\nquant_path = \"/path/to/save/quantized/model\"\nmodel.save_pretrained(quant_path)\nmodel = AutoModelForCausalLM.from_pretrained(quant_path, device_map=\"auto\")\n```"
+        },
+        {
+          "doc_id": "models.md",
+          "chunk_id": "models.md::chunk_19",
+          "score": -1.2145941257476807,
+          "text": "guide to learn more about how models are loaded.\n\n[`~PreTrainedModel.save_pretrained`] also creates an index file mapping parameter names to their shard files. The index contains two keys, `metadata` and `weight_map`.\n\n```py\nimport json\n\nwith tempfile.TemporaryDirectory() as tmp_dir:\n    model.save_pretrained(tmp_dir, max_shard_size=\"50GB\")\n    with open(os.path.join(tmp_dir, \"model.safetensors.index.json\"), \"r\") as f:\n        index = json.load(f)\n\nprint(index.keys())\n```"
+        },
+        {
+          "doc_id": "philosophy.md",
+          "chunk_id": "philosophy.md::chunk_17",
+          "score": -1.505039930343628,
+          "text": "or\n\nstored locally (or on a server) by the user.\n\n- `save_pretrained()` lets you save a model, configuration, and preprocessing class locally so that it can be reloaded using\n\n`from_pretrained()`.\n\n- `push_to_hub()` lets you share a model, configuration, and a preprocessing class to the Hub, so it is easily accessible to everyone."
+        }
+      ],
+      "ideal_answer": "Use `model.save_pretrained(path)` to save your fine-tuned model locally [5], then reload it with `AutoModel.from_pretrained(path)` [5]. For example: `model.save_pretrained(\"/path/to/model\")` followed by `model = AutoModelForCausalLM.from_pretrained(\"/path/to/model\")` [3]. This saves the model weights, configuration, and preprocessing class together [5].",
+      "is_refusal": false,
+      "metadata": {
+        "distill_model": "claude-haiku-4-5",
+        "enable_thinking": false,
+        "prompt_version": "v2",
+        "captured_at": "2026-05-06T22:51:44+00:00",
+        "input_tokens": 1810,
+        "output_tokens": 122
+      }
+    },
+    {
+      "query": "What's the difference between AutoModel and AutoModelForCausalLM?",
+      "retrieved_chunks": [
+        {
+          "doc_id": "models.md",
+          "chunk_id": "models.md::chunk_8",
+          "score": 1.5306774377822876,
+          "text": "*model* used interchangeably with architecture and checkpoint.\n\nThere are two general types of models you can load:\n\n1. A barebones model, like [`AutoModel`] or [`LlamaModel`], that outputs hidden states.\n2. A model with a specific *head* attached, like [`AutoModelForCausalLM`] or [`LlamaForCausalLM`], for performing specific tasks.\n\n## Model classes"
+        },
+        {
+          "doc_id": "model_doc/auto.md",
+          "chunk_id": "model_doc/auto.md::chunk_9",
+          "score": 1.480766773223877,
+          "text": "AutoModelForCausalLM\n\n### AutoModelForMaskedLM\n\n[[autodoc]] AutoModelForMaskedLM\n\n### AutoModelForMaskGeneration\n\n[[autodoc]] AutoModelForMaskGeneration\n\n### AutoModelForSeq2SeqLM\n\n[[autodoc]] AutoModelForSeq2SeqLM\n\n### AutoModelForSequenceClassification\n\n[[autodoc]] AutoModelForSequenceClassification\n\n### AutoModelForMultipleChoice\n\n[[autodoc]] AutoModelForMultipleChoice\n\n### AutoModelForNextSentencePrediction\n\n[[autodoc]] AutoModelForNextSentencePrediction\n\n### AutoModelForTokenClassification"
+        },
+        {
+          "doc_id": "model_doc/auto.md",
+          "chunk_id": "model_doc/auto.md::chunk_8",
+          "score": 1.240644931793213,
+          "text": "a base model class without a specific head.\n\n### AutoModel\n\n[[autodoc]] AutoModel\n\n## Generic pretraining classes\n\nThe following auto classes are available for instantiating a model with a pretraining head.\n\n### AutoModelForPreTraining\n\n[[autodoc]] AutoModelForPreTraining\n\n## Natural Language Processing\n\nThe following auto classes are available for the following natural language processing tasks.\n\n### AutoModelForCausalLM\n\n[[autodoc]] AutoModelForCausalLM\n\n### AutoModelForMaskedLM"
+        },
+        {
+          "doc_id": "models.md",
+          "chunk_id": "models.md::chunk_11",
+          "score": 0.85304194688797,
+          "text": "as long as the architecture is supported for a given task.\n\nFor example, the same model can be used for separate tasks.\n\n```py\nfrom transformers import AutoModelForCausalLM, AutoModelForSequenceClassification, AutoModelForQuestionAnswering"
+        },
+        {
+          "doc_id": "community_integrations/axolotl.md",
+          "chunk_id": "community_integrations/axolotl.md::chunk_7",
+          "score": -0.07585178315639496,
+          "text": "and [attention backend](../attention_interface).\n\n- `ModelLoader` automatically selects the appropriate [`AutoModel`] class ([`AutoModelForCausalLM`], [`AutoModelForImageTextToText`], [`AutoModelForSequenceClassification`]) or a model-specific class from the multimodal mapping. Weights load with the selected loader's `from_pretrained`. When `reinit_weights` is set, Axolotl uses `from_config` for random initialization."
+        }
+      ],
+      "ideal_answer": "AutoModel is a base model class without a specific head [3], while AutoModelForCausalLM is a model with a causal language modeling head attached for performing next-token prediction tasks [1].",
+      "is_refusal": false,
+      "metadata": {
+        "distill_model": "claude-haiku-4-5",
+        "enable_thinking": false,
+        "prompt_version": "v2",
+        "captured_at": "2026-05-06T22:51:46+00:00",
+        "input_tokens": 1882,
+        "output_tokens": 52
+      }
+    },
+    {
+      "query": "How does Flash Attention 2 integrate with transformers models?",
+      "retrieved_chunks": [
+        {
+          "doc_id": "model_doc/gpt_bigcode.md",
+          "chunk_id": "model_doc/gpt_bigcode.md::chunk_16",
+          "score": 6.644364356994629,
+          "text": "a model using Flash Attention 2, refer to the snippet below:\n\n```python\n>>> import torch\n>>> from transformers import AutoModelForCausalLM, AutoTokenizer\nfrom accelerate import Accelerator\n>>> device = Accelerator().device # the device to load the model onto\n\n>>> model = AutoModelForCausalLM.from_pretrained(\"bigcode/gpt_bigcode-santacoder\", dtype=torch.float16, attn_implementation=\"flash_attention_2\")\n>>> tokenizer = AutoTokenizer.from_pretrained(\"bigcode/gpt_bigcode-santacoder\")"
+        },
+        {
+          "doc_id": "model_doc/video_llama_3.md",
+          "chunk_id": "model_doc/video_llama_3.md::chunk_22",
+          "score": 6.388411045074463,
+          "text": "when a model is loaded in `torch.float16` or `torch.bfloat16`.\n\nTo load and run a model using Flash Attention-2, simply add `attn_implementation=\"flash_attention_2\"` when loading the model as follows:\n\n```python\nfrom transformers import VideoLlama3ForConditionalGeneration\n\nmodel = VideoLlama3ForConditionalGeneration.from_pretrained(\n    \"lkhl/VideoLLaMA3-2B-Image-HF\", \n    dtype=torch.bfloat16, \n    attn_implementation=\"flash_attention_2\",\n)\n```\n\n## VideoLlama3Config\n\n[[autodoc]] VideoLlama3Config"
+        },
+        {
+          "doc_id": "model_doc/chameleon.md",
+          "chunk_id": "model_doc/chameleon.md::chunk_25",
+          "score": 6.1073503494262695,
+          "text": "for Flash Attention 2, first make sure to install flash-attn\n\nRefer to the [original repository](https://github.com/Dao-AILab/flash-attention) regarding that package installation\n\nSimply change the snippet above with:\n\n```python\nfrom transformers import ChameleonForConditionalGeneration\n\nmodel_id = \"facebook/chameleon-7b\"\nmodel = ChameleonForConditionalGeneration.from_pretrained(\n    model_id,\n    dtype=torch.bfloat16,\n    attn_implementation=\"flash_attention_2\"\n).to(0)\n```\n\n## ChameleonConfig"
+        },
+        {
+          "doc_id": "model_doc/bark.md",
+          "chunk_id": "model_doc/bark.md::chunk_12",
+          "score": 6.0866546630859375,
+          "text": "install -U flash-attn --no-build-isolation\n```\n\n##### Usage\n\nTo load a model using Flash Attention 2, we can pass the `attn_implementation=\"flash_attention_2\"` flag to [`.from_pretrained`](https://huggingface.co/docs/transformers/main/en/main_classes/model#transformers.PreTrainedModel.from_pretrained). We'll also load the model in half-precision (e.g. `torch.float16`), since it results in almost no degradation to audio quality but significantly lower memory usage and faster inference:"
+        },
+        {
+          "doc_id": "model_doc/wav2vec2.md",
+          "chunk_id": "model_doc/wav2vec2.md::chunk_10",
+          "score": 5.946980953216553,
+          "text": "install -U flash-attn --no-build-isolation\n```\n\n### Usage\n\nTo load a model using Flash Attention 2, we can pass the argument `attn_implementation=\"flash_attention_2\"` to [`.from_pretrained`](https://huggingface.co/docs/transformers/main/en/main_classes/model#transformers.PreTrainedModel.from_pretrained). We'll also load the model in half-precision (e.g. `torch.float16`), since it results in almost no degradation to audio quality but significantly lower memory usage and faster inference:"
+        }
+      ],
+      "ideal_answer": "Flash Attention 2 integrates with transformers models by passing `attn_implementation=\"flash_attention_2\"` to `.from_pretrained()` when loading the model [1][2][3]. First, install the flash-attn package with `pip install -U flash-attn --no-build-isolation` [4][5]. Load the model in half-precision (`torch.float16` or `torch.bfloat16`) to achieve lower memory usage and faster inference with minimal quality degradation [4][5].",
+      "is_refusal": false,
+      "metadata": {
+        "distill_model": "claude-haiku-4-5",
+        "enable_thinking": false,
+        "prompt_version": "v2",
+        "captured_at": "2026-05-06T22:51:48+00:00",
+        "input_tokens": 2089,
+        "output_tokens": 131
+      }
+    },
+    {
+      "query": "What's the recommended way to handle padding for batched inference?",
+      "retrieved_chunks": [
+        {
+          "doc_id": "model_doc/paddleocr_vl.md",
+          "chunk_id": "model_doc/paddleocr_vl.md::chunk_19",
+          "score": 4.132884979248047,
+          "text": "Batched inference\n\nPaddleOCRVL also supports batched inference. We advise users to use `padding_side=\"left\"` when computing batched generation as it leads to more accurate results. Here is how you can do it with PaddleOCRVL using [`Pipeline`] or the [`AutoModel`]:\n\n<hfoptions id=\"usage\">\n<hfoption id=\"Pipeline\">\n\n```py\nfrom transformers import pipeline"
+        },
+        {
+          "doc_id": "model_doc/granitemoehybrid.md",
+          "chunk_id": "model_doc/granitemoehybrid.md::chunk_7",
+          "score": 2.298121690750122,
+          "text": "- `GraniteMoeHybridForCausalLM` supports padding-free training which concatenates distinct training examples while still processing inputs as separate batches. It can significantly accelerate inference by [~2x](https://github.com/huggingface/transformers/pull/35861#issue-2807873129) (depending on model and data distribution) and reduce memory-usage if there are examples of varying lengths by avoiding unnecessary compute and memory overhead from padding tokens."
+        },
+        {
+          "doc_id": "model_doc/llava.md",
+          "chunk_id": "model_doc/llava.md::chunk_9",
+          "score": 2.0831029415130615,
+          "text": "Usage tips\n\n- We advise users to use `padding_side=\"left\"` when computing batched generation as it leads to more accurate results. Simply make sure to call `processor.tokenizer.padding_side = \"left\"` before generating.\n\n- Note the model has not been explicitly trained to process multiple images in the same prompt, although this is technically possible, you may experience inaccurate results.\n\n> [!NOTE]"
+        },
+        {
+          "doc_id": "model_doc/llava_next_video.md",
+          "chunk_id": "model_doc/llava_next_video.md::chunk_13",
+          "score": 1.990530252456665,
+          "text": "Usage tips\n\n- We advise users to use `padding_side=\"left\"` when computing batched generation as it leads to more accurate results. Simply make sure to call `processor.tokenizer.padding_side = \"left\"` before generating.\n\n<Tip warning={true}>\n\n- Llava-Next uses different number of patches for images and thus has to pad the inputs inside modeling code, aside from the padding done when processing the inputs. The default setting is \"left-padding\" if model is in `eval()` mode, otherwise \"right-padding\".\n\n</Tip>"
+        },
+        {
+          "doc_id": "model_doc/llava_onevision.md",
+          "chunk_id": "model_doc/llava_onevision.md::chunk_9",
+          "score": 1.7553025484085083,
+          "text": "paper.</a> </small>\n\nTips:\n\n- We advise users to use `padding_side=\"left\"` when computing batched generation as it leads to more accurate results. Simply make sure to call `processor.tokenizer.padding_side = \"left\"` before generating.\n\n<Tip warning={true}>"
+        }
+      ],
+      "ideal_answer": "For batched inference, use `padding_side=\"left\"` as it leads to more accurate results [1][3][4][5]. Set this by calling `processor.tokenizer.padding_side = \"left\"` before generating [3][4][5]. Alternatively, some models like GraniteMoeHybridForCausalLM support padding-free training which concatenates distinct training examples while still processing inputs as separate batches, potentially accelerating inference by ~2x and reducing memory usage [2].",
+      "is_refusal": false,
+      "metadata": {
+        "distill_model": "claude-haiku-4-5",
+        "enable_thinking": false,
+        "prompt_version": "v2",
+        "captured_at": "2026-05-06T22:51:49+00:00",
+        "input_tokens": 1855,
+        "output_tokens": 120
+      }
+    },
+    {
+      "query": "How do I convert a model from TensorFlow to PyTorch using transformers?",
+      "retrieved_chunks": [
+        {
+          "doc_id": "add_new_model.md",
+          "chunk_id": "add_new_model.md::chunk_57",
+          "score": 6.65115213394165,
+          "text": "conversion script to copy, adapt, and reuse for your model!\n\n>\n\n> - If you're porting a model from TensorFlow to PyTorch, a good starting point may be the BERT [conversion script](https://github.com/huggingface/transformers/blob/7acfa95afb8194f8f9c1f4d2c6028224dbed35a2/src/transformers/models/bert/modeling_bert.py#L91)."
+        },
+        {
+          "doc_id": "tasks/image_classification.md",
+          "chunk_id": "tasks/image_classification.md::chunk_27",
+          "score": 4.841278076171875,
+          "text": "{'score': 0.012728818692266941, 'label': 'prime_rib'}]\n```\n\nYou can also manually replicate the results of the `pipeline` if you'd like:\n\nLoad an image processor to preprocess the image and return the `input` as PyTorch tensors:\n\n```py\n>>> from transformers import AutoImageProcessor\n>>> import torch\n\n>>> image_processor = AutoImageProcessor.from_pretrained(\"my_awesome_food_model\")\n>>> inputs = image_processor(image, return_tensors=\"pt\")\n```\n\nPass your inputs to the model and return the logits:"
+        },
+        {
+          "doc_id": "tasks/sequence_classification.md",
+          "chunk_id": "tasks/sequence_classification.md::chunk_27",
+          "score": 4.509853363037109,
+          "text": "tensors:\n\n```py\n>>> from transformers import AutoTokenizer\n\n>>> tokenizer = AutoTokenizer.from_pretrained(\"stevhliu/my_awesome_model\")\n>>> inputs = tokenizer(text, return_tensors=\"pt\")\n```\n\nPass your inputs to the model and return the `logits`:\n\n```py\n>>> from transformers import AutoModelForSequenceClassification\n\n>>> model = AutoModelForSequenceClassification.from_pretrained(\"stevhliu/my_awesome_model\")\n>>> with torch.no_grad():\n...     logits = model(**inputs).logits\n```"
+        },
+        {
+          "doc_id": "image_processors.md",
+          "chunk_id": "image_processors.md::chunk_5",
+          "score": 4.267462253570557,
+          "text": "file.\n\n```py\nfrom transformers import AutoImageProcessor\n\nimage_processor = AutoImageProcessor.from_pretrained(\"google/vit-base-patch16-224\")\n```\n\nPass an image to the image processor to transform it into pixel values, and set `return_tensors=\"pt\"` to return PyTorch tensors. Feel free to print out the inputs to see what the image looks like as a tensor.\n\n```py\nfrom PIL import Image\nimport requests"
+        },
+        {
+          "doc_id": "tasks/asr.md",
+          "chunk_id": "tasks/asr.md::chunk_39",
+          "score": 3.8801488876342773,
+          "text": "tensors:\n\n```py\n>>> from transformers import AutoProcessor\n\n>>> processor = AutoProcessor.from_pretrained(\"stevhliu/my_awesome_asr_mind_model\")\n>>> inputs = processor(dataset[0][\"audio\"][\"array\"], sampling_rate=sampling_rate, return_tensors=\"pt\")\n```\n\nPass your inputs to the model and return the logits:\n\n```py\n>>> from transformers import AutoModelForCTC\n\n>>> model = AutoModelForCTC.from_pretrained(\"stevhliu/my_awesome_asr_mind_model\")\n>>> with torch.no_grad():\n...     logits = model(**inputs).logits\n```"
+        }
+      ],
+      "ideal_answer": "Use the BERT conversion script in `modeling_bert.py` as a starting point — copy, adapt, and reuse it for your model [1].",
+      "is_refusal": false,
+      "metadata": {
+        "distill_model": "claude-haiku-4-5",
+        "enable_thinking": false,
+        "prompt_version": "v2",
+        "captured_at": "2026-05-06T22:51:51+00:00",
+        "input_tokens": 1983,
+        "output_tokens": 46
+      }
+    },
+    {
+      "query": "What's the latest stable Linux kernel version?",
+      "retrieved_chunks": [
+        {
+          "doc_id": "installation.md",
+          "chunk_id": "installation.md::chunk_7",
+          "score": -0.26117196679115295,
+          "text": "'score': 0.9998704791069031}]\n```\n\n### Source install\n\nInstalling from source installs the *latest* version rather than the *stable* version of the library. It ensures you have the most up-to-date changes in Transformers and it's useful for experimenting with the latest features or fixing a bug that hasn't been officially released in the stable version yet."
+        },
+        {
+          "doc_id": "quantization/gptq.md",
+          "chunk_id": "quantization/gptq.md::chunk_19",
+          "score": -1.353302001953125,
+          "text": "and not all kernels (Marlin) support asymmetric quantization.\n\nGPT-QModel also has broader support for the latest LLM models, multimodal models (Qwen2-VL and Ovis1.6-VL), platforms (Linux, macOS, Windows 11), and hardware (AMD ROCm, Apple Silicon, Intel/AMD CPUs, and Intel Datacenter Max/Arc GPUs, etc.).\n\nThe Marlin kernels are also updated for A100 GPUs and other kernels are updated to include auto-padding for legacy models and models with non-uniform in/out-features.\n\n## Resources"
+        },
+        {
+          "doc_id": "model_doc/stablelm.md",
+          "chunk_id": "model_doc/stablelm.md::chunk_4",
+          "score": -4.56048583984375,
+          "text": "Overview\n\nStableLM 3B 4E1T ([blog post](https://stability.ai/news/stable-lm-3b-sustainable-high-performance-language-models-smart-devices)) was proposed in [StableLM 3B 4E1T: Technical Report](https://stability.wandb.io/stability-llm/stable-lm/reports/StableLM-3B-4E1T--VmlldzoyMjU4?accessToken=u3zujipenkx5g7rtcj9qojjgxpconyjktjkli2po09nffrffdhhchq045vp0wyfo) by Stability AI and is the first model in a series of multi-epoch pre-trained language models.\n\n### Model Details"
+        },
+        {
+          "doc_id": "quantization/compressed_tensors.md",
+          "chunk_id": "quantization/compressed_tensors.md::chunk_6",
+          "score": -5.368272304534912,
+          "text": "Targeted support for specific modules by name or class.\n\nInstall compressed-tensors from [PyPI](https://pypi.org/project/compressed-tensors) to get the latest stable release (recommended) or install it from source to get the latest features.\n\n<hfoptions id=\"install\">\n<hfoption id=\"PyPI\">\n\n```bash\npip install compressed-tensors\n```\n\n</hfoption>\n<hfoption id=\"source code\">\n\n```bash\ngit clone https://github.com/neuralmagic/compressed-tensors\ncd compressed-tensors\npip install -e .\n```\n\n</hfoption>\n</hfoptions>"
+        },
+        {
+          "doc_id": "quantization/bitnet.md",
+          "chunk_id": "quantization/bitnet.md::chunk_9",
+          "score": -6.453365325927734,
+          "text": "kernels will be integrated in future versions.\n\n## Resources\n\nRead [Fine-tuning LLMs to 1.58bit: extreme quantization made easy](https://huggingface.co/blog/1_58_llm_extreme_quantization) to learn more about how BitNet models are trained and fine-tuned."
+        }
+      ],
+      "ideal_answer": "I don't have enough context to answer that.",
+      "is_refusal": true,
+      "metadata": {
+        "distill_model": "claude-haiku-4-5",
+        "enable_thinking": false,
+        "prompt_version": "v2",
+        "captured_at": "2026-05-06T22:51:52+00:00",
+        "input_tokens": 1973,
+        "output_tokens": 18
+      }
+    }
+  ],
+  "version": "pilot-claude-haiku-4-5-v1",
+  "description": "Pilot distillation run (Block 3B.1). Model=claude-haiku-4-5, enable_thinking=False, prompt_version=v2, input_file=pilot_input.json.",
+  "metadata": {
+    "model": "claude-haiku-4-5",
+    "enable_thinking": false,
+    "prompt_version": "v2",
+    "input_file": "evaluations/datasets/training/pilot_input.json",
+    "n_inputs": 6,
+    "n_examples": 6,
+    "n_in_corpus": 5,
+    "n_refusal": 1,
+    "n_parse_failures": 0,
+    "total_input_tokens": 11592,
+    "total_output_tokens": 489,
+    "captured_at": "2026-05-06T22:51:52+00:00"
+  }
+}
