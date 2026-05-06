@@ -42,6 +42,13 @@ class TestCheckNoAnswerBehavior:
             "I'm unable to answer that based on the given context.",
             "I apologize, but I'm unable to find that in the documentation.",
             "Insufficient context to provide a meaningful answer.",
+            # Discovered during first Block 1B eval — all 8 no-answer
+            # queries opened with this exact phrasing but went undetected
+            # because the "have" verb wasn't in the negative-modal verb
+            # list. The dont_have_context pattern fixes this.
+            "I don't have enough context to answer that.",
+            "I do not have the information needed.",
+            "The model doesn't have sufficient context for that question.",
         ],
     )
     def test_recognizes_common_refusals(self, text: str):

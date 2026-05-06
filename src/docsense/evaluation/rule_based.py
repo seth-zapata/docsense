@@ -36,6 +36,22 @@ _REFUSAL_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
         "no_information",
         re.compile(r"\b(?:no|not enough|insufficient)\s+(?:information|context|details?)\b"),
     ),
+    # Possessive form — "I don't have enough context to answer".
+    # Discovered as a coverage gap during the first Block 1B eval run:
+    # all 8 no-answer queries opened with this exact phrase, but only
+    # the 3 with a follow-up "The provided context does not..." sentence
+    # were flagged as refusals. The "have" verb wasn't in cannot_action's
+    # action-verb list because "I don't have time" / "I don't have a
+    # pen" aren't refusals on their own — but "don't have <quantifier>
+    # context/information" is unambiguous.
+    (
+        "dont_have_context",
+        re.compile(
+            r"\b(?:do\s+not|don'?t|doesn'?t|does\s+not)\s+have\s+"
+            r"(?:enough|the|sufficient|adequate|any|relevant)?\s*"
+            r"(?:context|information|details?)\b"
+        ),
+    ),
     # Negative-modal + action verb. Covers "I don't know", "cannot
     # determine", "I'm unable to answer", "can't tell", etc. — the
     # bulk of LLM refusal phrasings collapse here.
