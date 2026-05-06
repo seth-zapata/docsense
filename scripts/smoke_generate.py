@@ -95,13 +95,26 @@ def main() -> int:
             "without bitsandbytes installed."
         ),
     )
+    parser.add_argument(
+        "--device",
+        default=None,
+        help=(
+            "Override GenerationConfig.device. Default 'auto' lets accelerate "
+            "distribute weights across devices (slow if VRAM is tight and "
+            "weights spill to CPU). Pass 'cuda:0' to force all-GPU placement "
+            "(fast but OOMs if model doesn't fit). Pass 'cpu' for CPU-only."
+        ),
+    )
     args = parser.parse_args()
 
     settings = Settings()
+    overrides: dict = {}
     if args.no_4bit:
-        settings.generation = GenerationConfig(
-            **{**settings.generation.model_dump(), "use_4bit_quantization": False}
-        )
+        overrides["use_4bit_quantization"] = False
+    if args.device is not None:
+        overrides["device"] = args.device
+    if overrides:
+        settings.generation = GenerationConfig(**{**settings.generation.model_dump(), **overrides})
 
     logger.info("=== Smoke generate ===")
     logger.info("System model:   %s", settings.generation.model_name)

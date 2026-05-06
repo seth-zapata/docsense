@@ -1,0 +1,87 @@
+INFO: === Smoke generate ===
+INFO: System model:   Qwen/Qwen2.5-7B-Instruct
+INFO: 4-bit:          True
+INFO: Chunking:       recursive
+INFO: Reranker:       on
+INFO: Query:          How do I use AutoModel.from_pretrained() to load a pretrained model?
+INFO:
+Loading index + chunks...
+INFO:   12601 chunks loaded
+INFO: Load pretrained SentenceTransformer: sentence-transformers/all-MiniLM-L6-v2
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+WARNING: Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loading weights:   0%|          | 0/103 [00:00<?, ?it/s]Loading weights: 100%|██████████| 103/103 [00:00<00:00, 2012.50it/s]
+[1mBertModel LOAD REPORT[0m from: sentence-transformers/all-MiniLM-L6-v2
+Key                     | Status     |  |
+------------------------+------------+--+-
+embeddings.position_ids | UNEXPECTED |  |
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+Loading weights:   0%|          | 0/105 [00:00<?, ?it/s]Loading weights: 100%|██████████| 105/105 [00:00<00:00, 1847.22it/s]
+[1mBertForSequenceClassification LOAD REPORT[0m from: cross-encoder/ms-marco-MiniLM-L-6-v2
+Key                          | Status     |  |
+-----------------------------+------------+--+-
+bert.embeddings.position_ids | UNEXPECTED |  |
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+Batches:   0%|          | 0/2 [00:00<?, ?it/s]Batches:  50%|█████     | 1/2 [00:00<00:00,  2.94it/s]Batches: 100%|██████████| 2/2 [00:00<00:00,  5.13it/s]
+INFO:
+Retrieved 5 results in 6479 ms
+INFO: Assembled context with 5 chunks
+INFO:
+Loading generation model (this may take a minute on first run)...
+INFO: Running inference...
+Loading weights:   0%|          | 0/339 [00:00<?, ?it/s]Loading weights:   0%|          | 1/339 [00:04<26:38,  4.73s/it]Loading weights:   1%|          | 2/339 [00:09<27:50,  4.96s/it]/home/sethz/projects/docsense/.venv/lib/python3.12/site-packages/bitsandbytes/backends/cuda/ops.py:213: FutureWarning: _check_is_size will be removed in a future PyTorch release along with guard_size_oblivious.     Use _check(i >= 0) instead.
+  torch._check_is_size(blocksize)
+Loading weights:   1%|          | 4/339 [00:10<11:33,  2.07s/it]Loading weights:   1%|▏         | 5/339 [00:11<09:01,  1.62s/it]Loading weights:   2%|▏         | 6/339 [00:11<07:19,  1.32s/it]Loading weights:   3%|▎         | 10/339 [00:11<02:46,  1.97it/s]Loading weights:   4%|▎         | 12/339 [00:12<02:01,  2.69it/s]Loading weights:   5%|▍         | 16/339 [00:12<01:29,  3.62it/s]Loading weights:   5%|▌         | 17/339 [00:13<01:48,  2.98it/s]Loading weights:   5%|▌         | 18/339 [00:15<03:39,  1.46it/s]Loading weights:   6%|▋         | 22/339 [00:16<01:56,  2.73it/s]Loading weights:   7%|▋         | 24/339 [00:16<01:30,  3.47it/s]Loading weights:   8%|▊         | 28/339 [00:16<01:13,  4.24it/s]Loading weights:   9%|▉         | 30/339 [00:18<01:41,  3.04it/s]Loading weights:  10%|█         | 34/339 [00:18<01:04,  4.71it/s]Loading weights:  11%|█         | 36/339 [00:18<00:54,  5.59it/s]Loading weights:  12%|█▏        | 40/339 [00:19<00:52,  5.75it/s]Loading weights:  12%|█▏        | 42/339 [00:20<01:22,  3.59it/s]Loading weights:  14%|█▎        | 46/339 [00:20<00:54,  5.36it/s]Loading weights:  14%|█▍        | 48/339 [00:20<00:46,  6.27it/s]Loading weights:  15%|█▌        | 52/339 [00:21<00:46,  6.13it/s]Loading weights:  16%|█▌        | 54/339 [00:22<01:14,  3.81it/s]Loading weights:  17%|█▋        | 58/339 [00:22<00:49,  5.66it/s]Loading weights:  18%|█▊        | 60/339 [00:22<00:42,  6.56it/s]Loading weights:  19%|█▉        | 64/339 [00:23<00:42,  6.47it/s]Loading weights:  19%|█▉        | 66/339 [00:24<01:07,  4.04it/s]Loading weights:  21%|██        | 70/339 [00:24<00:44,  6.03it/s]Loading weights:  21%|██        | 72/339 [00:24<00:38,  7.00it/s]Loading weights:  22%|██▏       | 76/339 [00:25<00:38,  6.88it/s]Loading weights:  23%|██▎       | 78/339 [00:26<01:03,  4.08it/s]Loading weights:  24%|██▍       | 82/339 [00:26<00:42,  6.10it/s]Loading weights:  25%|██▍       | 84/339 [00:26<00:35,  7.10it/s]Loading weights:  26%|██▌       | 88/339 [00:27<00:37,  6.68it/s]Loading weights:  27%|██▋       | 90/339 [00:28<01:02,  3.98it/s]Loading weights:  28%|██▊       | 94/339 [00:29<00:42,  5.80it/s]Loading weights:  28%|██▊       | 96/339 [00:29<00:36,  6.75it/s]Loading weights:  29%|██▉       | 100/339 [00:29<00:36,  6.55it/s]Loading weights:  30%|███       | 102/339 [00:30<00:58,  4.02it/s]Loading weights:  31%|███▏      | 106/339 [00:31<00:39,  5.94it/s]Loading weights:  32%|███▏      | 108/339 [00:31<00:33,  6.85it/s]Loading weights:  33%|███▎      | 112/339 [00:31<00:34,  6.55it/s]Loading weights:  34%|███▎      | 114/339 [00:33<00:58,  3.84it/s]Loading weights:  35%|███▍      | 118/339 [00:33<00:38,  5.69it/s]Loading weights:  35%|███▌      | 120/339 [00:33<00:33,  6.56it/s]Loading weights:  37%|███▋      | 124/339 [00:34<00:33,  6.51it/s]Loading weights:  37%|███▋      | 126/339 [00:35<00:54,  3.91it/s]Loading weights:  38%|███▊      | 130/339 [00:35<00:35,  5.81it/s]Loading weights:  39%|███▉      | 132/339 [00:35<00:30,  6.72it/s]Loading weights:  40%|████      | 136/339 [00:36<00:31,  6.50it/s]Loading weights:  41%|████      | 138/339 [00:37<00:51,  3.90it/s]Loading weights:  42%|████▏     | 142/339 [00:37<00:34,  5.77it/s]Loading weights:  42%|████▏     | 144/339 [00:37<00:29,  6.72it/s]Loading weights:  44%|████▎     | 148/339 [00:38<00:29,  6.46it/s]Loading weights:  44%|████▍     | 150/339 [00:39<00:47,  3.98it/s]Loading weights:  45%|████▌     | 153/339 [00:39<00:35,  5.30it/s]Loading weights:  46%|████▌     | 155/339 [00:39<00:29,  6.28it/s]Loading weights:  46%|████▋     | 157/339 [00:40<00:24,  7.44it/s]Loading weights:  47%|████▋     | 160/339 [00:40<00:29,  6.03it/s]Loading weights:  48%|████▊     | 162/339 [00:42<00:50,  3.48it/s]Loading weights:  49%|████▉     | 166/339 [00:42<00:31,  5.46it/s]Loading weights:  50%|████▉     | 168/339 [00:42<00:26,  6.46it/s]Loading weights:  51%|█████     | 172/339 [00:42<00:25,  6.49it/s]Loading weights:  51%|█████▏    | 174/339 [00:44<00:42,  3.87it/s]Loading weights:  53%|█████▎    | 178/339 [00:44<00:27,  5.80it/s]Loading weights:  53%|█████▎    | 180/339 [00:44<00:23,  6.77it/s]Loading weights:  54%|█████▍    | 184/339 [00:45<00:24,  6.41it/s]Loading weights:  55%|█████▍    | 186/339 [00:46<00:40,  3.73it/s]Loading weights:  56%|█████▌    | 190/339 [00:46<00:27,  5.48it/s]Loading weights:  57%|█████▋    | 192/339 [00:46<00:23,  6.31it/s]Loading weights:  58%|█████▊    | 196/339 [00:47<00:23,  5.98it/s]Loading weights:  58%|█████▊    | 198/339 [00:50<01:05,  2.15it/s]Loading weights:  60%|█████▉    | 202/339 [00:50<00:41,  3.29it/s]Loading weights:  60%|██████    | 204/339 [00:51<00:34,  3.92it/s]Loading weights:  61%|██████▏   | 208/339 [00:51<00:29,  4.38it/s]Loading weights:  62%|██████▏   | 210/339 [00:53<00:41,  3.09it/s]Loading weights:  63%|██████▎   | 214/339 [00:53<00:26,  4.66it/s]Loading weights:  64%|██████▎   | 216/339 [00:53<00:22,  5.50it/s]Loading weights:  65%|██████▍   | 220/339 [00:54<00:21,  5.54it/s]Loading weights:  65%|██████▌   | 222/339 [00:55<00:33,  3.50it/s]Loading weights:  67%|██████▋   | 226/339 [00:55<00:21,  5.18it/s]Loading weights:  67%|██████▋   | 228/339 [00:55<00:19,  5.78it/s]Loading weights:  68%|██████▊   | 232/339 [00:56<00:18,  5.69it/s]Loading weights:  68%|██████▊   | 232/339 [01:15<00:18,  5.69it/s]Loading weights:  69%|██████▉   | 234/339 [01:48<09:50,  5.62s/it]Loading weights:  70%|██████▉   | 237/339 [01:48<06:36,  3.89s/it]Loading weights:  71%|███████   | 239/339 [01:55<06:23,  3.84s/it]Loading weights:  71%|███████   | 240/339 [02:00<06:34,  3.99s/it]Loading weights:  71%|███████▏  | 242/339 [02:00<04:40,  2.90s/it]Loading weights:  72%|███████▏  | 244/339 [02:26<09:07,  5.77s/it]Loading weights:  72%|███████▏  | 245/339 [02:27<07:43,  4.93s/it]Loading weights:  73%|███████▎  | 246/339 [02:28<06:23,  4.12s/it]Loading weights:  74%|███████▎  | 250/339 [02:28<02:53,  1.95s/it]Loading weights:  74%|███████▍  | 252/339 [02:28<02:04,  1.43s/it]Loading weights:  76%|███████▌  | 256/339 [02:29<01:14,  1.12it/s]Loading weights:  76%|███████▌  | 258/339 [02:32<01:27,  1.08s/it]Loading weights:  77%|███████▋  | 262/339 [02:32<00:50,  1.53it/s]Loading weights:  78%|███████▊  | 264/339 [02:32<00:39,  1.91it/s]Loading weights:  79%|███████▉  | 268/339 [02:33<00:28,  2.49it/s]Loading weights:  80%|███████▉  | 270/339 [02:35<00:32,  2.10it/s]Loading weights:  81%|████████  | 274/339 [02:35<00:20,  3.24it/s]Loading weights:  81%|████████▏ | 276/339 [02:35<00:16,  3.89it/s]Loading weights:  83%|████████▎ | 280/339 [02:36<00:13,  4.22it/s]Loading weights:  83%|████████▎ | 282/339 [02:38<00:21,  2.70it/s]Loading weights:  84%|████████▍ | 286/339 [02:38<00:13,  3.96it/s]Loading weights:  85%|████████▍ | 288/339 [02:38<00:10,  4.68it/s]Loading weights:  86%|████████▌ | 292/339 [02:39<00:09,  4.87it/s]Loading weights:  86%|████████▋ | 293/339 [02:39<00:12,  3.72it/s]Loading weights:  87%|████████▋ | 294/339 [02:40<00:14,  3.03it/s]Loading weights:  88%|████████▊ | 298/339 [02:40<00:08,  5.11it/s]Loading weights:  88%|████████▊ | 300/339 [02:40<00:06,  6.18it/s]Loading weights:  90%|████████▉ | 304/339 [02:41<00:06,  5.61it/s]Loading weights:  90%|█████████ | 306/339 [02:43<00:10,  3.08it/s]Loading weights:  91%|█████████▏| 310/339 [02:43<00:06,  4.76it/s]Loading weights:  92%|█████████▏| 312/339 [02:43<00:04,  5.51it/s]Loading weights:  93%|█████████▎| 316/339 [02:44<00:04,  5.22it/s]Loading weights:  94%|█████████▍| 318/339 [02:45<00:06,  3.34it/s]Loading weights:  95%|█████████▍| 322/339 [02:45<00:03,  5.00it/s]Loading weights:  96%|█████████▌| 324/339 [02:46<00:02,  5.82it/s]Loading weights:  97%|█████████▋| 328/339 [02:46<00:01,  5.54it/s]Loading weights:  97%|█████████▋| 330/339 [02:48<00:02,  3.56it/s]Loading weights:  99%|█████████▊| 334/339 [02:48<00:00,  5.34it/s]Loading weights:  99%|█████████▉| 336/339 [02:48<00:00,  6.25it/s]Loading weights: 100%|██████████| 339/339 [02:48<00:00,  2.01it/s]
+/home/sethz/projects/docsense/.venv/lib/python3.12/site-packages/bitsandbytes/backends/cuda/ops.py:468: FutureWarning: _check_is_size will be removed in a future PyTorch release along with guard_size_oblivious.     Use _check(i >= 0) instead.
+  torch._check_is_size(blocksize)
+INFO:   generated in 178239 ms (799 ms per token)
+
+================================================================================
+QUERY: How do I use AutoModel.from_pretrained() to load a pretrained model?
+================================================================================
+
+ANSWER:
+To use `AutoModel.from_pretrained()` to load a pretrained model, you need to call the `from_pretrained` method from the `transformers` library. This method can accept weights from the Hugging Face Hub or a local directory. Here's how you can do it:
+
+```py
+from transformers import AutoModel
+
+# Load a pretrained model from the Hugging Face Hub or a local directory
+model = AutoModel.from_pretrained("username/modelname")
+```
+
+If you want to specifically use `AutoModelForCausalLM`, which is a subclass of `AutoModel` tailored for causal language modeling tasks, you would do something like this:
+
+```py
+from transformers import AutoModelForCausalLM
+
+# Load a pretrained causal language model from the Hugging Face Hub or a local directory
+model = AutoModelForCausalLM.from_pretrained("username/modelname")
+```
+
+In both cases, replace `"username/modelname"` with the actual name of the model you wish to load from the Hugging Face Hub or the path to the local directory containing the model weights.
+
+CITATIONS: (none)
+
+RETRIEVED CHUNKS PASSED TO LLM:
+  [1] models.md (score=7.467)
+      for performing specific tasks.  ## Model classes  To get a pretrained model, you need to load the weights into the model...
+  [2] peft.md (score=6.441)
+       weights.  <hfoptions id="load"> <hfoption id="from_pretrained">  [`~PreTrainedModel.from_pretrained`] automatically det...
+  [3] community_integrations/unsloth.md (score=6.133)
+       wraps Transformers APIs and patches internal methods for speed.  - `FastLanguageModel.from_pretrained` loads config wit...
+  [4] models.md (score=6.110)
+      class and the [`~PreTrainedModel.from_pretrained`] method.  Call [`~PreTrainedModel.from_pretrained`] to download and lo...
+  [5] quantization/finegrained_fp8.md (score=5.807)
+      model and reload it with [`~PreTrainedModel.from_pretrained`].  ```py quant_path = "/path/to/save/quantized/model" model...
+
+METADATA:
+  model:            Qwen/Qwen2.5-7B-Instruct
+  prompt tokens:    572
+  completion tokens: 223
+  inference latency: 15320 ms
+  total wall:       184718 ms
