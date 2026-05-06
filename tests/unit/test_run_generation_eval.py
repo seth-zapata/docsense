@@ -66,8 +66,9 @@ class TestLoadEvalSet:
 
     def test_no_answer_loads_marked_correctly(self):
         queries = driver.load_eval_set("no-answer")
-        assert len(queries) == 8
+        assert len(queries) == 25
         assert queries[0].query_id == "no_answer_001"
+        assert queries[-1].query_id == "no_answer_025"
         assert all(q.is_no_answer is True for q in queries)
 
     def test_unknown_set_raises(self):
