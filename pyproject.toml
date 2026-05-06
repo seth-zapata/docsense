@@ -52,8 +52,20 @@ dev = [
     "types-PyYAML>=6.0",
 ]
 gpu = [
+    # bitsandbytes is the only real GPU dep we need: NF4 4-bit
+    # quantization for the generation model so a 7-8B Instruct fits
+    # in 12 GB VRAM. It's a runtime requirement when
+    # GenerationConfig.use_4bit_quantization is True (the default).
     "bitsandbytes>=0.43.0",
-    "faiss-gpu>=1.7.2",
+    # Note: faiss-gpu is intentionally NOT here. The package is
+    # chronically unavailable on PyPI for most Python/CUDA combinations
+    # (FAISS' GPU wheels have shifted between conda-only, third-party
+    # community wheels like faiss-gpu-cu12, and platform-specific
+    # builds). For our index sizes (~12K chunks for the HF Transformers
+    # docs) faiss-cpu (in the base deps) handles searches in milliseconds —
+    # the bottleneck is LLM inference, not vector search. If the corpus
+    # ever grows to millions of chunks, revisit and pin the appropriate
+    # GPU wheel for the user's CUDA version.
 ]
 
 [project.urls]
