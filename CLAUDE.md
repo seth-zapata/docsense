@@ -135,11 +135,21 @@ gh pr merge --auto --rebase --delete-branch  # merges when CI passes
   non-additive-tokenizer drift bug). 194 tests, 90% CI coverage gate. **The
   full pipeline is end-to-end runnable; real LLM behavior is exercised in
   Phase 3 / pre-Phase-3 LLM-judge evals, not yet.**
+- **Pre-Phase-3 Block 1B — closed (2026-05-06).** LLM-judge framework
+  (`LLMJudge` ABC, `LlamaJudge` concrete impl with NF4 4-bit), rule-based
+  evals (`check_no_answer_behavior`, `check_citations_grounded`),
+  `scripts/run_generation_eval.py` (sequential generator → judge load
+  on 12 GB GPU), and the first end-to-end LLM-judged baseline at
+  `evaluations/baselines/pre_phase3_generation_base.json`. Findings:
+  citation rate ~54% (cross-set agreement; highest-leverage fine-tune
+  target), 100% refusal on off-corpus, faithfulness mean 0.75 with
+  judge anchor saturation flagged. Full analysis:
+  `evaluations/analyses/2026-05-06-baseline-generation-eval.md`.
 - **Phase 3.** QLoRA fine-tuning track — supervised dataset construction,
-  training script, eval against base-model baseline. Pre-Phase-3 work also
-  includes the LLM-judge eval scaffolding (faithfulness, answer relevance,
-  citation grounding, real no-answer behavior) and the deferred 5c
-  LLM-generated eval set.
+  training script, eval against the pre-Phase-3 baseline. Pre-Phase-3
+  Block 1B's deferred items still in scope: 5c LLM-generated eval set
+  for cross-validation, AnthropicJudge calibration if absolute
+  faithfulness becomes load-bearing.
 - **Phase 4.** FastAPI serving + `tracing/` (structured query logs), end-to-end
   generation eval (faithfulness, answer relevance), Docker packaging.
 
