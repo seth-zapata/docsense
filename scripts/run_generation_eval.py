@@ -80,8 +80,6 @@ from docsense.retrieval.hybrid import HybridRetriever
 from docsense.retrieval.sparse import SparseRetriever
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
-
     from docsense.evaluation.judge import JudgeScore
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -316,27 +314,14 @@ def run_generation_phase(
 # ---------------------------------------------------------------------------
 
 
-def _format_context_for_judge(chunks: Iterable[ChunkRef]) -> str:
-    """Render retrieved chunks as the judge sees them.
-
-    Uses the same numbered ``[N]`` shape PromptBuilder uses for the
-    generator, so the judge's view of "context" matches what was
-    actually in the prompt. Drift here would make faithfulness scores
-    measure a different thing than the generator was given.
-    """
-    pieces: list[str] = []
-    for i, c in enumerate(chunks, start=1):
-        pieces.append(f"[{i}] (source: {c.doc_id})\n{c.text}")
-    return "\n\n".join(pieces)
-
-
 def run_judging_phase(records: list[QueryRecord], settings: Settings) -> None:
     """Score each record's Answer in-place.
 
-    For in-corpus queries: faithfulness + relevance via the LLM judge.
-    For no-answer queries: skipped — the judge prompts assume a
-    well-formed in-corpus question, and grading "I don't know" for
-    relevance produces meaningless scores.
+    For in-corpus queries: faithfulness (claim-level decomposition,
+    two LLM calls per query) + relevance (single absolute-scale
+    judgment) via the LLM judge. For no-answer queries: skipped —
+    the judge prompts assume a well-formed in-corpus question, and
+    grading "I don't know" for relevance produces meaningless scores.
 
     The rule-based checks (citation grounding, refusal behavior) run
     on every record and are computed in Phase D from the Answer
@@ -352,8 +337,9 @@ def run_judging_phase(records: list[QueryRecord], settings: Settings) -> None:
         if rec.query.is_no_answer:
             continue
         logger.info("[%d/%d] judging %s", i, len(records), rec.query.query_id)
-        ctx = _format_context_for_judge(rec.answer.retrieved_chunks)
-        rec.faithfulness = judge.judge_faithfulness(rec.query.text, ctx, rec.answer.text)
+        rec.faithfulness = judge.judge_faithfulness(
+            rec.query.text, rec.answer.retrieved_chunks, rec.answer.text
+        )
         rec.relevance = judge.judge_relevance(rec.query.text, rec.answer.text)
 
     del judge

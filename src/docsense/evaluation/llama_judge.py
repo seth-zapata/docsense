@@ -10,14 +10,25 @@ hook":
 - ``_run_inference(messages) -> str`` is the override point. Production
   goes through ``tokenizer.apply_chat_template(...)`` so the prompt
   format is whatever Llama 3.1 ships with; tests stub a canned string.
-- ``judge_faithfulness`` / ``judge_relevance`` build the prompt,
-  invoke ``_run_inference``, and parse the response into a
-  ``JudgeScore``.
 
-The five-anchor scale (0.0 / 0.25 / 0.5 / 0.75 / 1.0) is repeated
-verbatim in both prompts. The parser snaps whatever number the model
-emits to the nearest anchor — so even if the LLM produces 0.7 the
-score becomes 0.75 and stays in the [0.0, 1.0] anchor grid.
+**Faithfulness** uses RAGAS-style claim-level decomposition with
+per-chunk attribution (replaced the absolute-scale anchor approach
+2026-05-06 after the baseline showed 49 of 50 in-corpus answers
+clustering at 0.75). Two LLM calls per query:
+
+1. ``extract_claims(answer)`` — decompose into atomic factual claims.
+2. ``attribute_claims_to_chunks(claims, chunks)`` — for each claim,
+   identify which chunk supports it (or ``None``).
+
+Aggregate: ``score = n_supported / n_total`` in ``[0, 1]``,
+continuous (no anchor snapping). Per-claim attributions are
+preserved on the JudgeScore so reports carry grounded evidence.
+
+**Relevance** still uses the absolute-scale anchor approach
+(0.0 / 0.25 / 0.5 / 0.75 / 1.0). Relevance had healthier spread in
+the baseline (3 queries at 0.25, 4 at 1.0 on structural) and
+"does the answer address the question?" doesn't naturally
+decompose into claims the way faithfulness does.
 """
 
 from __future__ import annotations
@@ -25,15 +36,21 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING, Any, cast
 
-from docsense.evaluation.judge import JudgeMetric, JudgeScore, LLMJudge
+from docsense.evaluation.judge import (
+    ClaimAttribution,
+    JudgeMetric,
+    JudgeScore,
+    LLMJudge,
+)
 
 if TYPE_CHECKING:
     from transformers import PreTrainedModel, PreTrainedTokenizerBase
 
     from docsense.config import JudgeConfig
+    from docsense.generation.types import ChunkRef
 
 
-_ANCHORS: tuple[float, ...] = (0.0, 0.25, 0.5, 0.75, 1.0)
+_RELEVANCE_ANCHORS: tuple[float, ...] = (0.0, 0.25, 0.5, 0.75, 1.0)
 
 # Tolerant of the model dropping the colon, putting the number inline
 # with text, or emitting a leading-dot decimal like ".75". Anchored to
@@ -50,24 +67,172 @@ _RATIONALE_RE = re.compile(
 )
 
 
-_FAITHFULNESS_SYSTEM = (
-    "You are an evaluator of LLM-generated answers. Score how FAITHFUL "
-    "an answer is to its source context. An answer is faithful when "
-    "every factual claim in it is directly supported by the provided "
-    "context. Hallucinated facts, plausible-sounding inventions, and "
-    "claims that go beyond the context all reduce faithfulness.\n\n"
-    "Score on this five-point scale:\n"
-    "- 1.0: Every claim is directly supported by the context.\n"
-    "- 0.75: Most claims supported; minor reasonable extrapolations.\n"
-    "- 0.5: About half the claims supported; some unsupported.\n"
-    "- 0.25: Few claims supported; significant hallucination.\n"
-    "- 0.0: Answer is largely fabricated relative to the context.\n\n"
-    "Respond in EXACTLY this format and nothing else:\n"
-    "SCORE: <one of 0.0, 0.25, 0.5, 0.75, 1.0>\n"
-    "RATIONALE: <one or two sentences explaining the score>"
+# --- Faithfulness: claim extraction -----------------------------------
+
+_EXTRACT_CLAIMS_SYSTEM = (
+    "You are decomposing an LLM-generated answer into atomic factual "
+    "claims. A claim is a single, verifiable factual statement small "
+    "enough to be checked against a single source. Skip rhetorical "
+    "content, conversational framing, opinions, and code/markdown "
+    "formatting — only extract factual content.\n\n"
+    "Examples of well-formed claims:\n"
+    "- AutoModel.from_pretrained accepts a model name from the "
+    "HuggingFace Hub.\n"
+    "- The default cache directory is ~/.cache/huggingface.\n"
+    "- Setting trust_remote_code=True allows execution of custom "
+    "model code.\n\n"
+    "Output one claim per line as a numbered list:\n"
+    "1. <claim 1>\n"
+    "2. <claim 2>\n"
+    "...\n\n"
+    "If the answer contains no factual claims (e.g., it's a refusal, "
+    "or purely a code example with no surrounding statements), "
+    "output exactly: NO_CLAIMS"
+)
+_EXTRACT_CLAIMS_USER_TEMPLATE = "QUESTION:\n{question}\n\nANSWER:\n{answer}"
+
+# Numbered-list line: "<num>. <claim>". Multiline mode so ^ matches
+# each line. The (?:.|\n(?!\d+\.|\Z))* trick lets a claim span lines
+# until the next numbered item or end of string — handles claims that
+# wrap mid-sentence.
+_CLAIM_LINE_RE = re.compile(
+    r"^\s*(\d+)\.\s*(.+?)(?=\n\s*\d+\.|\Z)",
+    re.MULTILINE | re.DOTALL,
 )
 
-_FAITHFULNESS_USER_TEMPLATE = "QUESTION:\n{question}\n\nCONTEXT:\n{context}\n\nANSWER:\n{answer}"
+
+def parse_claims(text: str) -> list[str]:
+    """Extract claims from the LLM's claim-extraction output.
+
+    Returns an empty list if the model emitted ``NO_CLAIMS`` (its
+    sentinel for "answer has no factual content"). Otherwise returns
+    a list of claim texts in numerical order. The numbered prefixes
+    are stripped; whitespace is trimmed.
+
+    Robust to:
+    - Multi-line claims (whitespace between numbered items)
+    - Out-of-order numbering (still returns claims in document order)
+    - Missing trailing period or other punctuation
+    - Leading/trailing whitespace per claim
+    """
+    if re.search(r"\bNO_CLAIMS\b", text, re.IGNORECASE):
+        return []
+    matches = _CLAIM_LINE_RE.findall(text)
+    return [claim.strip() for _, claim in matches if claim.strip()]
+
+
+# --- Faithfulness: claim attribution ----------------------------------
+
+_ATTRIBUTE_CLAIMS_SYSTEM = (
+    "You are attributing claims to retrieved source chunks. For each "
+    "claim, identify which chunk (1-indexed) supports it. A claim is "
+    '"supported by chunk N" if the chunk\'s content provides evidence '
+    "for the claim via reasonable inference. Direct quotation is not "
+    "required — paraphrasing and reasonable inference are fine. If no "
+    'chunk supports the claim, output "none".\n\n'
+    "Output ONE LINE PER CLAIM in this exact format:\n"
+    "CLAIM <i>: chunk <chunk_idx> | RATIONALE: <one short sentence>\n"
+    "or\n"
+    "CLAIM <i>: none | RATIONALE: <one short sentence>\n\n"
+    "Output the claims in numerical order. Do not output anything else."
+)
+
+_ATTRIBUTE_CLAIMS_USER_TEMPLATE = "CHUNKS:\n{chunks_block}\n\nCLAIMS:\n{claims_block}"
+
+# "CLAIM 3: chunk 2 | RATIONALE: ..." — captures claim index, the
+# chunk index (or "none"), and the optional rationale that follows
+# the pipe. Tolerant of the rationale being missing.
+_ATTRIBUTION_LINE_RE = re.compile(
+    r"^\s*CLAIM\s+(\d+)\s*:?\s*(?:chunk\s+(\d+)|(none))\s*"
+    r"(?:\|\s*RATIONALE\s*:?\s*(.+?))?\s*$",
+    re.MULTILINE | re.IGNORECASE,
+)
+
+
+def parse_claim_attributions(text: str, claims: list[str], n_chunks: int) -> list[ClaimAttribution]:
+    """Parse the LLM's per-claim attribution output into ClaimAttribution objects.
+
+    Returns one ClaimAttribution per claim in ``claims``, in order.
+    For each claim:
+    - If the LLM output a parseable line with a chunk index in
+      ``[1, n_chunks]``, ``supporting_chunk_idx`` is populated.
+    - If the LLM said "none" or the chunk index was out of range,
+      ``supporting_chunk_idx`` is ``None``.
+    - If the LLM omitted the line for this claim entirely (parse
+      failure), ``supporting_chunk_idx`` is ``None`` and the
+      rationale carries a ``PARSE_FAILED`` marker.
+
+    Returning a typed result for every input claim — rather than
+    raising — keeps the eval loop robust. Parse failures show up in
+    the per-claim data on the report so a reviewer can spot which
+    queries to recheck.
+    """
+    # Index the LLM's output by claim_idx for direct lookup.
+    by_idx: dict[int, tuple[str | None, str | None]] = {}
+    for match in _ATTRIBUTION_LINE_RE.finditer(text):
+        claim_idx = int(match.group(1))
+        chunk_idx_str = match.group(2)
+        none_marker = match.group(3)
+        rationale = match.group(4)
+        rationale_clean = rationale.strip() if rationale else None
+        if none_marker is not None:
+            by_idx[claim_idx] = (None, rationale_clean)
+        elif chunk_idx_str is not None:
+            by_idx[claim_idx] = (chunk_idx_str, rationale_clean)
+
+    results: list[ClaimAttribution] = []
+    for i, claim_text in enumerate(claims, start=1):
+        if i not in by_idx:
+            results.append(
+                ClaimAttribution(
+                    claim_idx=i,
+                    claim_text=claim_text,
+                    supporting_chunk_idx=None,
+                    rationale=f"PARSE_FAILED: no attribution line for claim {i}",
+                )
+            )
+            continue
+
+        chunk_str, rationale = by_idx[i]
+        if chunk_str is None:
+            # Explicit "none" from the model.
+            results.append(
+                ClaimAttribution(
+                    claim_idx=i,
+                    claim_text=claim_text,
+                    supporting_chunk_idx=None,
+                    rationale=rationale,
+                )
+            )
+            continue
+
+        chunk_idx = int(chunk_str)
+        if chunk_idx < 1 or chunk_idx > n_chunks:
+            # Out-of-range index — model hallucinated a chunk number
+            # that doesn't exist. Treat as unsupported and flag it.
+            note = f"OUT_OF_RANGE: chunk {chunk_idx} not in [1, {n_chunks}]"
+            results.append(
+                ClaimAttribution(
+                    claim_idx=i,
+                    claim_text=claim_text,
+                    supporting_chunk_idx=None,
+                    rationale=f"{note}. {rationale}" if rationale else note,
+                )
+            )
+            continue
+
+        results.append(
+            ClaimAttribution(
+                claim_idx=i,
+                claim_text=claim_text,
+                supporting_chunk_idx=chunk_idx,
+                rationale=rationale,
+            )
+        )
+    return results
+
+
+# --- Relevance (unchanged absolute-scale approach) --------------------
 
 _RELEVANCE_SYSTEM = (
     "You are an evaluator of LLM-generated answers. Score how RELEVANT "
@@ -90,28 +255,26 @@ _RELEVANCE_USER_TEMPLATE = "QUESTION:\n{question}\n\nANSWER:\n{answer}"
 
 
 def _snap_to_anchor(raw: float) -> float:
-    """Snap an arbitrary float in [0, 1] to the nearest anchor value.
+    """Snap an arbitrary float in [0, 1] to the nearest 5-anchor value.
 
+    Used for relevance, which still uses the absolute-scale approach.
     The score parser receives whatever the LLM produced — sometimes
     exactly an anchor, sometimes off by a hair (0.7 instead of 0.75),
     occasionally a wildly out-of-band number. We clamp to the [0, 1]
-    range first so the JudgeScore validator never trips on the snap
-    output, then pick the closest anchor by absolute distance.
+    range first, then pick the closest anchor by absolute distance.
     """
     clamped = max(0.0, min(1.0, raw))
-    return min(_ANCHORS, key=lambda a: abs(a - clamped))
+    return min(_RELEVANCE_ANCHORS, key=lambda a: abs(a - clamped))
 
 
-def parse_judge_response(text: str, metric: JudgeMetric) -> JudgeScore:
-    """Extract SCORE and RATIONALE from a judge response into a JudgeScore.
+def parse_relevance_response(text: str, metric: JudgeMetric = "relevance") -> JudgeScore:
+    """Extract SCORE and RATIONALE from the relevance judge's response.
 
-    On a clean response, returns the snapped anchor + rationale. On a
-    response missing SCORE entirely, returns ``score=0.0`` with the
-    rationale field flagged as a parse failure (with a truncated dump
-    of the raw text). Returning a typed JudgeScore on every input —
-    rather than raising — keeps the eval loop robust to occasional
-    judge misbehavior; the report includes the parse-failure marker so
-    a reviewer can spot which queries to recheck.
+    Robust to: missing colon, lowercase keys, leading-dot decimals,
+    multi-line rationales. Out-of-range scores (e.g., "SCORE: 5.0")
+    fall through to the parse-failure path rather than being clamped
+    silently — an LLM that ignored the [0, 1] scale should be flagged
+    for review, not have its bad output coerced.
     """
     score_match = _SCORE_RE.search(text)
     if score_match is None:
@@ -134,12 +297,32 @@ def parse_judge_response(text: str, metric: JudgeMetric) -> JudgeScore:
     return JudgeScore(metric=metric, score=score, rationale=rationale)
 
 
+def _format_chunks_for_attribution(chunks: list[ChunkRef]) -> str:
+    """Render chunks as `[N] <text>` blocks separated by blank lines.
+
+    Same numbered-bracket convention the generator's prompt uses, so
+    the judge sees the same chunk identifiers as the model that
+    produced the answer. Drift here would make per-chunk attribution
+    indices not match the indices used elsewhere on the eval report.
+    """
+    pieces: list[str] = []
+    for i, c in enumerate(chunks, start=1):
+        pieces.append(f"[{i}] {c.text}")
+    return "\n\n".join(pieces)
+
+
+def _format_claims_for_attribution(claims: list[str]) -> str:
+    """Render claims as a numbered list matching the extraction output."""
+    return "\n".join(f"{i}. {claim}" for i, claim in enumerate(claims, start=1))
+
+
 class LlamaJudge(LLMJudge):
     """LLM-judge backed by Llama 3.1 8B Instruct (NF4 4-bit by default).
 
-    See module docstring for the structural mirror to ``Generator``.
-    Tests should override ``_run_inference`` directly to avoid model
-    loading; production use loads the model on first ``judge_*`` call.
+    See module docstring for the structural mirror to ``Generator``
+    and the methodology choice for faithfulness vs relevance. Tests
+    should override ``_run_inference`` directly to avoid model
+    loading; production loads the model on first ``judge_*`` call.
     """
 
     def __init__(self, config: JudgeConfig) -> None:
@@ -186,12 +369,7 @@ class LlamaJudge(LLMJudge):
         )
 
     def _run_inference(self, messages: list[dict[str, str]]) -> str:
-        """Run the judge model and return the generated text.
-
-        Mirrors ``Generator._run_inference`` but returns text only —
-        the judge doesn't need latency/token metadata; that lives on
-        the eval report alongside the JudgeScore, not inside it.
-        """
+        """Run the judge model and return the generated text."""
         inputs = cast(
             "Any",
             self.tokenizer.apply_chat_template(
@@ -215,18 +393,99 @@ class LlamaJudge(LLMJudge):
         completion_ids = output_ids[0][input_token_count:]
         return cast("str", self.tokenizer.decode(completion_ids, skip_special_tokens=True))
 
-    def judge_faithfulness(self, question: str, context: str, answer: str) -> JudgeScore:
+    def extract_claims(self, question: str, answer: str) -> list[str]:
+        """LLM call 1 of faithfulness: decompose the answer into claims.
+
+        Single LLM call. Returns the claims as a list of strings; an
+        empty list signals the model emitted ``NO_CLAIMS`` (e.g., the
+        answer was a refusal or pure code with no factual statements).
+        Public so eval drivers and tests can call it directly without
+        going through the full faithfulness flow.
+        """
         messages = [
-            {"role": "system", "content": _FAITHFULNESS_SYSTEM},
+            {"role": "system", "content": _EXTRACT_CLAIMS_SYSTEM},
             {
                 "role": "user",
-                "content": _FAITHFULNESS_USER_TEMPLATE.format(
-                    question=question, context=context, answer=answer
+                "content": _EXTRACT_CLAIMS_USER_TEMPLATE.format(question=question, answer=answer),
+            },
+        ]
+        text = self._run_inference(messages)
+        return parse_claims(text)
+
+    def attribute_claims_to_chunks(
+        self, claims: list[str], chunks: list[ChunkRef]
+    ) -> list[ClaimAttribution]:
+        """LLM call 2 of faithfulness: attribute each claim to a chunk.
+
+        Single batched LLM call covering all claims at once — N×K
+        verification scaling collapses to a single inference. Returns
+        one ClaimAttribution per claim, in input order. Out-of-range
+        chunk indices and missing attribution lines are surfaced as
+        ``supporting_chunk_idx=None`` with a marker in the rationale.
+
+        Empty ``claims`` returns an empty list without invoking the
+        LLM (no work to do).
+        """
+        if not claims:
+            return []
+        messages = [
+            {"role": "system", "content": _ATTRIBUTE_CLAIMS_SYSTEM},
+            {
+                "role": "user",
+                "content": _ATTRIBUTE_CLAIMS_USER_TEMPLATE.format(
+                    chunks_block=_format_chunks_for_attribution(chunks),
+                    claims_block=_format_claims_for_attribution(claims),
                 ),
             },
         ]
         text = self._run_inference(messages)
-        return parse_judge_response(text, "faithfulness")
+        return parse_claim_attributions(text, claims=claims, n_chunks=len(chunks))
+
+    def judge_faithfulness(self, question: str, chunks: list[ChunkRef], answer: str) -> JudgeScore:
+        """RAGAS-style claim-level faithfulness with per-chunk attribution.
+
+        Two LLM calls: extract atomic claims from the answer, then
+        attribute each claim to a specific chunk (or mark unsupported).
+        Score is ``n_supported / n_total`` — continuous in ``[0, 1]``,
+        no anchor snapping. Per-claim attributions are preserved on
+        the JudgeScore so the eval report carries grounded evidence.
+
+        Edge cases:
+        - **No claims extracted** (model emitted ``NO_CLAIMS`` or the
+          extraction parsed empty): returns ``score=0.0`` with a
+          rationale flagging the parse failure. The eval driver
+          should ideally not call this on refusal answers — that's
+          why no-answer queries skip faithfulness in the driver.
+        - **All unsupported**: ``score=0.0``, real signal that the
+          model hallucinated.
+        - **Mix of supported and unsupported**: ``score`` is the
+          supported fraction.
+        """
+        claims = self.extract_claims(question=question, answer=answer)
+        if not claims:
+            return JudgeScore(
+                metric="faithfulness",
+                score=0.0,
+                rationale=(
+                    "NO_CLAIMS_EXTRACTED: claim-extraction step returned no "
+                    "atomic claims. Answer may be a refusal, pure code, or "
+                    "the extraction parser may have failed."
+                ),
+                claim_attributions=[],
+            )
+
+        attributions = self.attribute_claims_to_chunks(claims=claims, chunks=chunks)
+        n_supported = sum(1 for a in attributions if a.supporting_chunk_idx is not None)
+        n_total = len(attributions)
+        score = n_supported / n_total if n_total > 0 else 0.0
+
+        rationale = f"{n_supported} of {n_total} claims supported by retrieved chunks."
+        return JudgeScore(
+            metric="faithfulness",
+            score=score,
+            rationale=rationale,
+            claim_attributions=attributions,
+        )
 
     def judge_relevance(self, question: str, answer: str) -> JudgeScore:
         messages = [
@@ -237,4 +496,4 @@ class LlamaJudge(LLMJudge):
             },
         ]
         text = self._run_inference(messages)
-        return parse_judge_response(text, "relevance")
+        return parse_relevance_response(text, "relevance")

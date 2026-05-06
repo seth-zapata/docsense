@@ -6,6 +6,7 @@ import pytest
 from pydantic import ValidationError
 
 from docsense.evaluation.judge import ClaimAttribution, JudgeScore, LLMJudge
+from docsense.generation.types import ChunkRef
 
 
 class MockJudge(LLMJudge):
@@ -20,11 +21,11 @@ class MockJudge(LLMJudge):
         self.faith_score = faith_score
         self.rel_score = rel_score
         self.rationale = rationale
-        self.faith_calls: list[tuple[str, str, str]] = []
+        self.faith_calls: list[tuple[str, list[ChunkRef], str]] = []
         self.rel_calls: list[tuple[str, str]] = []
 
-    def judge_faithfulness(self, question: str, context: str, answer: str) -> JudgeScore:
-        self.faith_calls.append((question, context, answer))
+    def judge_faithfulness(self, question: str, chunks: list[ChunkRef], answer: str) -> JudgeScore:
+        self.faith_calls.append((question, chunks, answer))
         return JudgeScore(metric="faithfulness", score=self.faith_score, rationale=self.rationale)
 
     def judge_relevance(self, question: str, answer: str) -> JudgeScore:
@@ -139,7 +140,8 @@ class TestLLMJudgeABC:
 
     def test_mock_subclass_satisfies_interface(self):
         judge = MockJudge(faith_score=0.5, rel_score=0.75)
-        f = judge.judge_faithfulness("q", "ctx", "ans")
+        chunks = [ChunkRef(doc_id="a.md", chunk_id="1", score=1.0, text="alpha")]
+        f = judge.judge_faithfulness("q", chunks, "ans")
         r = judge.judge_relevance("q", "ans")
         assert f.score == 0.5
         assert f.metric == "faithfulness"
@@ -150,7 +152,8 @@ class TestLLMJudgeABC:
         """Confirms the test double's call-recording works — used by
         downstream tests that need to assert what was sent to the judge."""
         judge = MockJudge()
-        judge.judge_faithfulness("q1", "ctx1", "a1")
+        chunks = [ChunkRef(doc_id="a.md", chunk_id="1", score=1.0, text="alpha")]
+        judge.judge_faithfulness("q1", chunks, "a1")
         judge.judge_relevance("q1", "a1")
-        assert judge.faith_calls == [("q1", "ctx1", "a1")]
+        assert judge.faith_calls == [("q1", chunks, "a1")]
         assert judge.rel_calls == [("q1", "a1")]

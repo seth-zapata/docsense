@@ -33,9 +33,12 @@ if Phase 3 measurements suggest relevance also needs decomposition.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from pydantic import BaseModel, Field, model_validator
+
+if TYPE_CHECKING:
+    from docsense.generation.types import ChunkRef
 
 JudgeMetric = Literal["faithfulness", "relevance"]
 
@@ -138,8 +141,8 @@ class LLMJudge(ABC):
     """
 
     @abstractmethod
-    def judge_faithfulness(self, question: str, context: str, answer: str) -> JudgeScore:
-        """Score how faithfully ``answer`` follows from ``context``.
+    def judge_faithfulness(self, question: str, chunks: list[ChunkRef], answer: str) -> JudgeScore:
+        """Score how faithfully ``answer`` follows from the retrieved chunks.
 
         Concrete implementations should use claim-level decomposition
         (extract atomic claims, attribute each to a specific chunk or
@@ -147,11 +150,12 @@ class LLMJudge(ABC):
         ``claim_attributions`` populated. The aggregate ``score`` is
         ``n_supported / n_total`` in ``[0, 1]``.
 
-        ``context`` should be the formatted retrieved-chunk text the
-        Generator was prompted with. ``LlamaJudge`` parses the chunk
-        boundaries from this string to build the per-claim attribution
-        prompt — passing different context here measures something
-        other than faithfulness-as-served.
+        ``chunks`` is the typed list of retrieved chunks the Generator
+        saw — passed as ChunkRef objects rather than a pre-formatted
+        string so the judge can address them by index without parsing
+        bracket markers out of a rendered context. The 1-indexed
+        position in this list is what ``ClaimAttribution.supporting_chunk_idx``
+        refers to.
         """
 
     @abstractmethod

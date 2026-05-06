@@ -122,20 +122,6 @@ class TestPercentiles:
         assert result["p99"] >= 98.0  # ~99.0 with linear interpolation
 
 
-class TestFormatContextForJudge:
-    def test_numbered_format_matches_prompt_shape(self):
-        chunks = [
-            ChunkRef(doc_id="a.md", chunk_id="1", score=1.0, text="alpha"),
-            ChunkRef(doc_id="b.md", chunk_id="2", score=0.9, text="beta"),
-        ]
-        rendered = driver._format_context_for_judge(chunks)
-        assert "[1]" in rendered
-        assert "[2]" in rendered
-        assert "a.md" in rendered
-        assert "alpha" in rendered
-        assert "beta" in rendered
-
-
 class TestAggregateScores:
     def test_empty_records_returns_n_zero(self):
         result = driver._aggregate_scores([], "faithfulness")
