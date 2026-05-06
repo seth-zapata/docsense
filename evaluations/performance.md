@@ -23,7 +23,7 @@ LLM-judged generation eval landed; pre-Phase-3 baseline at
 
 | Subsystem | Quality | Latency | Notes |
 |---|---|---|---|
-| Retrieval (hybrid+rerank, structural) | ✅ MRR 0.685, Recall@10 0.800 | ✅ retrieve p50 ~320 ms (n=58) | recursive chunker; production default |
+| Retrieval (hybrid+rerank, structural) | ✅ MRR 0.685, Recall@10 0.800 | ✅ retrieve p50 ~320 ms / p95 ~520 ms (n=30) | recursive chunker; production default |
 | Retrieval (hybrid+rerank, curated) | ⚠️ MRR 0.599 — see analysis | (same path) | curated MRR caveat documented |
 | Reranking (cross-encoder lift) | ✅ +0.05 to +0.20 Recall@10 | ⚠️ ~1.3 s/chunk; first-call ~10 s warmup | dominates retrieve+rerank time |
 | Generation contracts | 🔒 4 invariants pinned in CI | — | citation, budget, prompt, generator |
@@ -31,7 +31,7 @@ LLM-judged generation eval landed; pre-Phase-3 baseline at
 | Generation answer relevance (Llama judge) | ✅ mean 0.74; healthy spread on structural | — | 3 low-relevance outliers identified |
 | Generation citation rate | ⚠️ 54% (cross-set agreement) | — | Qwen cites half the time despite directive |
 | Generation refusal on off-corpus | ✅ 100% (8/8) | ✅ p50 2.4 s (refusals are short) | post-pattern-fix; see analysis |
-| End-to-end (in-corpus) | ✅ measured n=50 | ✅ generate p50 10–15 s, p90 19–24 s | RTX 4070 NF4 |
+| End-to-end (in-corpus) | ✅ measured n=50 | ✅ generate p50 10–15 s, p95 20–25 s, p99 26–30 s | RTX 4070 NF4 |
 | System fit on RTX 4070 12 GB | ✅ Qwen 7B + Llama 8B at NF4 ≈ 5–6 GB each | — | sequential load; both verified |
 
 ---
@@ -83,18 +83,24 @@ the right default despite the curated MRR exception.
 
 ### Retrieval latency
 
-| Stage | p50 | p90 | max | n | Source |
-|---|---:|---:|---:|---:|---|
-| Hybrid retrieve + rerank (curated, top_k=5) | 315 ms | 446 ms | 10,573 ms | 20 | [`baselines/pre_phase3_generation_base.json`](baselines/pre_phase3_generation_base.json) |
-| Hybrid retrieve + rerank (structural, top_k=5) | 322 ms | 388 ms | 3,417 ms | 30 | same |
-| Hybrid retrieve + rerank (no-answer, top_k=5) | 393 ms | 1,401 ms | 3,100 ms | 8 | same |
-| Per-stage breakdown (dense / sparse / RRF / rerank) | ◻️ followup | | | | |
+AWS-standard percentiles (p50 / p95 / p99). p99 with small N is
+dominated by single-event outliers — read it as "tail signal" not
+"production worst-case."
 
-The `max` outlier on the curated set (10.6 s on the very first query)
-is a one-time cross-encoder warm-up — the model loads lazily on first
-`predict()`. After that, retrieve + rerank is consistently sub-second.
-Per-substage timing (dense vs. sparse vs. RRF vs. rerank) is still a
-single bucket; instrumenting that is a small follow-up.
+| Stage | p50 | p95 | p99 | mean | n | Source |
+|---|---:|---:|---:|---:|---:|---|
+| Hybrid retrieve + rerank (curated, top_k=5) | 315 ms | 1,277 ms | 8,714 ms | 855 ms | 20 | [`baselines/pre_phase3_generation_base.json`](baselines/pre_phase3_generation_base.json) |
+| Hybrid retrieve + rerank (structural, top_k=5) | 322 ms | 518 ms | 2,596 ms | 420 ms | 30 | same |
+| Hybrid retrieve + rerank (no-answer, top_k=5) | 438 ms | 6,453 ms | 8,988 ms | 1,586 ms | 8 | same |
+| Per-stage breakdown (dense / sparse / RRF / rerank) | ◻️ followup | | | | | |
+
+The p99 outliers on curated (8.7 s) and no-answer (9.0 s) are both
+one-time cross-encoder cold-starts — the model loads lazily on the
+first `.predict()` call within each Python process. Steady-state
+p50 is consistently sub-second. Per-substage timing (dense vs. sparse
+vs. RRF vs. rerank) is still a single bucket; instrumenting that is
+a small follow-up tracked in [`docs/phase-2-4-scope.md`](../docs/phase-2-4-scope.md)
+under "Latency & observability conventions."
 
 ---
 
@@ -157,18 +163,21 @@ LLM judge: Llama 3.1 8B Instruct (NF4, temperature=0). Source data:
 
 ### Generation latency (Qwen 2.5 7B, NF4, RTX 4070)
 
-| Stage | p50 | p90 | max | n | Source |
-|---|---:|---:|---:|---:|---|
-| Generate (curated in-corpus) | 15,125 ms | 24,311 ms | 26,566 ms | 20 | [`baselines/pre_phase3_generation_base.json`](baselines/pre_phase3_generation_base.json) |
-| Generate (structural in-corpus) | 9,733 ms | 18,822 ms | 33,779 ms | 30 | same |
-| Generate (no-answer / refusal) | 2,438 ms | 3,994 ms | 4,286 ms | 8 | same |
-| Model load (cold, one-time per process) | ~163 s | — | — | n=1 | smoke.md |
+| Stage | p50 | p95 | p99 | mean | n | Source |
+|---|---:|---:|---:|---:|---:|---|
+| Generate (curated in-corpus) | 15,125 ms | 25,148 ms | 26,282 ms | 16,255 ms | 20 | [`baselines/pre_phase3_generation_base.json`](baselines/pre_phase3_generation_base.json) |
+| Generate (structural in-corpus) | 9,733 ms | 19,589 ms | 29,694 ms | 10,909 ms | 30 | same |
+| Generate (no-answer / refusal) | 2,748 ms | 3,728 ms | 3,865 ms | 2,629 ms | 8 | same |
+| Model load (cold, one-time per process) | ~163 s | — | — | — | 1 | smoke.md |
 
-Refusals are short (≤ 50 tokens) so generation is much faster — ~2.4 s
+Refusals are short (≤ 50 tokens) so generation is much faster — ~2.7 s
 p50 vs ~10–15 s for in-corpus answers. Curated questions tend to elicit
 longer expository answers ("How do I install transformers?" gets a
 multi-paragraph response); structural queries lean terminology-focused
-("Albert specific outputs") and produce shorter answers.
+("Albert specific outputs") and produce shorter answers. Note that
+mean ≫ p50 on curated (16.3 s mean vs 15.1 s p50) confirms a
+right-skewed distribution — the heavy-tail signal that p95/p99 are
+designed to surface.
 
 ---
 

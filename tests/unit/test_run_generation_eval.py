@@ -80,27 +80,46 @@ class TestPercentiles:
         result = driver._percentiles([])
         assert result["n"] == 0
         assert result["p50"] == 0.0
+        assert result["p95"] == 0.0
+        assert result["p99"] == 0.0
+
+    def test_no_p90_or_max_in_output(self):
+        """AWS-standard reporting is p50/p95/p99 + mean. p90 and max
+        were intentionally removed to keep the schema focused — pin
+        the omission so a future addition is a deliberate decision."""
+        result = driver._percentiles([1.0, 2.0, 3.0])
+        assert "p90" not in result
+        assert "max" not in result
+        assert set(result.keys()) == {"p50", "p95", "p99", "mean", "n"}
 
     def test_single_value(self):
         result = driver._percentiles([42.0])
         assert result["p50"] == 42.0
-        assert result["p90"] == 42.0
-        assert result["max"] == 42.0
+        assert result["p95"] == 42.0
+        assert result["p99"] == 42.0
         assert result["mean"] == 42.0
         assert result["n"] == 1
 
     def test_p50_is_median_for_odd_count(self):
         result = driver._percentiles([1.0, 2.0, 3.0, 4.0, 5.0])
         assert result["p50"] == 3.0
-        assert result["max"] == 5.0
         assert result["mean"] == 3.0
 
-    def test_p90_above_p50(self):
-        """Sanity: percentiles must be monotone non-decreasing."""
+    def test_percentiles_monotone_non_decreasing(self):
+        """Sanity: p50 ≤ p95 ≤ p99 ≤ underlying max for any input."""
         values = [float(i) for i in range(100)]
         result = driver._percentiles(values)
-        assert result["p90"] >= result["p50"]
-        assert result["max"] >= result["p90"]
+        assert result["p50"] <= result["p95"]
+        assert result["p95"] <= result["p99"]
+        assert result["p99"] <= max(values)
+
+    def test_p99_at_n100(self):
+        """With exactly 100 values 0-99, p99 lands at the last value
+        (or very close — linear-interpolation between rank 98 and 99).
+        Documents the small-N caveat for the schema."""
+        values = [float(i) for i in range(100)]
+        result = driver._percentiles(values)
+        assert result["p99"] >= 98.0  # ~99.0 with linear interpolation
 
 
 class TestFormatContextForJudge:
@@ -207,3 +226,8 @@ class TestBuildReport:
         assert "timing_ms_per_query" in report
         assert report["timing_ms_per_query"]["generate_ms"]["n"] == 5
         assert report["timing_ms_per_query"]["retrieve_ms"]["mean"] > 0
+        # Schema-pin: p50/p95/p99 must be present, p90/max must not.
+        assert "p99" in report["timing_ms_per_query"]["generate_ms"]
+        assert "p95" in report["timing_ms_per_query"]["generate_ms"]
+        assert "p90" not in report["timing_ms_per_query"]["generate_ms"]
+        assert "max" not in report["timing_ms_per_query"]["generate_ms"]
