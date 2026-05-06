@@ -625,3 +625,144 @@ LLM-as-judge practice. After C.2, the only regex left in the eval
 pipeline will be `_CITATION_MARKER_RE` (extracting `[N]` from
 generator output, which is the right level of mechanical for the
 input format the system asks the model to produce).
+
+---
+
+## Update 3 — judge output → JSON, regex eliminated from judge parsing (later same day)
+
+After PR C.1 closed the regex-on-generator-output problem with the
+LLM-judge for refusal detection, the parallel problem stayed open:
+the four judge methods themselves still parsed LLM output with regex
+(``parse_claims``, ``parse_claim_attributions``,
+``parse_relevance_response``, ``parse_refusal_response``). PR C.2
+closed it.
+
+The conceptual point: **the judge is *our* tool, we own the prompt
+and the output format**. Parsing our tool's output with regex is
+just bad tool choice — JSON gives us a typed contract via pydantic,
+forgiving shape tolerance (whitespace, key casing, fence wrapping
+all become trivial), and a clean retry path on parse failure.
+That's strictly better than regex-tolerance escalation.
+
+### What changed (PR C.2)
+
+1. **JSON helper + four pydantic response schemas.** ``_extract_json_block``
+   strips markdown code fences and prose preambles to find the first
+   ``{...}`` block. ``_parse_json_response[T: BaseModel](text, schema)``
+   does the parse + validate; returns ``None`` on any failure
+   (json decode error or pydantic validation error).
+2. **``_call_with_json_retry`` method on LlamaJudge.** Single LLM
+   call → parse → if failed, append a clarifying message ("your
+   previous response was not valid JSON") → one retry. Permanent
+   failure returns ``None``; the calling method falls back to a
+   ``PARSE_FAILED`` marker, same end-state as the prior regex
+   parsers.
+3. **All four judge prompts updated to ask for JSON output.**
+   Pydantic schema embedded in the prompt; "Do not output any other
+   text. Do not wrap in markdown code fences." explicit instruction.
+4. **Per-call response schemas** (``_ClaimsResponse``,
+   ``_AttributionsResponse``, ``_RelevanceResponse``,
+   ``_RefusalResponse``) constrain the LLM's output shape.
+   ``_RelevanceResponse.score: Field(ge=0.0, le=1.0)`` catches
+   out-of-range scores at validation time; snap-to-anchor still
+   happens in post-processing.
+5. **Five regex constants and four ``parse_*`` functions deleted.**
+   Replaced with private ``_post_process_*`` helpers that take
+   pydantic-validated responses and produce ``JudgeScore`` /
+   ``ClaimAttribution`` / ``RefusalJudgment``.
+
+### Headline result
+
+**Zero claim-level parse failures across 273 total claims** (curated
+128 + structural 145). The ``curated_001`` 8/8 PARSE_FAILED edge
+case from Update 1 is gone.
+
+| Metric | Update 1 (regex) | Update 3 (JSON) |
+|---|---:|---:|
+| Faithfulness mean (curated) | 0.853 | **0.894** |
+| Faithfulness mean (structural) | 0.853 | **0.889** |
+| Cross-set Δ | exact | within 0.005 |
+| Claim parse failures (curated / structural) | 9 / 1 | **0 / 1** |
+| OUT_OF_RANGE picks (curated / structural) | 5 / 3 | 18 / 11 |
+| Support rate (curated / structural) | 0.89 / 0.94 | 0.85 / 0.88 |
+
+The faithfulness mean rose 0.853 → 0.894 on curated because
+``curated_001``'s 8/8 PARSE_FAILED no longer drags the average down
+(those 8 claims now score and contribute to the mean). On structural
+the rise is smaller (0.853 → 0.889) because there was no equivalent
+parser-broken outlier in PR B.
+
+### The cross-validation methodology earned its keep mid-PR
+
+The first JSON-format eval run had an embarrassing finding:
+
+```
+no-answer (n=25): judge=0.00  rule=1.00  agreement=0.00
+                  disagreements=25  judge-parse-fails=25
+```
+
+Every single ``judge_refusal`` call parse-failed. Cause: I missed
+updating the refusal prompt during the JSON migration — it still
+asked for ``REFUSED: yes/no`` text format. The LLM was producing
+exactly what the prompt asked for; the parser was looking for JSON
+and rejecting it.
+
+The agreement_rate metric — designed in PR C.1 specifically to be
+the early-warning canary for this kind of cross-validation
+divergence — fired immediately and unmistakably. A regex-only
+refusal measurement would have shown 100% (the rule was always
+going to match Qwen's actual output) and we'd have shipped a broken
+JSON migration without knowing. **Two independent measurements
+landing on different numbers caught the bug within minutes of the
+eval completing.**
+
+Fix: commit ``fec3dc6`` rewrote the refusal prompt to JSON and
+strengthened the attribution prompt with an explicit
+``[1, N]`` chunk-range constraint. Re-run produced
+``judge=1.00 / rule=1.00 / agreement=1.00`` again.
+
+### The OUT_OF_RANGE finding
+
+Only residual issue: OUT_OF_RANGE picks went UP post-migration
+(curated 5 → 18, structural 3 → 11). The strengthened attribution
+prompt (commit ``fec3dc6``) didn't help — same numbers in the
+re-run.
+
+Hypothesis: with regex output the LLM had to *write the chunk
+number* in a specific format ("CLAIM 3: chunk 7 |
+RATIONALE: ..."), which made out-of-range less likely because the
+LLM was producing structured prose. With JSON, ``"supporting_chunk_idx":
+7`` is structurally valid JSON regardless of whether 7 is in
+[1, K]. The LLM picks a confident-looking but wrong number when
+it's uncertain.
+
+Worth flagging as a real model-behavior pattern, not a parser bug.
+Phase 3 follow-up if it persists. Mitigations to consider later:
+constrained decoding (Outlines, lm-format-enforcer) that masks
+out-of-range tokens, or a post-attribution LLM verifier pass.
+
+### Implications for Phase 3 (final)
+
+After three updates' worth of methodology iteration, here's what
+Phase 3 inherits:
+
+1. **Faithfulness measured continuously** via claim-level decomposition
+   with per-chunk attribution. No anchor saturation; per-claim
+   evidence preserved in reports. Cross-set agreement (0.894 / 0.889)
+   validates the method.
+2. **Relevance measured on the 5-anchor scale** via JSON output.
+   Snap-to-anchor in post-processing. Healthier spread on structural
+   set than faithfulness used to have on the absolute scale.
+3. **Refusal measured by LLM-judge primary + regex guardrail** with
+   ``agreement_rate`` as the methodology canary. 100% / 100% /
+   100% baseline; Phase 3 watches for drift.
+4. **Citation rate ~48%** — generator-side, unchanged code path.
+   Highest-leverage Phase 3 fine-tune target.
+5. **AWS-standard latency** (p50/p95/p99/mean/n) reported per stage.
+6. **Methodology cleanup is complete**: the only regex left in
+   the eval pipeline is ``_CITATION_MARKER_RE`` extracting ``[N]``
+   from generator output. Everywhere we parse LLM output that we
+   *control the format of*, we now use JSON + pydantic + retry.
+
+The eval surface is in good shape going into Phase 3. Time to
+fine-tune.

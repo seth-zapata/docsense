@@ -708,19 +708,50 @@ agreement=1.000 across 25 queries — perfect cross-validation.
 result alongside `JudgeScore` — refusal is naturally categorical,
 not a [0, 1] score.
 
-#### Block 2D — Judge output → JSON, eliminate regex parsers (PR C.2, queued)
+#### Block 2D — Judge output → JSON, eliminate regex parsers (PR C.2, closed 2026-05-06)
 
-Final piece of the methodology cleanup. Refactor judge output
-parsing for `extract_claims`, `attribute_claims_to_chunks`, and
-`parse_relevance_response` from regex to JSON + pydantic
-validation + retry-on-parse-failure. Eliminates the `curated_001`
-8-of-8-PARSE_FAILED edge case documented in the baseline analysis
-and aligns with industry-standard LLM-as-judge practice.
+Final piece of the methodology cleanup. Refactored all four judge
+calls (`extract_claims`, `attribute_claims_to_chunks`,
+`judge_relevance`, `judge_refusal`) from regex parsing of free-form
+output to JSON + pydantic validation + retry-on-parse-failure.
 
-After PR C.2, the only regex left in the eval pipeline will be
-`_CITATION_MARKER_RE` — extracting `[N]` markers from the
-generator's output, which is the right level of mechanical for
-the input shape we ask the model to produce.
+Implementation: per-call pydantic response schemas (`_ClaimsResponse`,
+`_AttributionsResponse`, `_RelevanceResponse`, `_RefusalResponse`);
+`_extract_json_block` helper strips markdown fences and prose
+preambles; `_call_with_json_retry` does one retry on parse failure
+with a clarifying message; `_post_process_*` helpers convert
+validated schemas into the public types (`JudgeScore`,
+`ClaimAttribution`, `RefusalJudgment`).
+
+Headline result: **zero claim-level parse failures across 273
+total claims** (PR B had 9 / 1; PR C.2 has 0 / 1). The
+`curated_001` 8-of-8-PARSE_FAILED edge case is gone. Faithfulness
+mean rose to 0.894 / 0.889 (cross-set agreement within 0.005)
+because the previously-broken queries now contribute to the
+average. After PR C.2 the only regex left in the eval pipeline is
+`_CITATION_MARKER_RE` — extracting `[N]` from generator output,
+which is the right level of mechanical for the input shape.
+
+The cross-validation methodology from C.1 paid off mid-PR: the
+first post-migration eval run had `judge_refusal` parse-failing
+25/25 because I missed updating the refusal prompt to JSON. The
+`agreement_rate=0.00` against `rule=1.00` made the bug
+unmistakable. Fix landed (commit fec3dc6); re-run restored
+agreement to 1.000.
+
+Residual finding for Phase 3 follow-up: OUT_OF_RANGE picks went up
+post-migration (5 → 18 curated, 3 → 11 structural). With JSON the
+LLM emits structurally-valid `"supporting_chunk_idx": 7` regardless
+of whether 7 is in [1, K]; with regex it had to write the number
+in prose, which made out-of-range less likely. Strengthening the
+prompt with explicit range constraints didn't help. This is a real
+model-behavior pattern, worth a Phase 3 follow-up (constrained
+decoding via Outlines / lm-format-enforcer would mask out-of-range
+tokens at generation time).
+
+⏸️ **Pre-Phase-3 Block 2 closed.** Eval methodology is solid; Phase
+3 fine-tuning has a methodologically-defensible baseline to diff
+against.
 
 ### Optional follow-up — AnthropicJudge calibration mode
 

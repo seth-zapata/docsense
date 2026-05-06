@@ -5,11 +5,12 @@ docsense system. Per-experiment JSON in `reports/`, narrative
 interpretations in `analyses/`, raw smoke artifacts in `manual-runs/` —
 this file is the dashboard that points into them.
 
-**Last updated:** 2026-05-06 (refusal detection moved from regex-only
-to LLM-judge-primary with regex as guardrail; no-answer eval set
-expanded from n=8 to n=25). Earlier same-day update: faithfulness
-methodology refactored to RAGAS-style claim-level decomposition.
-See the [baseline](baselines/pre_phase3_generation_base.json) and
+**Last updated:** 2026-05-06 (judge output migrated from regex parsing
+to JSON + pydantic + retry-on-parse-failure across all four judge
+calls). Earlier same-day updates: refusal detection via LLM judge with
+cross-validation (n=8 → n=25), claim-level faithfulness with
+per-chunk attribution, AWS-standard latency percentiles. See the
+[baseline](baselines/pre_phase3_generation_base.json) and
 [analysis](analyses/2026-05-06-baseline-generation-eval.md).
 
 **Status legend:**
@@ -26,11 +27,11 @@ See the [baseline](baselines/pre_phase3_generation_base.json) and
 
 | Subsystem | Quality | Latency | Notes |
 |---|---|---|---|
-| Retrieval (hybrid+rerank, structural) | ✅ MRR 0.685, Recall@10 0.800 | ✅ retrieve p50 ~320 ms / p95 ~520 ms (n=30) | recursive chunker; production default |
+| Retrieval (hybrid+rerank, structural) | ✅ MRR 0.685, Recall@10 0.800 | ✅ retrieve p50 ~270 ms / p95 ~330 ms (n=30) | recursive chunker; production default |
 | Retrieval (hybrid+rerank, curated) | ⚠️ MRR 0.599 — see analysis | (same path) | curated MRR caveat documented |
 | Reranking (cross-encoder lift) | ✅ +0.05 to +0.20 Recall@10 | ⚠️ ~1.3 s/chunk; first-call ~10 s warmup | dominates retrieve+rerank time |
 | Generation contracts | 🔒 4 invariants pinned in CI | — | citation, budget, prompt, generator |
-| Generation faithfulness (claim-level, Llama judge) | ✅ mean 0.853 / median 1.0 (cross-set agreement) | — | RAGAS-style; support rate 0.89 curated / 0.94 structural |
+| Generation faithfulness (claim-level, JSON judge) | ✅ mean **0.894 / 0.889** (cross-set agreement within 0.005) | — | RAGAS-style + JSON output; zero claim parse-fails |
 | Generation answer relevance (Llama judge, 5-anchor) | ✅ mean 0.72 (curated 0.725, structural 0.717) | — | 4 low-relevance outliers across sets |
 | Generation citation rate | ⚠️ ~58% (cross-set agreement) | — | Qwen cites about half the time despite directive |
 | Generation refusal on off-corpus | ✅ 100% (25/25) — judge & rule agree | ✅ p50 2.0 s (refusals are short) | LLM-judge primary + regex guardrail; cross-validation in place for Phase 3 |
@@ -92,9 +93,9 @@ dominated by single-event outliers — read it as "tail signal" not
 
 | Stage | p50 | p95 | p99 | mean | n | Source |
 |---|---:|---:|---:|---:|---:|---|
-| Hybrid retrieve + rerank (curated, top_k=5) | 315 ms | 1,277 ms | 8,714 ms | 855 ms | 20 | [`baselines/pre_phase3_generation_base.json`](baselines/pre_phase3_generation_base.json) |
-| Hybrid retrieve + rerank (structural, top_k=5) | 322 ms | 518 ms | 2,596 ms | 420 ms | 30 | same |
-| Hybrid retrieve + rerank (no-answer, top_k=5) | 432 ms | 681 ms | 5,776 ms | 722 ms | 25 | same |
+| Hybrid retrieve + rerank (curated, top_k=5) | 274 ms | 1,050 ms | 6,308 ms | 653 ms | 20 | [`baselines/pre_phase3_generation_base.json`](baselines/pre_phase3_generation_base.json) |
+| Hybrid retrieve + rerank (structural, top_k=5) | 267 ms | 331 ms | 2,323 ms | 354 ms | 30 | same |
+| Hybrid retrieve + rerank (no-answer, top_k=5) | 340 ms | 649 ms | 2,700 ms | 511 ms | 25 | same |
 | Per-stage breakdown (dense / sparse / RRF / rerank) | ◻️ followup | | | | | |
 
 The p99 outliers on curated (8.7 s) and no-answer (9.0 s) are both
@@ -159,22 +160,22 @@ Source data: [`baselines/pre_phase3_generation_base.json`](baselines/pre_phase3_
 |---|---|---|---|
 | Loads at NF4 in 12 GB VRAM | ✅ | Qwen ~5–6 GB; Llama ~5–6 GB; sequential load works on shared 12 GB GPU | [smoke.md](manual-runs/2026-05-06-smoke.md) + eval handoff (9 MB residual after each unload) |
 | Inference throughput | ✅ | 14.6 tok/s (smoke); generate p50 9.7–15 s (eval) | smoke.md, eval reports |
-| **Faithfulness — score** (claim-level) | ✅ | mean **0.853** curated / **0.853** structural (exact cross-set agreement) | median 1.0 on both; right-skewed distribution |
-| **Faithfulness — claim support** | ✅ | **0.89** curated (114/128 claims) / **0.94** structural (146/156) | per-chunk attribution; only ~10% of unsupported are real, rest are parser issues |
-| **Answer relevance** (Llama, 5-anchor) | ✅ | mean **0.725** curated / **0.717** structural | structural: 3×0.25, 25×0.75, 2×1.0; curated: 1×0.25, 19×0.75 |
-| **Citation rate** (`[N]` markers in text) | ⚠️ | **~58%** of in-corpus answers (60% curated, 57% structural) | cross-set agreement; highest-leverage Phase 3 fine-tune target |
+| **Faithfulness — score** (claim-level, JSON judge) | ✅ | mean **0.894** curated / **0.889** structural (within 0.005 cross-set) | median 1.0 on both; right-skewed; **zero parse failures** post-JSON migration |
+| **Faithfulness — claim support** | ✅ | **0.85** curated (109/128 claims) / **0.88** structural (128/145) | OUT_OF_RANGE picks now the residual issue (~10% of attributions); model behavior, not parser |
+| **Answer relevance** (Llama, 5-anchor) | ✅ | mean **0.775** curated / **0.742** structural | curated: 18×0.75, 2×1.0; structural: 2×0.0, 1×0.25, 20×0.75, 7×1.0 |
+| **Citation rate** (`[N]` markers in text) | ⚠️ | **~48%** of in-corpus answers (50% curated, 47% structural) | generator-side variance from temp=0.1; highest-leverage Phase 3 target |
 | **Refusal on off-corpus** (LLM-judge primary + regex guardrail) | ✅ | **100%** (25/25 — judge and rule agree on all queries) | every refusal triggered `dont_have_context` regex; cross-validation in place to catch Phase 3 phrasing drift |
 | Generated answer quality (eyeball) | ✅ | technically correct on the smoke run | smoke.md §Generated answer |
-| Claim-level parser robustness | ⚠️ | 10 of 50 in-corpus queries (20%) have at least one parser issue; only 3 (6%) had scores materially affected | curated_001 alone has 8/8 PARSE_FAILED; followup |
+| Claim-level parser robustness | ✅ | **zero claim parse failures** post-JSON migration (was 9 / 1 in PR B) | curated_001 8/8 PARSE_FAILED edge case eliminated |
 | Prompt-tuning sweep for citation rate | ◻️ followup | — | the citation gap is documented and Phase 3 fine-tune may target it |
 
 ### Generation latency (Qwen 2.5 7B, NF4, RTX 4070)
 
 | Stage | p50 | p95 | p99 | mean | n | Source |
 |---|---:|---:|---:|---:|---:|---|
-| Generate (curated in-corpus) | 15,125 ms | 25,148 ms | 26,282 ms | 16,255 ms | 20 | [`baselines/pre_phase3_generation_base.json`](baselines/pre_phase3_generation_base.json) |
-| Generate (structural in-corpus) | 9,733 ms | 19,589 ms | 29,694 ms | 10,909 ms | 30 | same |
-| Generate (no-answer / refusal) | 2,040 ms | 3,695 ms | 3,789 ms | 2,123 ms | 25 | same |
+| Generate (curated in-corpus) | 15,618 ms | 26,735 ms | 31,027 ms | 16,350 ms | 20 | [`baselines/pre_phase3_generation_base.json`](baselines/pre_phase3_generation_base.json) |
+| Generate (structural in-corpus) | 12,067 ms | 17,836 ms | 27,621 ms | 10,610 ms | 30 | same |
+| Generate (no-answer / refusal) | 1,213 ms | 3,445 ms | 3,584 ms | 1,943 ms | 25 | same |
 | Model load (cold, one-time per process) | ~163 s | — | — | — | 1 | smoke.md |
 
 Refusals are short (≤ 50 tokens) so generation is much faster — ~2.7 s
