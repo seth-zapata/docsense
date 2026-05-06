@@ -366,9 +366,27 @@ def run_judging_phase(records: list[QueryRecord], settings: Settings) -> None:
 
 
 def _percentiles(values: list[float]) -> dict[str, float]:
-    """Return p50/p90/max plus mean. Empty input returns NaN-ish dict."""
+    """Return p50/p95/p99 + mean + n.
+
+    AWS-standard latency reporting. p50 captures typical UX, p95 catches
+    the slow tail without being dominated by single outliers, p99 is the
+    "1-in-100" tail signal — what users at the long tail experience.
+    Mean is included because it's still a useful summary alongside the
+    percentiles (and reveals when the distribution is skewed: mean ≫
+    p50 means heavy tail).
+
+    p90 and max were intentionally dropped:
+    - p90 is a lower-bar version of p95 that the AWS convention
+      replaces. Keeping both adds noise without information.
+    - max is a single-observation tail signal that's easy to pollute
+      with one-off slow events (cold-start cross-encoder warmup, GC
+      pause). p99 is the right tail metric in a controlled eval; max
+      is recoverable from per_query data in the report if needed.
+
+    Empty input returns a zeroed dict; no NaN propagation.
+    """
     if not values:
-        return {"p50": 0.0, "p90": 0.0, "max": 0.0, "mean": 0.0, "n": 0}
+        return {"p50": 0.0, "p95": 0.0, "p99": 0.0, "mean": 0.0, "n": 0}
     sorted_vals = sorted(values)
 
     def _pct(p: float) -> float:
@@ -383,8 +401,8 @@ def _percentiles(values: list[float]) -> dict[str, float]:
 
     return {
         "p50": round(_pct(0.5), 2),
-        "p90": round(_pct(0.9), 2),
-        "max": round(max(sorted_vals), 2),
+        "p95": round(_pct(0.95), 2),
+        "p99": round(_pct(0.99), 2),
         "mean": round(statistics.fmean(sorted_vals), 2),
         "n": len(sorted_vals),
     }
@@ -611,7 +629,8 @@ def _print_summary(report: dict[str, Any]) -> None:
     print(
         f"  timing/query: retrieve p50={timing['retrieve_ms']['p50']:.0f}ms  "
         f"generate p50={timing['generate_ms']['p50']:.0f}ms  "
-        f"generate p90={timing['generate_ms']['p90']:.0f}ms"
+        f"generate p95={timing['generate_ms']['p95']:.0f}ms  "
+        f"generate p99={timing['generate_ms']['p99']:.0f}ms"
     )
     print()
 

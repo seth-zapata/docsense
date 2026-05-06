@@ -673,6 +673,95 @@ the value of judge calibration justifies the API key + spend:
 
 ---
 
+## Latency & observability conventions
+
+Cross-cutting standards for how docsense reports latency and other
+operational metrics. Pinned here so every eval run, smoke artifact,
+and (eventually) Phase 4 serving telemetry uses the same shapes —
+inconsistent reporting is the enemy of system-state legibility.
+
+### Latency: AWS-standard percentiles
+
+**p50, p95, p99 + mean + n.** Adopted 2026-05-06 (`scripts/run_generation_eval.py`,
+`evaluations/performance.md`, `evaluations/baselines/pre_phase3_generation_base.json`).
+
+| Metric | What it captures |
+|---|---|
+| **p50 (median)** | Typical user experience. The "what does it feel like for most queries" number. |
+| **p95** | Slow-tail signal that survives single outliers. The "1 in 20 users" boundary; the canonical SLO target in most prod systems. |
+| **p99** | True tail signal. The "1 in 100 users" boundary; reveals heavy-tailed distributions. At small N (n < 100) p99 is dominated by single events — read it as "tail signal" not "production worst-case." |
+| **mean** | Sanity check alongside the percentiles. mean ≫ p50 ⇒ right-skewed (heavy-tail); mean ≈ p50 ⇒ symmetric. |
+| **n** | Sample size. Always reported; absolute percentile interpretations require it. |
+
+Why not p90 + max:
+- p90 is a lower-bar version of p95. Pick one — AWS convention is p95.
+- max is a single-observation tail metric that's easy to pollute
+  with one-off slow events (cold-start cross-encoder warmup, GC
+  pause). p99 is the right tail metric in a controlled eval; max
+  is recoverable from per_query data when needed for forensics.
+
+### Cold-start vs steady-state
+
+Distinguish in every report. Currently informal — a one-time model
+load (~163 s for Qwen 7B at NF4) inflates wall time on the first
+query but doesn't represent steady-state. Eval timings already
+exclude model load (Phase B starts post-load). For Phase 4 serving,
+warm vs cold starts must be separately tracked: a request that
+hit a freshly-spawned worker shouldn't be aggregated with requests
+to a warm worker — the distributions are bimodal.
+
+### Per-stage breakdown — pending
+
+Currently `retrieve_ms` is a single bucket covering dense + sparse
++ RRF + cross-encoder rerank. The cross-encoder dominates (~1.3 s
+at `rerank_candidates=20`); dense + sparse + RRF are sub-second.
+Splitting these out is a small follow-up — useful when Phase 3
+lands and we want to see whether changes in retrieval (e.g., a
+reranker swap) shift the latency distribution.
+
+### Resource utilization — Phase 3 onwards
+
+Track peak VRAM per phase: relevant when comparing fine-tuned vs
+base models (a fine-tune that doesn't change quality but bloats
+VRAM is a real regression). Peak RSS and CUDA fragmentation are
+secondary signals; matter at Phase 4 serving but not in offline eval.
+
+### Throughput
+
+`tokens/sec` (generation) is the most useful throughput metric for
+LLM eval — captures inference speed independent of answer length.
+Baseline: ~14.6 tok/s for Qwen 2.5 7B Instruct at NF4 on RTX 4070.
+Track Δtok/s after Phase 3 fine-tuning — should be flat (LoRA
+adapters add ~1-5% overhead, not more).
+
+`queries/sec` matters at Phase 4 serving, not earlier.
+
+### Error rate
+
+Currently zero across Block 1B's 100+ judge calls (parse failures
+tracked separately). For Phase 4 serving, error rate joins p99 as
+a primary SLO. Categories worth distinguishing:
+
+- Generator parse / format errors
+- Judge parse failures (already tracked via `n_parse_failures`)
+- Retrieval errors (FAISS search failure, BM25 index miss)
+- Network / dependency errors (Phase 4 only)
+- Timeouts (Phase 4 only)
+
+### Anti-patterns to avoid
+
+- **Reporting only mean.** Mean alone hides distribution shape; a
+  bimodal distribution (warm vs cold start) reads identically to a
+  unimodal one if you only see mean.
+- **Reporting only max.** As above for the tail end. One slow event
+  dominates.
+- **Mixing wall time and CPU time.** Wall clock is what users
+  experience; report it explicitly.
+- **Aggregating across hardware classes.** A laptop CPU run and an
+  RTX 4070 NF4 run are different distributions. Don't combine.
+
+---
+
 ## Security and dependency hygiene — staged
 
 The agreement is to document these now and implement them as their

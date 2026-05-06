@@ -60,31 +60,20 @@
     }
   },
   "timing_ms_per_query": {
+    "_schema_note": "AWS-standard latency reporting: p50 (typical UX), p95 (slow tail without single-outlier dominance), p99 (1-in-100 tail). p90 and max were dropped — p95 supersedes p90, and max is recoverable from per_query data when needed and is too sensitive to one-off slow events (cold-start warmup, GC pause) to be a useful summary at small N. Mean is included alongside the percentiles because mean ≫ p50 reveals heavy-tailed distributions.",
     "curated": {
-      "retrieve_ms_p50": 315.17,
-      "retrieve_ms_p90": 445.50,
-      "retrieve_ms_max": 10573.12,
-      "generate_ms_p50": 15125.35,
-      "generate_ms_p90": 24310.92,
-      "generate_ms_max": 26565.55,
-      "note": "retrieve_ms max=10573 is a one-time cross-encoder warmup on the first query (model load lazy on first call). p50/p90 are post-warmup steady-state."
+      "retrieve_ms": {"p50": 315.17, "p95": 1276.74, "p99": 8713.81, "mean": 854.82, "n": 20},
+      "generate_ms": {"p50": 15125.35, "p95": 25148.21, "p99": 26282.13, "mean": 16254.75, "n": 20},
+      "note": "retrieve p99=8714 ms reflects a one-time cross-encoder warmup on the first query (model loads lazily on first .predict() call). p50 and p95 are post-warmup steady-state."
     },
     "structural": {
-      "retrieve_ms_p50": 321.67,
-      "retrieve_ms_p90": 388.17,
-      "retrieve_ms_max": 3417.43,
-      "generate_ms_p50": 9732.61,
-      "generate_ms_p90": 18822.44,
-      "generate_ms_max": 33778.51
+      "retrieve_ms": {"p50": 321.67, "p95": 518.40, "p99": 2595.61, "mean": 420.46, "n": 30},
+      "generate_ms": {"p50": 9732.61, "p95": 19589.07, "p99": 29694.27, "mean": 10908.73, "n": 30}
     },
     "no_answer": {
-      "retrieve_ms_p50": 393.43,
-      "retrieve_ms_p90": 1401.04,
-      "retrieve_ms_max": 3100.02,
-      "generate_ms_p50": 2437.79,
-      "generate_ms_p90": 3994.46,
-      "generate_ms_max": 4286.16,
-      "note": "Generation is much faster on no-answer queries (~2.5s p50 vs ~10-15s in-corpus) because refusal answers are short."
+      "retrieve_ms": {"p50": 437.99, "p95": 6453.39, "p99": 8988.20, "mean": 1586.27, "n": 8},
+      "generate_ms": {"p50": 2748.04, "p95": 3727.93, "p99": 3864.86, "mean": 2629.46, "n": 8},
+      "note": "Generation is much faster on no-answer queries (~2.7 s p50 vs ~10-15 s in-corpus) because refusal answers are short. retrieve_ms p95/p99 are dominated by a single 9.6 s cross-encoder cold-start outlier (this set ran in a separate process from curated/structural after the refusal-pattern fix); n=8 is too small for stable tail estimates."
     }
   },
   "headline_findings": [
@@ -92,6 +81,6 @@
     "Relevance shows more spread (3 queries at 0.25, 23 at 0.75, 4 at 1.0 on structural) — the judge can produce low scores when the answer is genuinely off-topic. The 0.25 cases are all 'Usage example/examples' structural queries where Qwen acknowledged the gap but produced unrelated content.",
     "Qwen produces citation markers on ~54% of in-corpus answers (55% curated, 53% structural). Cross-set agreement makes this a stable behavioral measurement, not noise. The smoke run's 0% on a single query was unrepresentative.",
     "Refusal behavior on off-corpus queries is 100% (8/8) — Qwen reliably refuses with 'I don't have enough context to answer that.' The discovery process (initial 38% → coverage gap found → pattern patched → 100%) is itself a methodology learning: rule-based heuristics need iteration against real model outputs.",
-    "Generation latency: in-corpus p50 ~10-15s, p90 ~19-24s on RTX 4070 NF4. Off-corpus refusals are much faster (~2.5s p50) because they're short. Retrieve+rerank latency is sub-second after the cross-encoder warmup on the first query."
+    "Generation latency: in-corpus p50 ~10-15s, p95 ~20-25s, p99 ~26-30s on RTX 4070 NF4. Off-corpus refusals are much faster (~2.7s p50) because they're short. Retrieve+rerank latency is sub-second after the cross-encoder warmup on the first query."
   ]
 }
