@@ -7,6 +7,9 @@ interpret them.
 ```
 evaluations/
 ├── README.md                this file
+├── performance.md           consolidated, dashboard-style report card
+│                            across all subsystems. Updated whenever a new
+│                            measurement lands. Start here.
 ├── baselines/               committed-once reference numbers
 │   └── phase1_chunking.json     Phase 1 corrected dense-only baseline,
 │                                eval_k=10. Phase 2+ runs diff against it.
@@ -16,12 +19,19 @@ evaluations/
 │                                scripts/generate_structural_queries.py).
 ├── reports/                 raw output from scripts/run_bakeoff.py
 │   └── bakeoff-<YYYYMMDD>-<pipeline>-<eval-set>.json
-└── analyses/                committed markdown interpretations of reports
+├── analyses/                committed markdown interpretations of reports
+│   └── <YYYY-MM-DD>-<topic>.md
+└── manual-runs/             one-off smoke / debugging artifacts
     └── <YYYY-MM-DD>-<topic>.md
 ```
 
 ## Conventions
 
+- **`performance.md` is the dashboard.** When you add or update a
+  measurement (new report, new analysis, new smoke run), update the
+  matching row in `performance.md` in the same PR. Per-experiment
+  files are the system of record; `performance.md` is the at-a-glance
+  consolidated view that points into them.
 - **Baselines are committed once** and treated as immutable until a
   formally documented re-baseline. Phase 1 baseline at eval_k=10 is the
   reference point for all Phase 2 retrieval reports.

@@ -382,6 +382,7 @@ runs (PR / nightly / manual), and where artifacts live — is in
 | **Phase 1 finding** | Recursive chunking wins under dense-only retrieval (MRR 0.692). Established the eval set + corrected metrics. |
 | **Phase 2 finding** | The "fixed wins under hybrid+rerank" result on the curated set didn't replicate on the structural set — exposed eval-set bias as a real issue. Production default: hybrid+rerank with `chunking.strategy=recursive`. |
 | **Next experiment** | LLM-judge eval scaffolding (faithfulness, answer relevance, citation grounding); first end-to-end run of the pipeline with a real Mistral 7B / Llama 3 8B base model. |
-| **Test coverage** | 194 tests, 90% CI gate enforced |
+| **Test coverage** | 203 tests, 90% CI gate enforced |
 | **Workflow** | PR-based, branch-protected `main`, auto-merge with rebase on passing CI; pre-push pytest hook locally. |
 | **Recent commit** | See `git log` for the canonical state |
+| **Metric-level view** | See [`evaluations/performance.md`](../evaluations/performance.md) for the per-subsystem report card with measurement provenance and explicit gaps |
