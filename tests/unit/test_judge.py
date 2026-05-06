@@ -1,11 +1,11 @@
-"""Unit tests for the LLMJudge ABC and JudgeScore model."""
+"""Unit tests for the LLMJudge ABC and JudgeScore + ClaimAttribution models."""
 
 from __future__ import annotations
 
 import pytest
 from pydantic import ValidationError
 
-from docsense.evaluation.judge import JudgeScore, LLMJudge
+from docsense.evaluation.judge import ClaimAttribution, JudgeScore, LLMJudge
 
 
 class MockJudge(LLMJudge):
@@ -55,6 +55,81 @@ class TestJudgeScore:
         that the [0, 1] bound includes the endpoints."""
         for anchor in (0.0, 0.25, 0.5, 0.75, 1.0):
             JudgeScore(metric="relevance", score=anchor, rationale="ok")
+
+    def test_claim_attributions_empty_by_default(self):
+        """JudgeScore for relevance (or any non-claim-level metric) has
+        an empty claim_attributions list."""
+        score = JudgeScore(metric="relevance", score=0.75, rationale="ok")
+        assert score.claim_attributions == []
+
+    def test_claim_attributions_round_trip(self):
+        """Faithfulness JudgeScore carries per-claim attribution data
+        that survives model_dump / model_validate."""
+        attrs = [
+            ClaimAttribution(
+                claim_idx=1, claim_text="alpha", supporting_chunk_idx=2, rationale="r1"
+            ),
+            ClaimAttribution(
+                claim_idx=2, claim_text="beta", supporting_chunk_idx=None, rationale="r2"
+            ),
+        ]
+        score = JudgeScore(
+            metric="faithfulness",
+            score=0.5,
+            rationale="1 of 2 claims supported",
+            claim_attributions=attrs,
+        )
+        dumped = score.model_dump()
+        rehydrated = JudgeScore.model_validate(dumped)
+        assert len(rehydrated.claim_attributions) == 2
+        assert rehydrated.claim_attributions[0].supporting_chunk_idx == 2
+        assert rehydrated.claim_attributions[1].supporting_chunk_idx is None
+
+    def test_duplicate_claim_idx_rejected(self):
+        """Pin the validator: duplicate claim_idx values would silently
+        double-count in score aggregation if not caught at construction."""
+        attrs = [
+            ClaimAttribution(claim_idx=1, claim_text="a", supporting_chunk_idx=1),
+            ClaimAttribution(claim_idx=1, claim_text="b", supporting_chunk_idx=2),  # duplicate idx
+        ]
+        with pytest.raises(ValidationError, match="Duplicate claim_idx"):
+            JudgeScore(
+                metric="faithfulness",
+                score=1.0,
+                rationale="bad",
+                claim_attributions=attrs,
+            )
+
+
+class TestClaimAttribution:
+    def test_minimal_construction(self):
+        attr = ClaimAttribution(claim_idx=1, claim_text="alpha")
+        assert attr.claim_idx == 1
+        assert attr.supporting_chunk_idx is None
+        assert attr.rationale is None
+
+    def test_supported_construction(self):
+        attr = ClaimAttribution(
+            claim_idx=3,
+            claim_text="beta",
+            supporting_chunk_idx=2,
+            rationale="chunk 2 says beta",
+        )
+        assert attr.supporting_chunk_idx == 2
+        assert attr.rationale == "chunk 2 says beta"
+
+    def test_zero_claim_idx_rejected(self):
+        """claim_idx is 1-indexed; 0 would conflate with no-claim."""
+        with pytest.raises(ValidationError):
+            ClaimAttribution(claim_idx=0, claim_text="alpha")
+
+    def test_negative_chunk_idx_allowed_via_none(self):
+        """We don't accept negative chunk_idx — use None for unsupported."""
+        # Negative values aren't explicitly forbidden by the schema, but
+        # the parser is responsible for emitting None rather than -1 or 0
+        # for "unsupported." Document that contract here.
+        attr = ClaimAttribution(claim_idx=1, claim_text="x", supporting_chunk_idx=None)
+        assert attr.supporting_chunk_idx is None
 
 
 class TestLLMJudgeABC:
