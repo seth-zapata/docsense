@@ -1,0 +1,639 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-05-06T06:19:28+00:00",
+  "eval_set": "curated",
+  "eval_set_size": 20,
+  "limit_applied": null,
+  "config": {
+    "chunking_strategy": "recursive",
+    "chunks_total": 12601,
+    "generator_model": "Qwen/Qwen2.5-7B-Instruct",
+    "judge_model": "meta-llama/Meta-Llama-3.1-8B-Instruct",
+    "use_4bit_generator": true,
+    "use_4bit_judge": true,
+    "rerank_candidates": 20,
+    "top_k": 5,
+    "max_context_tokens": 3500,
+    "max_new_tokens_generator": 512,
+    "max_new_tokens_judge": 256
+  },
+  "aggregates": {
+    "faithfulness": {
+      "n": 20,
+      "mean": 0.75,
+      "median": 0.75,
+      "anchor_distribution": {
+        "0.00": 0,
+        "0.25": 0,
+        "0.50": 0,
+        "0.75": 20,
+        "1.00": 0
+      },
+      "n_parse_failures": 0
+    },
+    "relevance": {
+      "n": 20,
+      "mean": 0.762,
+      "median": 0.75,
+      "anchor_distribution": {
+        "0.00": 0,
+        "0.25": 0,
+        "0.50": 0,
+        "0.75": 19,
+        "1.00": 1
+      },
+      "n_parse_failures": 0
+    },
+    "citation_check": {
+      "n": 20,
+      "frac_with_any_marker": 0.55,
+      "frac_all_in_range": 0.55,
+      "mean_n_markers_in_text": 1.85
+    }
+  },
+  "timing_ms_per_query": {
+    "retrieve_ms": {
+      "p50": 315.17,
+      "p90": 445.5,
+      "max": 10573.12,
+      "mean": 854.82,
+      "n": 20
+    },
+    "assemble_ms": {
+      "p50": 0.02,
+      "p90": 0.03,
+      "max": 0.03,
+      "mean": 0.02,
+      "n": 20
+    },
+    "generate_ms": {
+      "p50": 15125.35,
+      "p90": 24310.92,
+      "max": 26565.55,
+      "mean": 16254.75,
+      "n": 20
+    }
+  },
+  "per_query": [
+    {
+      "query_id": "curated_001",
+      "query": "How do I install transformers?",
+      "answer_text": "To install transformers, you can use the following commands:\n\n```bash\npip install transformers[dev]\n```\n\nor for an editable install:\n\n```bash\npip install -e \".[dev]\"\n```\n\ninside the Transformers repo. If the dev install fails, ensure you have installed PyTorch first, then install the quality dependencies:\n\n```bash\npip install torch\npip install transformers[quality]\n```\n\nor for an editable install:\n\n```bash\npip install -e \".[quality]\"\n```\n\nFor an up-to-date version including additional libraries, use:\n\n```bash\npip install -U transformers datasets evaluate accelerate timm\n```\n\nAlternatively, you can clone the repository and perform an editable install:\n\n```bash\ngit clone https://github.com/huggingface/transformers.git\ncd transformers\npip install -e .\n```\n\nRemember to keep the local Transformers folder updated with the latest changes using:\n\n```bash\ncd ~/transformers/\ngit pull\n```",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 10573.1207029894,
+        "assemble_ms": 0.027789035812020302,
+        "generate_ms": 14530.6724649854
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 0.75,
+        "rationale": "The answer is mostly faithful to the context, with most claims directly supported by the provided instructions. However, there are minor reasonable extrapolations, such as the inclusion of additional libraries in the up-to-date version command, which are not explicitly mentioned in the context."
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer provides detailed instructions on how to install transformers, but includes some extraneous content (e.g., the command for installing additional libraries) that is not directly related to the question."
+      }
+    },
+    {
+      "query_id": "curated_002",
+      "query": "What are the different types of tokenizers?",
+      "answer_text": "Based on the provided context, there are several types of tokenizers mentioned:\n\n1. **PythonBackend**: A pure Python tokenizer that doesn't rely on external backends like Rust, SentencePiece, or mistral-common. It's suitable for very specialized tokenization needs [1].\n\n2. **SentencePiece**: A tokenization library that applies Byte Pair Encoding (BPE) or Unigram directly on raw text. It includes the space character, represented as `\"\u2581\"`, in its vocabulary [3].\n\n3. **Multimodal Tokenizer**: This type of tokenizer holds all relevant special tokens as part of its attributes for easier access. For instance, it might include `image_token_id` for vision-language models like LLaVA [2].\n\n4. **[`PreTrainedTokenizer`] and [`PreTrainedTokenizerFast`]**: These are classes that contain common methods for using all the tokenizers [4].\n\nWhile the context doesn't explicitly list these as the only types of tokenizers, they represent the primary types discussed within the given documents.",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 787.3870900366455,
+        "assemble_ms": 0.01866184175014496,
+        "generate_ms": 15071.133739082143
+      },
+      "citation_check": {
+        "n_markers_in_text": 4,
+        "n_resolved_citations": 4,
+        "all_markers_in_range": true,
+        "any_marker_present": true
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 0.75,
+        "rationale": "The answer accurately identifies four types of tokenizers mentioned in the context: PythonBackend, SentencePiece, Multimodal Tokenizer, and PreTrainedTokenizer. However, it slightly extrapolates by implying that these are the only types of tokenizers, which is not explicitly stated in the context."
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer provides information on four types of tokenizers, but it includes extraneous content (e.g., the mention of specific documents) and does not explicitly state that these are the only types of tokenizers."
+      }
+    },
+    {
+      "query_id": "curated_003",
+      "query": "How does the pipeline API work?",
+      "answer_text": "The Pipeline API in the context of the provided sources works by creating a `Pipeline` object which allows for easy inference using pretrained models for various tasks. Here\u2019s a breakdown based on the context:\n\n1. **Creating a Pipeline**: You start by importing the necessary classes from the `transformers` library and `accelerate`. Then, you create a `Pipeline` object specifying the task you want to perform (e.g., text generation).\n\n2. **Task Selection**: The `Pipeline` object is initialized with a specific task, like \"text generation\". This task determines which model and preprocessing steps will be used.\n\n3. **Model Selection**: By default, the `Pipeline` downloads and caches a default pretrained model for the specified task. However, you can pass a different model name via the `model` parameter if needed.\n\n4. **Accelerator Usage**: To speed up inference, especially on hardware like GPUs, you can use the `Accelerator` from the `accelerate` library to automatically detect and utilize available accelerators.\n\n5. **Fine-Tuning**: There is a section mentioned for fine-tuning models, indicating that the `Pipeline` can be adapted for training purposes as well.\n\n6. **Input Handling**: Inputs should be kept simple and preferably JSON-serializable to make the pipeline easy to use. Supporting multiple input types increases flexibility.\n\n7. **Performance Considerations**: Pipeline parallelism is described as a technique to improve performance by reducing idle GPU time, allowing for concurrent processing of data across multiple GPUs.\n\nIn summary, the `Pipeline` API simplifies the process of performing complex NLP tasks by abstracting away much of the underlying model and data handling, while still providing flexibility through customizable parameters and support for multiple input formats [1-5].",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 290.22019915282726,
+        "assemble_ms": 0.02365000545978546,
+        "generate_ms": 24226.17802908644
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 0.75,
+        "rationale": "The answer is generally faithful to the context, with most claims supported by the provided sources. However, there are some minor reasonable extrapolations and slight rephrasings of the original text, which prevent it from being a perfect match."
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer provides a detailed breakdown of the pipeline API's workflow, but includes extraneous content such as a summary and references that are not directly related to the question of how the pipeline API works."
+      }
+    },
+    {
+      "query_id": "curated_004",
+      "query": "What is gradient checkpointing and when should I use it?",
+      "answer_text": "Gradient checkpointing is a technique that reduces memory usage by only storing some of the intermediate activations during the backward pass and recomputing the remaining activations. This method avoids storing all intermediate activations from the forward pass, which can be memory-intensive. However, it results in slower training speed, approximately 20% slower [1][2]. \n\nYou should consider using gradient checkpointing when you need to fit larger models on the GPU without running out of memory or to increase the batch size for better performance [2]. To enable gradient checkpointing, you can configure the `TrainingArguments` object as shown in the code snippet:\n\n```py\nfrom transformers import TrainingArguments\n\nargs = TrainingArguments(\n    per_device_train_batch_size=4,\n    gradient_accumulation_steps=16,\n    gradient_checkpointing=True,\n)\n```\n\nKeep in mind that while gradient checkpointing saves memory, it introduces a trade-off with training speed [1][2].",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 338.24802888557315,
+        "assemble_ms": 0.028038863092660904,
+        "generate_ms": 13230.51407490857
+      },
+      "citation_check": {
+        "n_markers_in_text": 5,
+        "n_resolved_citations": 2,
+        "all_markers_in_range": true,
+        "any_marker_present": true
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 0.75,
+        "rationale": "The answer is mostly faithful to the context, with most claims supported by the provided text. However, it includes minor reasonable extrapolations, such as the phrase \"approximately 20% slower,\" which is not explicitly stated in the context but is a reasonable inference based on the information provided."
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses what was asked, providing a clear explanation of gradient checkpointing and its benefits, but includes extraneous content about the trade-off with training speed and a code snippet that is not directly relevant to the question."
+      }
+    },
+    {
+      "query_id": "curated_005",
+      "query": "How do I use AutoModel to load a pretrained model?",
+      "answer_text": "To use `AutoModel` to load a pretrained model, you would call the `from_pretrained` method of `AutoModel`. Here is an example:\n\n```py\nfrom transformers import AutoModel\n\nmodel = AutoModel.from_pretrained(\"meta-llama/Llama-2-7b-hf\", dtype=\"auto\", device_map=\"auto\")\n```\n\nIn this example, `\"meta-llama/Llama-2-7b-hf\"` is the identifier for the pretrained model you want to load. The `dtype` and `device_map` parameters are optional and can be used to specify the data type and device map for the model, respectively [1].",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 376.17145013064146,
+        "assemble_ms": 0.028800219297409058,
+        "generate_ms": 9314.85482584685
+      },
+      "citation_check": {
+        "n_markers_in_text": 1,
+        "n_resolved_citations": 1,
+        "all_markers_in_range": true,
+        "any_marker_present": true
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 0.75,
+        "rationale": "The answer is mostly faithful to the context, as it correctly states that `AutoModel` can be used to load a pretrained model by calling the `from_pretrained` method. However, the example code provided is not directly supported by the context, as the context only mentions `AutoModelForCausalLM` and not `AutoModel` specifically."
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 1.0,
+        "rationale": "The answer directly addresses the question, providing a clear and concise example of how to use `AutoModel` to load a pretrained model."
+      }
+    },
+    {
+      "query_id": "curated_006",
+      "query": "How do I fine-tune a model with Trainer?",
+      "answer_text": "To fine-tune a model with Trainer, follow these steps:\n\n1. Prepare your dataset, model, tokenizer, and data collator.\n2. Define a `compute_metrics` function if needed.\n3. Pass the training arguments along with the model, dataset, tokenizer, data collator, and `compute_metrics` function to the `Trainer`.\n4. Call `~Trainer.train` to start the fine-tuning process.\n\nFor more details and an in-depth example, refer to the corresponding PyTorch notebook available at the provided link [here](https://colab.research.google.com/github/huggingface/notebooks/blob/main/examples/audio_classification.ipynb) [N2].",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 407.51500707119703,
+        "assemble_ms": 0.03164401277899742,
+        "generate_ms": 10277.648414019495
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 0.75,
+        "rationale": "The answer is mostly faithful to the context, as it accurately describes the steps to fine-tune a model with Trainer. However, it includes a minor reasonable extrapolation by mentioning the need to define a `compute_metrics` function if needed, which is not explicitly stated in the context."
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses the question, providing a step-by-step guide on how to fine-tune a model with Trainer, but includes an extraneous link to a PyTorch notebook, which is not necessary to answer the question."
+      }
+    },
+    {
+      "query_id": "curated_007",
+      "query": "How to train on multiple GPUs with data parallelism?",
+      "answer_text": "To train on multiple GPUs with data parallelism, the same setup is replicated multiple times, with each instance receiving a distinct data slice. Processing is done in parallel, and all setups are synchronized at the end of each training step. This method significantly reduces training time by processing data in parallel and scales to the number of GPUs available. However, there is overhead due to synchronizing results from each GPU.\n\nHere\u2019s a step-by-step breakdown of how data parallelism works:\n\n1. **Initialization**: The default GPU (e.g., `GPU 0`) reads a batch of data and sends a mini-batch of it to the other GPUs.\n2. **Model Replication**: An up-to-date model is replicated from `GPU 0` to the other GPUs.\n3. **Forward Pass**: A forward pass is performed on each GPU, and their outputs are sent to `GPU 0` to compute the loss.\n4. **Loss Distribution**: The loss is distributed from `GPU 0` to the other GPUs for the backward pass.\n5. **Gradient Aggregation**: Gradients from each GPU are sent back to `GPU 0` and averaged.\n\nFor more details, you can refer to the source [here](perf_train_gpu_many#dataparallel-vs-distributeddataparallel).",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 312.6156369689852,
+        "assemble_ms": 0.020213890820741653,
+        "generate_ms": 17414.893344044685
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 0.75,
+        "rationale": "The answer accurately describes the process of data parallelism and its benefits, but it includes minor reasonable extrapolations (e.g., the step-by-step breakdown) not directly supported by the provided context."
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses the question, providing a clear explanation of data parallelism and its steps, but includes extraneous content with the step-by-step breakdown and a reference to a source, which is not directly relevant to the question."
+      }
+    },
+    {
+      "query_id": "curated_008",
+      "query": "What is DeepSpeed and how do I use it with transformers?",
+      "answer_text": "DeepSpeed is an optimization library for training large models, supported by Zero Redundancy Optimizer (ZeRO), which helps manage GPU memory usage through various stages. It integrates well with the `Trainer` class in Transformers, automating much of the setup process [1, 4].\n\nTo use DeepSpeed with Transformers without the `Trainer`, you can use the `HfDeepSpeedConfig` class. This class is responsible for gathering ZeRO-3 parameters and partitioning a model across multiple GPUs when loading a model [2].\n\nFor installation, it's recommended to install DeepSpeed from source to ensure compatibility with your hardware and access additional features not available in the PyPI distribution [3].\n\nDeepSpeed supports the same schedulers as Transformers, such as `WarmupLR` and `WarmupDecayLR`, which correspond to specific learning rate schedules [5].",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 353.30888885073364,
+        "assemble_ms": 0.02559996210038662,
+        "generate_ms": 12130.813342053443
+      },
+      "citation_check": {
+        "n_markers_in_text": 3,
+        "n_resolved_citations": 3,
+        "all_markers_in_range": true,
+        "any_marker_present": true
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 0.75,
+        "rationale": "The answer is mostly faithful to the context, with most claims supported by the provided sources. However, there are minor reasonable extrapolations, such as the general description of DeepSpeed's functionality, which is not explicitly stated in the context."
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses how to use DeepSpeed with transformers, but includes extraneous content about installation and supported schedulers, which are not directly related to the question."
+      }
+    },
+    {
+      "query_id": "curated_009",
+      "query": "How do I customize the training loop with callbacks?",
+      "answer_text": "To customize the training loop with callbacks, you should subclass the `Trainer` class and override the methods you need. This allows you to change what the `Trainer` computes, rather than using callbacks which are read-only and can only return a `TrainerControl` object to control the flow [2]. For more details, refer to the [Subclassing Trainer methods](./trainer_customize) guide [1, 5].",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 310.830453177914,
+        "assemble_ms": 0.02047605812549591,
+        "generate_ms": 6024.119531037286
+      },
+      "citation_check": {
+        "n_markers_in_text": 1,
+        "n_resolved_citations": 1,
+        "all_markers_in_range": true,
+        "any_marker_present": true
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 0.75,
+        "rationale": "The answer is mostly supported by the context, but it contains minor reasonable extrapolations, such as the implication that subclassing `Trainer` is the only way to customize the training loop, which is not explicitly stated in the context."
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses the question, but includes extraneous content about the limitations of callbacks and a reference to a guide, which is not necessary to answer the question."
+      }
+    },
+    {
+      "query_id": "curated_010",
+      "query": "How to do hyperparameter search?",
+      "answer_text": "To perform hyperparameter search, you need to set up a `model_init` function and call `~Trainer.hyperparameter_search`. You must specify the direction of optimization (minimize, maximize, or multiple objectives), choose a backend (Optuna, Weights & Biases, Ray Tune), define the hyperparameters to optimize, the number of trials, and provide a compute objective function. Here\u2019s an example using Ray Tune:\n\n```python\nray_hp_space = {\n    'batch_size': tune.choice([16, 32, 64, 128]),\n}\n\nbest_trials = trainer.hyperparameter_search(\n    direction=[\"minimize\", \"maximize\"],\n    backend=\"ray\",\n    hp_space=ray_hp_space,\n    n_trials=20,\n    compute_objective=compute_objective,\n)\n```\n\nThis code snippet demonstrates setting up the hyperparameter space, specifying the optimization directions, choosing the Ray Tune backend, defining the number of trials, and providing a compute objective function. [N1] [N4] [N5]",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 314.2616571858525,
+        "assemble_ms": 0.019300030544400215,
+        "generate_ms": 15179.564788006246
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 0.75,
+        "rationale": "The answer is mostly faithful to the context, as it accurately describes the necessary steps for hyperparameter search, including setting up a `model_init` function, specifying the direction of optimization, choosing a backend, defining the hyperparameters to optimize, and providing a compute objective function. However, the answer includes a minor reasonable extrapolation by not explicitly mentioning the need to install the required packages (e.g., `optuna/wandb/ray[tune]`) as mentioned in the context."
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses the question by providing a code snippet and explaining the necessary steps for hyperparameter search, but includes some extraneous content (the mention of the code snippet being an example and the reference numbers [N1], [N4], and [N5] which seem to be irrelevant)."
+      }
+    },
+    {
+      "query_id": "curated_011",
+      "query": "How does text generation work in transformers?",
+      "answer_text": "Text generation in Transformers typically starts with the `~GenerationMixin.generate` API, which is used for generating text from models with generative capabilities [1]. The process can be influenced by various factors including the length of the generated text or reaching an end-of-sequence (`EOS`) token [1].\n\nThe basic decoding methods include greedy search, among others, which are recommended as starting points for text generation tasks [2]. For improved performance, especially with longer input sequences, the key-value cache should be utilized as it provides identical results with a significant speed-up [3].\n\nStreaming generation is also possible, where the output is generated one word at a time, useful for real-time applications [5]. To implement this, you would create an instance of `TextStreamer` with the tokenizer and pass it to the `streamer` parameter in `~GenerationMixin.generate` [5].\n\nFor a deeper understanding of different decoding strategies and their usage, refer to the provided resources [2, 4, 5].",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 293.13824395649135,
+        "assemble_ms": 0.02542790025472641,
+        "generate_ms": 13166.157987900078
+      },
+      "citation_check": {
+        "n_markers_in_text": 6,
+        "n_resolved_citations": 4,
+        "all_markers_in_range": true,
+        "any_marker_present": true
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 0.75,
+        "rationale": "The answer is mostly faithful to the context, with most claims supported by the provided sources. However, there are some minor reasonable extrapolations, such as the general description of the text generation process, which is not directly supported by the context."
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer provides a detailed explanation of the text generation process in transformers, including decoding methods and strategies, but includes some extraneous content such as references to specific resources and implementation details that are not directly relevant to the question."
+      }
+    },
+    {
+      "query_id": "curated_012",
+      "query": "What are the different decoding strategies like beam search?",
+      "answer_text": "The different decoding strategies like beam search include:\n\n- **Greedy Search**: Generates the most likely output at each step without considering future tokens.\n- **Beam Search**: Keeps track of multiple generated sequences (beams) at each time step. After a certain number of steps, it selects the sequence with the highest overall probability. It can \"look ahead\" and pick a sequence with a higher probability overall even if the initial tokens have a lower probability. This makes it suitable for input-grounded tasks like image description or speech recognition [2].\n\nAdditionally, you can use `do_sample=True` with beam search to sample at each step, but beam search will still greedily prune out low probability sequences between steps [5].",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 294.65329088270664,
+        "assemble_ms": 0.025999965146183968,
+        "generate_ms": 9798.29185991548
+      },
+      "citation_check": {
+        "n_markers_in_text": 2,
+        "n_resolved_citations": 2,
+        "all_markers_in_range": true,
+        "any_marker_present": true
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 0.75,
+        "rationale": "The answer accurately describes beam search and greedy search, but also includes a minor reasonable extrapolation by mentioning that beam search is suitable for input-grounded tasks, which is directly supported by the context. However, the answer also includes a minor unsupported claim that beam search will still greedily prune out low probability sequences between steps when sampling at each step, which is not explicitly stated in the context."
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses the question by listing different decoding strategies like beam search, but includes extraneous content (description of beam search) and a tangential note about using `do_sample=True`."
+      }
+    },
+    {
+      "query_id": "curated_013",
+      "query": "How do I use chat templates?",
+      "answer_text": "To use chat templates, follow these steps:\n\n1. **Define the Template**: Create a Jinja2 template that combines system messages and loops through user and assistant messages, assigning appropriate roles such as `<|user|>` and `<|assistant|>`.\n\n2. **Load the Template**: Load the written template as a string and assign it to the tokenizer's `chat_template` attribute.\n\n3. **Apply the Template**: Use the tokenizer's `apply_chat_template` method to convert chat messages into a formatted string suitable for the model. Note that when formatting text with `apply_chat_template(tokenize=False)`, set `add_special_tokens=False` if you plan to tokenize later to avoid duplicating special tokens like `<bos>` and `<eos>`.\n\nHere is an example of how you might define and apply a chat template:\n\n```python\n# Define the chat template\ntemplate = \"\"\"\nSystem Message: {{ system_message }}\n{% for message in messages %}\n{{ message['role'] }}: {{ message['content'] }}\n{% endfor %}\n\"\"\"\n\n# Assign the template to the tokenizer\ntokenizer.chat_template = template\n\n# Apply the template to a list of messages\nformatted_text = tokenizer.apply_chat_template(messages, tokenize=False, add_special_tokens=False)\n\nprint(formatted_text)\n```\n\nThis example assumes you have a list of messages structured as dictionaries containing 'role' and 'content'. Adjust the template and message structure according to your specific needs.",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 292.27199498564005,
+        "assemble_ms": 0.02519995905458927,
+        "generate_ms": 18829.24775616266
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 0.75,
+        "rationale": "The answer is mostly faithful to the context, as it accurately describes the steps to use chat templates, including defining the template, loading it, and applying it. However, the example code provided is not directly supported by the context, as it is a plausible-sounding invention rather than a direct quote or description from the source."
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses the question of how to use chat templates, but includes extraneous content such as an example code snippet and specific implementation details that are not necessary to understand the general process."
+      }
+    },
+    {
+      "query_id": "curated_014",
+      "query": "How to optimize inference on GPU?",
+      "answer_text": "To optimize inference on GPU, consider the following strategies:\n\n1. **Specialized Architectures**: Design models specifically for autoregressive text generation tasks to enhance efficiency [1].\n\n2. **Batch Inference**: \n   - Use batch inference if your sequence length is regular and push the batch size until you encounter an out-of-memory (OOM) error [2]. Larger GPUs benefit more from batch inference.\n   - Avoid batching if you are using a CPU or if you do not know the sequence length of your data. Measure performance iteratively and include OOM checks to recover from failures.\n   - Ensure you can handle OOM errors if you opt for batch inference [2].\n\n3. **Quantization**: If GPU memory is not a constraint, you may not need to apply quantization techniques. However, for most GPUs, quantization is necessary, especially for 4-bit and 8-bit schemes which are very useful [3].\n\n4. **Memory Management**: Regularly clear models and flush memory to free up GPU resources when they are no longer needed. For instance, you can use Python commands like `del model` and `del pipe` to delete models and then call a `flush()` function to clear the memory [1].\n\nBy implementing these strategies, you can significantly improve the efficiency of inference on GPUs while balancing between accuracy and inference time.",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 316.0740041639656,
+        "assemble_ms": 0.019799917936325073,
+        "generate_ms": 18275.355231016874
+      },
+      "citation_check": {
+        "n_markers_in_text": 5,
+        "n_resolved_citations": 3,
+        "all_markers_in_range": true,
+        "any_marker_present": true
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 0.75,
+        "rationale": "The answer is mostly faithful to the context, with most claims supported by the provided text. However, there are minor reasonable extrapolations, such as the general statement about balancing between accuracy and inference time, which is not explicitly mentioned in the context."
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer provides several strategies to optimize inference on GPU, but includes some extraneous content (e.g., the statement that quantization may not be necessary if GPU memory is not a constraint) and does not directly address the question in a concise manner."
+      }
+    },
+    {
+      "query_id": "curated_015",
+      "query": "How to reduce memory usage during training?",
+      "answer_text": "To reduce memory usage during training, you can try the following methods:\n\n- Decrease the `per_device_train_batch_size` value in `TrainingArguments`.\n- Use `gradient_accumulation_steps` in `TrainingArguments` to effectively increase the overall batch size.\n- Employ optimizers like Adafactor, which store a weighted average of a row or column instead of each element in the matrix, thus reducing memory requirements at the cost of slower convergence.\n- Utilize a 8-bit AdamW optimizer from the `bitsandbytes` library to quantize optimizer states, storing them in lower precision and dequantizing them before use.\n- Enable the Liger Kernel for training by setting `use_liger_kernel=True` in `TrainingArguments`. This patches the corresponding layers in the model with Liger kernels, increasing multi-GPU training throughput and reducing memory usage.\n- If you encounter a CUDA \"out-of-memory\" error, reduce the `per_device_train_batch_size` incrementally by factors of 2 and increase `gradient_accumulation_steps` by 2x to compensate.\n\nAdditionally, adjusting the `allgather_bucket_size` and `reduce_bucket_size` parameters can help balance between available GPU memory and communication speed, though this might slightly slow down training. [1][2][3]",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 358.7921508587897,
+        "assemble_ms": 0.01923181116580963,
+        "generate_ms": 19056.824595900252
+      },
+      "citation_check": {
+        "n_markers_in_text": 3,
+        "n_resolved_citations": 3,
+        "all_markers_in_range": true,
+        "any_marker_present": true
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 0.75,
+        "rationale": "The answer is mostly faithful to the context, as it accurately describes several methods to reduce memory usage during training, including reducing batch size, using gradient accumulation, and employing specific optimizers. However, it introduces a minor reasonable extrapolation by suggesting adjusting `allgather_bucket_size` and `reduce_bucket_size` parameters, which is not explicitly mentioned in the context, but is a plausible optimization technique."
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer provides several methods to reduce memory usage during training, but includes some extraneous content, such as the mention of adjusting `allgather_bucket_size` and `reduce_bucket_size` parameters, which is not directly related to the question."
+      }
+    },
+    {
+      "query_id": "curated_016",
+      "query": "How to train on CPU efficiently?",
+      "answer_text": "To train on CPU efficiently, you can use mixed precision training with either fp16 or bf16 data types, which is supported by the `Trainer` in PyTorch as shown in context [2]. Additionally, you can utilize distributed training across multiple CPUs to speed up the process [1]. For managing memory usage, especially with large models, you can employ DeepSpeed techniques such as partitioning optimizer, gradient, and parameters across different stages [3]. This helps in fitting larger models on a single GPU or across multiple nodes. \n\nFor handling potential out-of-memory issues, you can adjust the `per_device_train_batch_size` and `gradient_accumulation_steps` as needed [4]. The `Trainer` also supports automatic configuration of batch sizes, where it can set `train_micro_batch_size_per_gpu` and `train_batch_size` based on the `world_size`, `per_device_train_batch_size`, and `gradient_accumulation_steps` [5].\n\nThese strategies together can help in efficient CPU-based model training.",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 267.20623788423836,
+        "assemble_ms": 0.022999942302703857,
+        "generate_ms": 14376.27626513131
+      },
+      "citation_check": {
+        "n_markers_in_text": 5,
+        "n_resolved_citations": 5,
+        "all_markers_in_range": true,
+        "any_marker_present": true
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 0.75,
+        "rationale": "The answer is mostly supported by the context, with minor reasonable extrapolations, such as the generalization of mixed precision training to CPU and the implication of DeepSpeed's benefits for large models. However, some claims, like the specific benefits of distributed training and the automatic configuration of batch sizes, are directly supported by the context."
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer provides several strategies for efficient CPU-based model training, but includes some extraneous content (e.g., GPU and distributed training) that is not directly relevant to the question."
+      }
+    },
+    {
+      "query_id": "curated_017",
+      "query": "How do I add a new model to transformers?",
+      "answer_text": "To add a new model to Transformers, follow these steps:\n\n1. Open an issue on the [issue tracker](https://github.com/huggingface/transformers/issues/new?assignees=&labels=New+model&projects=&template=new-model-addition.yml) to request adding a specific model. Include the following information:\n   - A short description of the model and a link to the paper.\n   - A link to the implementation if it is open-sourced.\n   - A link to the model weights if they are available.\n\n2. If you are willing to contribute the model yourself, let us know so we can assist you in adding it to \ud83e\udd17 Transformers.\n\n3. If the model becomes very popular, it might be integrated into Transformers to ensure better support (documentation, maintenance, optimization, etc.).\n\n4. Use the [technical guide](https://huggingface.co/docs/transformers/modular_transformers) for adding a model to \ud83e\udd17 Transformers.\n\n5. You can also check if someone else has already requested the model by filtering issues with the [New model](https://github.com/huggingface/transformers/labels/New%20model) label on GitHub.\n\n6. Be aware that models are typically added during the next release unless there is significant community interest or the maintainers have the bandwidth to integrate it immediately [N4].\n\nFor more detailed instructions, refer to the [general contribution guidelines for new models](https://huggingface.co/docs/transformers/contributing#do-you-want-to-implement-a-new-model) [N5].",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 240.0579850655049,
+        "assemble_ms": 0.029999995604157448,
+        "generate_ms": 20837.201989954337
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 0.75,
+        "rationale": "The answer is mostly faithful to the context, as it accurately describes the steps to add a new model to Transformers, including opening an issue on the issue tracker, providing required information, and potentially contributing the model oneself. However, it includes some minor reasonable extrapolations, such as the statement that models are typically added during the next release unless there is significant community interest or the maintainers have the bandwidth to integrate it immediately, which is not explicitly stated in the context."
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer provides a step-by-step guide on how to add a new model to transformers, but includes some extraneous content such as the potential for community interest or immediate integration, which is not directly relevant to the question."
+      }
+    },
+    {
+      "query_id": "curated_018",
+      "query": "What is GGUF and how to use quantized models?",
+      "answer_text": "GGUF stands for General Game Format Unified, which is a format used for storing quantized models. It supports various quantized data types to save memory, making it possible to perform inference with large models like Whisper and Llama on local and edge devices [1].\n\nTo use quantized models, you can follow these steps:\n\n1. **Quantize the Model**: You can quantize the model on any device (e.g., CPU) and then load it on another device (e.g., CUDA or XPU). Here\u2019s an example of quantizing a model on the CPU and then loading it on CUDA or XPU [3]:\n\n   ```python\n   import torch\n   from transformers import TorchAoConfig, AutoModelForCausalLM, AutoTokenizer\n   from torchao.quantization import Int8WeightOnlyConfig\n\n   # Quantize the model on CPU\n   config = Int8WeightOnlyConfig()\n   model = AutoModelForCausalLM.from_pretrained(\"your-model-name\")\n   quantized_model = torchao.quantize(model, config)\n\n   # Load the quantized model on CUDA or XPU\n   quantized_model.to('cuda')\n   ```\n\n2. **Load Pre-Quantized Models**: If you have a pre-quantized model, you can directly load it without further quantization. Use the appropriate quantization library and pass the pre-quantized model from the Hub to the `model` argument [4, 5]. For example:\n\n   ```sh\n   curl http://localhost:8000/v1/responses \\\n     -H \"Content-Type: application/json\" \\\n     -d '{\n       \"model\": \"Qwen/Qwen3-8B-GGUF\",\n       \"stream\": true,\n       \"input\": \"Tell me a three sentence bedtime story about a unicorn.\"\n     }'\n   ```\n\nThese steps allow you to effectively utilize quantized models stored in the GGUF format for inference on various devices.",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 277.4583869613707,
+        "assemble_ms": 0.023741042241454124,
+        "generate_ms": 26565.554537111893
+      },
+      "citation_check": {
+        "n_markers_in_text": 2,
+        "n_resolved_citations": 2,
+        "all_markers_in_range": true,
+        "any_marker_present": true
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 0.75,
+        "rationale": "The answer is mostly faithful to the context, with most claims supported by the provided sources. However, there are minor reasonable extrapolations, such as the example code in step 1, which is not directly supported by the context but is a plausible implementation of the described process."
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses the question about GGUF and using quantized models, but includes extraneous content in the form of code examples and additional information about loading pre-quantized models, which is not directly related to the question."
+      }
+    },
+    {
+      "query_id": "curated_019",
+      "query": "How to use PEFT and LoRA with transformers?",
+      "answer_text": "To use PEFT and LoRA with transformers, you first need to install the PEFT library:\n\n```shell\npip install -U peft\n```\n\nThen, you can integrate PEFT into a transformer model using the `~integrations.PeftAdapterMixin`. Here's how you can do it:\n\n1. **Create a LoRA configuration**: Define the LoRA configuration parameters such as the rank (`r`) and alpha value (`lora_alpha`).\n\n2. **Attach the LoRA configuration to the model**: Use the `add_adapter` method of `~integrations.PeftAdapterMixin` to attach the LoRA configuration to the model.\n\nExample code:\n\n```python\nfrom peft import LoraConfig, TaskType\nfrom transformers import AutoModelForCausalLM\n\nmodel = AutoModelForCausalLM.from_pretrained(\"google/gemma-2-2b\")\n\n# Create a LoRA configuration\nlora_config = LoraConfig(r=8, lora_alpha=32, task_type=TaskType.CAUSAL_LM)\n\n# Attach the LoRA configuration to the model\nmodel.add_adapter(lora_config, adapter_name=\"adapter_1\")\n```\n\n3. **Switch between adapters**: Use the `set_adapter` method to activate a specific adapter. Other adapters will be disabled but remain in memory.\n\nExample code:\n\n```python\nmodel.set_adapter(\"adapter_1\")\n```\n\nThis setup allows you to manage multiple adapters and switch between them as needed. All non-prompt-learning PEFT methods, including LoRA, are supported by the `~integrations.PeftAdapterMixin`.",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 364.11047098226845,
+        "assemble_ms": 0.02459995448589325,
+        "generate_ms": 21716.09227405861
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 0.75,
+        "rationale": "The answer is mostly faithful to the context, as it accurately describes the steps to use PEFT and LoRA with transformers, including installing the PEFT library, creating a LoRA configuration, attaching it to the model, and switching between adapters. However, it slightly extrapolates the information by providing example code that is not directly present in the context."
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses how to use PEFT and LoRA with transformers, but includes extraneous content such as example code and a brief explanation of the setup, which is not directly relevant to the question."
+      }
+    },
+    {
+      "query_id": "curated_020",
+      "query": "How do I create a custom tokenizer?",
+      "answer_text": "To create a custom tokenizer, you can follow these steps:\n\n1. **Initialize an Empty Tokenizer**: You can start with an empty tokenizer which supports custom vocabularies using the `vocab` and `merges` arguments. For example, you can define a dictionary for `vocab` where keys are tokens and values are their corresponding input IDs. The `merges` argument defines how the Byte Pair Encoding (BPE) algorithm should combine adjacent tokens.\n\n2. **Define the Tokenization Pipeline**: Customize the tokenization process by defining the normalizer, pre-tokenizer, and tokenization algorithm. This step might involve subclassing the `TokenizersBackend` class and setting class attributes such as padding side and the tokenization algorithm to use. Additionally, you need to define the tokenization pipeline within the `__init__` method, specifying the tokenization algorithm, pre-tokenization steps, and decoding methods.\n\n3. **Add Special Tokens**: If needed, you can add extra special tokens that are not modality-related but are frequently accessed by the model. These tokens can be added to the tokenizer configuration and saved along with the tokenizer.\n\nHere is a simplified example based on the provided context:\n\n```python\nfrom transformers import TokenizersBackend\nfrom tokenizers import Tokenizer, models, pre_tokenizers, decoders\n\nclass CustomTokenizer(TokenizersBackend):\n    def __init__(self):\n        super().__init__()\n        self.tokenizer = Tokenizer(models.BPE())\n        self.tokenizer.pre_tokenizer = pre_tokenizers.Whitespace()\n        self.tokenizer.decoder = decoders.Bpe()\n\n# Initialize the custom tokenizer\ncustom_tokenizer = CustomTokenizer()\n```\n\nThis example demonstrates initializing a custom tokenizer with specific configurations for the BPE model, whitespace pre-tokenizer, and BPE decoder. You can further customize this setup according to your needs.",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 329.00392706505954,
+        "assemble_ms": 0.02210005186498165,
+        "generate_ms": 25073.563093086705
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 0.75,
+        "rationale": "The answer is generally faithful to the context, but it includes some minor reasonable extrapolations and simplifications, such as the example code, which is not directly supported by the context."
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses the question of how to create a custom tokenizer, but includes extraneous content such as a simplified example and additional details about customizing the tokenization pipeline, which are not essential to answering the question."
+      }
+    }
+  ]
+}

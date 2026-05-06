@@ -55,3 +55,4 @@ docs/journal/
 
 # Project prompt (personal reference)
 project_prompt_rag_finetune.md
+logs/

@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "phase": "pre-phase-3",
+  "description": "Pre-Phase-3 generation baseline. Qwen 2.5 7B Instruct (NF4) running through the production retrieval stack (hybrid + cross-encoder rerank, recursive chunking, top_k=5, max_context_tokens=3500). Judged by Llama 3.1 8B Instruct (NF4, temperature=0). Faithfulness and relevance scored on the [0.0, 0.25, 0.5, 0.75, 1.0] anchor scale. Citation grounding and refusal behavior measured by deterministic rule-based checks. This is the starting line Phase 3 fine-tuning will be measured against.",
+  "captured_at": "2026-05-06",
+  "captured_from": {
+    "reports": [
+      "evaluations/reports/generation-20260506T060710Z-curated.json",
+      "evaluations/reports/generation-20260506T060710Z-structural.json",
+      "evaluations/reports/generation-20260506T064240Z-no-answer.json"
+    ],
+    "commit": "87da2195085e335ecd9f5e317954933a9aa44756",
+    "notes": "no-answer report was re-run after a refusal-pattern coverage gap was discovered and patched. See commit 87da219 and the analysis at evaluations/analyses/2026-05-06-baseline-generation-eval.md."
+  },
+  "config": {
+    "generator_model": "Qwen/Qwen2.5-7B-Instruct",
+    "judge_model": "meta-llama/Meta-Llama-3.1-8B-Instruct",
+    "use_4bit_quantization_generator": true,
+    "use_4bit_quantization_judge": true,
+    "chunking_strategy": "recursive",
+    "chunks_total": 12601,
+    "rerank_candidates": 20,
+    "top_k": 5,
+    "max_context_tokens": 3500,
+    "max_new_tokens_generator": 512,
+    "max_new_tokens_judge": 256,
+    "temperature_generator": 0.1,
+    "temperature_judge": 0.0
+  },
+  "metrics_in_corpus": {
+    "curated": {
+      "n_queries": 20,
+      "faithfulness_mean": 0.750,
+      "faithfulness_anchor_distribution": {"0.00": 0, "0.25": 0, "0.50": 0, "0.75": 20, "1.00": 0},
+      "relevance_mean": 0.762,
+      "relevance_anchor_distribution": {"0.00": 0, "0.25": 0, "0.50": 0, "0.75": 19, "1.00": 1},
+      "citation_frac_with_any_marker": 0.55,
+      "citation_frac_all_in_range": 0.55,
+      "citation_mean_n_markers": 1.85,
+      "n_parse_failures": 0
+    },
+    "structural": {
+      "n_queries": 30,
+      "faithfulness_mean": 0.758,
+      "faithfulness_anchor_distribution": {"0.00": 0, "0.25": 0, "0.50": 0, "0.75": 29, "1.00": 1},
+      "relevance_mean": 0.733,
+      "relevance_anchor_distribution": {"0.00": 0, "0.25": 3, "0.50": 0, "0.75": 23, "1.00": 4},
+      "citation_frac_with_any_marker": 0.533,
+      "citation_frac_all_in_range": 0.533,
+      "citation_mean_n_markers": 1.90,
+      "n_parse_failures": 0
+    }
+  },
+  "metrics_off_corpus": {
+    "no_answer": {
+      "n_queries": 8,
+      "frac_correct_refusal": 1.000,
+      "frac_refused": 1.000,
+      "note": "Original measurement reported 0.375; the discrepancy was a refusal-pattern coverage gap in check_no_answer_behavior, not a model behavior issue. All 8 queries produced a refusal opening 'I don't have enough context to answer that.' but only 3 had a follow-up sentence triggering the existing context_doesnt pattern. Pattern set expanded with dont_have_context (commit 87da219) and re-run produced this 1.000 figure."
+    }
+  },
+  "timing_ms_per_query": {
+    "curated": {
+      "retrieve_ms_p50": 315.17,
+      "retrieve_ms_p90": 445.50,
+      "retrieve_ms_max": 10573.12,
+      "generate_ms_p50": 15125.35,
+      "generate_ms_p90": 24310.92,
+      "generate_ms_max": 26565.55,
+      "note": "retrieve_ms max=10573 is a one-time cross-encoder warmup on the first query (model load lazy on first call). p50/p90 are post-warmup steady-state."
+    },
+    "structural": {
+      "retrieve_ms_p50": 321.67,
+      "retrieve_ms_p90": 388.17,
+      "retrieve_ms_max": 3417.43,
+      "generate_ms_p50": 9732.61,
+      "generate_ms_p90": 18822.44,
+      "generate_ms_max": 33778.51
+    },
+    "no_answer": {
+      "retrieve_ms_p50": 393.43,
+      "retrieve_ms_p90": 1401.04,
+      "retrieve_ms_max": 3100.02,
+      "generate_ms_p50": 2437.79,
+      "generate_ms_p90": 3994.46,
+      "generate_ms_max": 4286.16,
+      "note": "Generation is much faster on no-answer queries (~2.5s p50 vs ~10-15s in-corpus) because refusal answers are short."
+    }
+  },
+  "headline_findings": [
+    "Faithfulness saturates at 0.75 (49 of 50 in-corpus queries scored exactly 0.75). Cross-eval-set agreement (0.750 curated, 0.758 structural) confirms this is a real Llama-judge bias toward the conservative-but-positive anchor, not a measurement artifact.",
+    "Relevance shows more spread (3 queries at 0.25, 23 at 0.75, 4 at 1.0 on structural) — the judge can produce low scores when the answer is genuinely off-topic. The 0.25 cases are all 'Usage example/examples' structural queries where Qwen acknowledged the gap but produced unrelated content.",
+    "Qwen produces citation markers on ~54% of in-corpus answers (55% curated, 53% structural). Cross-set agreement makes this a stable behavioral measurement, not noise. The smoke run's 0% on a single query was unrepresentative.",
+    "Refusal behavior on off-corpus queries is 100% (8/8) — Qwen reliably refuses with 'I don't have enough context to answer that.' The discovery process (initial 38% → coverage gap found → pattern patched → 100%) is itself a methodology learning: rule-based heuristics need iteration against real model outputs.",
+    "Generation latency: in-corpus p50 ~10-15s, p90 ~19-24s on RTX 4070 NF4. Off-corpus refusals are much faster (~2.5s p50) because they're short. Retrieve+rerank latency is sub-second after the cross-encoder warmup on the first query."
+  ]
+}

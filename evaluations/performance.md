@@ -5,8 +5,9 @@ docsense system. Per-experiment JSON in `reports/`, narrative
 interpretations in `analyses/`, raw smoke artifacts in `manual-runs/` —
 this file is the dashboard that points into them.
 
-**Last updated:** 2026-05-06 (closing Block 1A; Block 1B will populate
-the generation-quality and end-to-end-quality sections.)
+**Last updated:** 2026-05-06 (closing pre-Phase-3 Block 1B — first
+LLM-judged generation eval landed; pre-Phase-3 baseline at
+[`baselines/pre_phase3_generation_base.json`](baselines/pre_phase3_generation_base.json)).
 
 **Status legend:**
 
@@ -22,14 +23,16 @@ the generation-quality and end-to-end-quality sections.)
 
 | Subsystem | Quality | Latency | Notes |
 |---|---|---|---|
-| Retrieval (hybrid+rerank, structural) | ✅ MRR 0.685, Recall@10 0.800 | ✅ ~6.5 s incl. rerank (n=1) | recursive chunker; production default |
+| Retrieval (hybrid+rerank, structural) | ✅ MRR 0.685, Recall@10 0.800 | ✅ retrieve p50 ~320 ms (n=58) | recursive chunker; production default |
 | Retrieval (hybrid+rerank, curated) | ⚠️ MRR 0.599 — see analysis | (same path) | curated MRR caveat documented |
-| Reranking (cross-encoder lift) | ✅ +0.05 to +0.20 Recall@10 | ⚠️ ~1.3 s/chunk | dominates retrieve+rerank time |
+| Reranking (cross-encoder lift) | ✅ +0.05 to +0.20 Recall@10 | ⚠️ ~1.3 s/chunk; first-call ~10 s warmup | dominates retrieve+rerank time |
 | Generation contracts | 🔒 4 invariants pinned in CI | — | citation, budget, prompt, generator |
-| Generation LLM behavior | ⚠️ citations not honored on n=1 | ✅ 14.6 tok/s on RTX 4070 NF4 | flagged for Block 1B |
-| Generation quality (faithfulness, etc.) | ◻️ Block 1B | ◻️ Block 1B | LLM-judge scaffolding |
-| End-to-end | ⚠️ single smoke point (n=1) | ⚠️ 21.8 s/query steady-state | systematic measurement: Block 1B |
-| System fit on RTX 4070 12 GB | ✅ Qwen 7B at NF4 ≈ 5–6 GB | — | requires `device=cuda:0` not `auto` |
+| Generation faithfulness (Llama judge) | ⚠️ mean 0.75 — judge anchor saturation | — | 49/50 queries scored exactly 0.75 |
+| Generation answer relevance (Llama judge) | ✅ mean 0.74; healthy spread on structural | — | 3 low-relevance outliers identified |
+| Generation citation rate | ⚠️ 54% (cross-set agreement) | — | Qwen cites half the time despite directive |
+| Generation refusal on off-corpus | ✅ 100% (8/8) | ✅ p50 2.4 s (refusals are short) | post-pattern-fix; see analysis |
+| End-to-end (in-corpus) | ✅ measured n=50 | ✅ generate p50 10–15 s, p90 19–24 s | RTX 4070 NF4 |
+| System fit on RTX 4070 12 GB | ✅ Qwen 7B + Llama 8B at NF4 ≈ 5–6 GB each | — | sequential load; both verified |
 
 ---
 
@@ -80,17 +83,18 @@ the right default despite the curated MRR exception.
 
 ### Retrieval latency
 
-| Stage | Wall time | Sample | Source |
-|---|---:|---|---|
-| Index + retriever setup (cold) | ~10 s | n=1 | [`manual-runs/2026-05-06-smoke.md`](manual-runs/2026-05-06-smoke.md) |
-| Hybrid retrieve + rerank (5 chunks) | 6.5 s | n=1 | same |
-| Per-stage breakdown (dense / sparse / RRF / rerank) | ◻️ Block 1B will instrument | | |
+| Stage | p50 | p90 | max | n | Source |
+|---|---:|---:|---:|---:|---|
+| Hybrid retrieve + rerank (curated, top_k=5) | 315 ms | 446 ms | 10,573 ms | 20 | [`baselines/pre_phase3_generation_base.json`](baselines/pre_phase3_generation_base.json) |
+| Hybrid retrieve + rerank (structural, top_k=5) | 322 ms | 388 ms | 3,417 ms | 30 | same |
+| Hybrid retrieve + rerank (no-answer, top_k=5) | 393 ms | 1,401 ms | 3,100 ms | 8 | same |
+| Per-stage breakdown (dense / sparse / RRF / rerank) | ◻️ followup | | | | |
 
-The 6.5-second figure is dominated by the cross-encoder (~1.3 s/chunk
-× 5). Dense + sparse retrieval is sub-second; RRF and assembly are
-negligible. Block 1B's `scripts/run_generation_eval.py` will record
-per-stage latencies into each report's `timing` field so we can
-publish quartiles instead of n=1 anecdotes.
+The `max` outlier on the curated set (10.6 s on the very first query)
+is a one-time cross-encoder warm-up — the model loads lazily on first
+`predict()`. After that, retrieve + rerank is consistently sub-second.
+Per-substage timing (dense vs. sparse vs. RRF vs. rerank) is still a
+single bucket; instrumenting that is a small follow-up.
 
 ---
 
@@ -133,34 +137,38 @@ should be able to see.
 | 🔒 Prompt template structure is stable | JSON snapshot | `tests/snapshots/prompt_default.json` |
 | 🔒 Generator messages-API contract | unit-test override of `_run_inference` | `tests/unit/test_generator.py` |
 
-### LLM behavior — Block 1A smoke (n=1)
+### LLM behavior — pre-Phase-3 baseline (Qwen 2.5 7B Instruct, NF4)
 
-Single end-to-end execution against Qwen 2.5 7B Instruct (NF4) on the
-user's RTX 4070. Real query, real corpus, real model. Aspect-by-aspect:
+Measured across **58 queries** (curated 20 + structural 30 + no-answer 8)
+running the production retrieval+rerank stack with recursive chunking.
+LLM judge: Llama 3.1 8B Instruct (NF4, temperature=0). Source data:
+[`baselines/pre_phase3_generation_base.json`](baselines/pre_phase3_generation_base.json).
 
-| Aspect | Status | Notes / Source |
-|---|---|---|
-| Loads at NF4 in 12 GB VRAM | ✅ ~5–6 GB resident | [smoke.md](manual-runs/2026-05-06-smoke.md) |
-| Inference throughput | ✅ 14.6 tok/s (223 tok / 15.3 s) | smoke.md §Timing |
-| Generated answer quality (eyeball) | ✅ technically correct, no hallucinated APIs | smoke.md §Generated answer |
-| Citation honoring (`[N]` markers) | ⚠️ ignored despite system-prompt directive | smoke.md §Citations — n=1 |
-| Refusal / no-answer behavior | ◻️ Block 1B `check_no_answer_behavior` | |
-| Faithfulness (LLM-judge) | ◻️ Block 1B `LlamaJudge` | |
-| Answer relevance (LLM-judge) | ◻️ Block 1B `LlamaJudge` | |
-| Citation grounding (LLM-judge) | ◻️ Block 1B `check_citations_grounded` | |
-| Prompt-tuning sweep for citation rate | ◻️ Block 1B+ if Block 1B confirms the gap | |
+| Aspect | Status | Result | Source |
+|---|---|---|---|
+| Loads at NF4 in 12 GB VRAM | ✅ | Qwen ~5–6 GB; Llama ~5–6 GB; sequential load works on shared 12 GB GPU | [smoke.md](manual-runs/2026-05-06-smoke.md) + eval handoff (9 MB residual after each unload) |
+| Inference throughput | ✅ | 14.6 tok/s (smoke); generate p50 9.7–15 s (eval) | smoke.md, eval reports |
+| **Faithfulness (Llama judge)** | ⚠️ | mean **0.750** curated / **0.758** structural | judge anchor saturation — 49/50 in-corpus answers scored exactly 0.75; flagged for cross-judge calibration |
+| **Answer relevance (Llama judge)** | ✅ | mean **0.762** curated / **0.733** structural | structural shows 3×0.25, 23×0.75, 4×1.0 — healthier spread than faithfulness |
+| **Citation rate** (`[N]` markers in text) | ⚠️ | **54%** of in-corpus answers (55% curated, 53% structural) | cross-set agreement → real, not noise; smoke 0% was unrepresentative |
+| **Refusal on off-corpus** (rule-based) | ✅ | **100%** (8/8) | Qwen reliably refuses with "I don't have enough context"; pattern coverage gap caught + fixed mid-eval |
+| Generated answer quality (eyeball) | ✅ | technically correct on the smoke run | smoke.md §Generated answer |
+| Prompt-tuning sweep for citation rate | ◻️ followup | — | optional; the citation gap is documented and Phase 3 fine-tune may target it |
 
 ### Generation latency (Qwen 2.5 7B, NF4, RTX 4070)
 
-| Stage | Wall time | Sample | Notes |
-|---|---:|---|---|
-| Model load (cold, one-time) | ~163 s | n=1 | per-process; warm sessions skip |
-| Inference (223 tokens) | 15.3 s | n=1 | 14.6 tok/s |
-| Per-query steady-state (retrieve + rerank + assemble + generate) | ~21.8 s | n=1, derived | excludes one-time loads |
+| Stage | p50 | p90 | max | n | Source |
+|---|---:|---:|---:|---:|---|
+| Generate (curated in-corpus) | 15,125 ms | 24,311 ms | 26,566 ms | 20 | [`baselines/pre_phase3_generation_base.json`](baselines/pre_phase3_generation_base.json) |
+| Generate (structural in-corpus) | 9,733 ms | 18,822 ms | 33,779 ms | 30 | same |
+| Generate (no-answer / refusal) | 2,438 ms | 3,994 ms | 4,286 ms | 8 | same |
+| Model load (cold, one-time per process) | ~163 s | — | — | n=1 | smoke.md |
 
-Block 1B will publish quartile latencies over a meaningful query
-distribution — the n=1 figures here establish the order of magnitude
-only.
+Refusals are short (≤ 50 tokens) so generation is much faster — ~2.4 s
+p50 vs ~10–15 s for in-corpus answers. Curated questions tend to elicit
+longer expository answers ("How do I install transformers?" gets a
+multi-paragraph response); structural queries lean terminology-focused
+("Albert specific outputs") and produce shorter answers.
 
 ---
 
@@ -169,9 +177,10 @@ only.
 | Aspect | Status | Source / Plan |
 |---|---|---|
 | Single-query smoke completes | ✅ end-to-end success | [smoke.md](manual-runs/2026-05-06-smoke.md) |
-| Per-query latency distribution | ◻️ Block 1B `run_generation_eval.py` | will publish p50 / p90 / max |
-| Per-query quality scores | ◻️ Block 1B LLM-judge | faithfulness, relevance, citations |
-| Robustness (no-answer queries, adversarial) | ◻️ Block 1B+ | rule-based + LLM-judge mix |
+| Per-query latency distribution (n=58) | ✅ measured across 3 eval sets | [`baselines/pre_phase3_generation_base.json`](baselines/pre_phase3_generation_base.json) |
+| Per-query quality scores (n=50 in-corpus) | ✅ faithfulness, relevance, citation grounding | same |
+| Off-corpus refusal robustness (n=8) | ✅ 100% with patched heuristic | same; methodology iteration documented in analysis |
+| Adversarial / prompt-injection eval | ◻️ Phase 4 territory | small adversarial set when serving exists |
 | Streaming generation | ◻️ Phase 4 (serving) | not currently wired |
 
 ---
@@ -183,16 +192,17 @@ only.
 | Constraint | Value | Verified |
 |---|---|---|
 | Target VRAM (vanilla RTX 4070) | 12 GB total, ~5 GB free with display | ✅ smoke run |
-| Generation model fit (Qwen 2.5 7B, NF4) | ~5–6 GB resident | ✅ smoke run |
-| Judge model fit (Llama 3.1 8B, NF4, sequential load) | ~6 GB resident, post-`del` of generator | ◻️ Block 1B will verify |
+| Generation model fit (Qwen 2.5 7B, NF4) | ~5–6 GB resident | ✅ smoke run + eval |
+| Judge model fit (Llama 3.1 8B, NF4, sequential load) | ~5–6 GB resident, post-`del` of generator | ✅ eval (9 MB residual after generator unload, 9 MB after judge unload) |
 | Required device flag | `device=cuda:0` (not `device=auto`) | ⚠️ followup: change default — see smoke.md |
-| HF cache location | `/mnt/e/hf-cache` (E: drive, ~1 TB free) | ✅ documented in CLAUDE.md |
+| HF cache location | `/mnt/e/hf-cache` (E: drive) | ✅ ~31 GB used (Qwen 15 GB + Llama 15 GB + small models ~80 MB each) |
+| HF auth (Llama 3.1 is a gated model) | required for judge model | ✅ user has accepted license + HF_TOKEN configured |
 
 ### Code & test footprint
 
 | Metric | Value | Source |
 |---|---:|---|
-| Tests | 203 | `pytest --collect-only` |
+| Tests | 266 | `pytest --collect-only` |
 | Coverage gate (CI-enforced) | ≥ 90% | `.github/workflows/ci.yml` |
 | Lint / format | ruff (pinned 0.15.8) | `pyproject.toml` |
 | Type check | mypy (pinned 1.19.1, strict) | `pyproject.toml` |
