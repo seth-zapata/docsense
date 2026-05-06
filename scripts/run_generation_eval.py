@@ -80,7 +80,7 @@ from docsense.retrieval.hybrid import HybridRetriever
 from docsense.retrieval.sparse import SparseRetriever
 
 if TYPE_CHECKING:
-    from docsense.evaluation.judge import JudgeScore
+    from docsense.evaluation.judge import JudgeScore, RefusalJudgment
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -116,6 +116,14 @@ class QueryRecord:
 
     Phase B fills ``answer`` and ``timing``. Phase C fills the score
     fields if applicable. Phase D dumps the whole thing to the report.
+
+    For in-corpus queries: ``faithfulness`` (claim-level) and
+    ``relevance`` (5-anchor absolute) are populated.
+
+    For no-answer queries: ``refusal_judge`` (LLM judgment) is
+    populated as the primary measurement. The rule-based check is
+    not stored on the record — it's recomputed from ``answer`` in
+    the report-build phase since it's a pure-function regex.
     """
 
     query: EvalQuery
@@ -123,6 +131,7 @@ class QueryRecord:
     timing: dict[str, float]
     faithfulness: JudgeScore | None = None
     relevance: JudgeScore | None = None
+    refusal_judge: RefusalJudgment | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -319,28 +328,31 @@ def run_judging_phase(records: list[QueryRecord], settings: Settings) -> None:
 
     For in-corpus queries: faithfulness (claim-level decomposition,
     two LLM calls per query) + relevance (single absolute-scale
-    judgment) via the LLM judge. For no-answer queries: skipped —
-    the judge prompts assume a well-formed in-corpus question, and
-    grading "I don't know" for relevance produces meaningless scores.
+    judgment).
 
-    The rule-based checks (citation grounding, refusal behavior) run
-    on every record and are computed in Phase D from the Answer
-    state — they don't need the judge to be loaded.
+    For no-answer queries: refusal_judge (single LLM call) — replaces
+    regex-only refusal detection as the primary measurement.
+    Faithfulness and relevance still skipped since they assume a
+    well-formed in-corpus question. The rule-based
+    check_no_answer_behavior is recomputed in Phase D from the answer
+    text and surfaced alongside the judge verdict; the agreement rate
+    between the two is a methodology-health signal (see
+    _aggregate_refusal_judgments).
+
+    The citation_check rule-based pass runs in Phase D from Answer
+    state — it doesn't need the judge to be loaded.
     """
-    if all(r.query.is_no_answer for r in records):
-        logger.info("All-no-answer eval set: skipping LLM-judge load.")
-        return
-
     judge = LlamaJudge(settings.judge)
 
     for i, rec in enumerate(records, start=1):
-        if rec.query.is_no_answer:
-            continue
         logger.info("[%d/%d] judging %s", i, len(records), rec.query.query_id)
-        rec.faithfulness = judge.judge_faithfulness(
-            rec.query.text, rec.answer.retrieved_chunks, rec.answer.text
-        )
-        rec.relevance = judge.judge_relevance(rec.query.text, rec.answer.text)
+        if rec.query.is_no_answer:
+            rec.refusal_judge = judge.judge_refusal(rec.query.text, rec.answer.text)
+        else:
+            rec.faithfulness = judge.judge_faithfulness(
+                rec.query.text, rec.answer.retrieved_chunks, rec.answer.text
+            )
+            rec.relevance = judge.judge_relevance(rec.query.text, rec.answer.text)
 
     del judge
     _free_cuda("judge unload")
@@ -548,6 +560,79 @@ def _aggregate_faithfulness_scores(records: list[QueryRecord]) -> dict[str, Any]
     }
 
 
+def _aggregate_refusal_judgments(records: list[QueryRecord]) -> dict[str, Any]:
+    """Aggregate refusal data: LLM-judge primary, rule-based guardrail.
+
+    For each off-corpus record, both the LLM judge's verdict
+    (``rec.refusal_judge``) and the rule-based pattern check
+    (recomputed here from ``rec.answer``) produce a bool. We surface
+    three numbers:
+
+    - ``frac_refused_judge``: fraction the LLM judge marked as
+      refusals. The primary measurement going forward — robust to
+      phrasing drift in a way the regex isn't.
+    - ``frac_refused_rule``: fraction the regex marked as refusals.
+      Kept as a sanity check; should agree closely on a stable model.
+    - ``agreement_rate``: fraction of records where the two methods
+      gave the same verdict. Methodology-health signal: a drop here
+      between Phase 3 pre-FT and post-FT runs is an early warning
+      that fine-tuning shifted refusal phrasing in a way one of the
+      methods missed.
+
+    Plus parse-failure counts and pattern-match diagnostics from the
+    rule-based side (which patterns fired, on which queries).
+    """
+    n = len(records)
+    if n == 0:
+        return {"n": 0}
+
+    judge_verdicts: list[bool] = []
+    rule_verdicts: list[bool] = []
+    n_judge_parse_failures = 0
+    matched_patterns: dict[str, int] = {}
+    disagreement_query_ids: list[str] = []
+
+    for rec in records:
+        rule_result = check_no_answer_behavior(rec.answer, expected_refusal=True)
+        rule_verdicts.append(rule_result.refused)
+        if rule_result.matched_pattern is not None:
+            matched_patterns[rule_result.matched_pattern] = (
+                matched_patterns.get(rule_result.matched_pattern, 0) + 1
+            )
+
+        judge = rec.refusal_judge
+        if judge is None:
+            # Shouldn't happen if Phase C ran cleanly; defensive fallback.
+            judge_verdicts.append(False)
+            continue
+        judge_verdicts.append(judge.refused)
+        if "PARSE_FAILED" in judge.rationale:
+            n_judge_parse_failures += 1
+
+        if judge.refused != rule_result.refused:
+            disagreement_query_ids.append(rec.query.query_id)
+
+    n_judge_refused = sum(judge_verdicts)
+    n_rule_refused = sum(rule_verdicts)
+    n_agree = sum(1 for j, r in zip(judge_verdicts, rule_verdicts, strict=True) if j == r)
+
+    # All off-corpus queries should refuse (expected_refusal=True).
+    # frac_correct = frac_refused_judge by construction here, but we
+    # surface it explicitly for clarity in the report.
+    return {
+        "n": n,
+        "frac_refused_judge": round(n_judge_refused / n, 3),
+        "frac_refused_rule": round(n_rule_refused / n, 3),
+        "frac_correct_judge": round(n_judge_refused / n, 3),
+        "frac_correct_rule": round(n_rule_refused / n, 3),
+        "agreement_rate": round(n_agree / n, 3),
+        "n_disagreements": n - n_agree,
+        "disagreement_query_ids": disagreement_query_ids,
+        "n_judge_parse_failures": n_judge_parse_failures,
+        "rule_matched_patterns": matched_patterns,
+    }
+
+
 def build_report(
     records: list[QueryRecord],
     *,
@@ -570,8 +655,14 @@ def build_report(
             "citation_check": cit.model_dump(),
         }
         if rec.query.is_no_answer:
-            no_ans = check_no_answer_behavior(rec.answer, expected_refusal=True)
-            entry["no_answer_check"] = no_ans.model_dump()
+            # Cross-validation: both the rule-based regex and the LLM
+            # judge run on the answer. The judge is the primary
+            # measurement; the rule is a guardrail and disagreement
+            # signal. See _aggregate_refusal_judgments for the
+            # agreement-rate computation.
+            rule_check = check_no_answer_behavior(rec.answer, expected_refusal=True)
+            entry["no_answer_check_rule"] = rule_check.model_dump()
+            entry["refusal_judge"] = rec.refusal_judge.model_dump() if rec.refusal_judge else None
         else:
             entry["faithfulness"] = rec.faithfulness.model_dump() if rec.faithfulness else None
             entry["relevance"] = rec.relevance.model_dump() if rec.relevance else None
@@ -599,18 +690,7 @@ def build_report(
             ),
         }
     if no_answer_records:
-        no_ans_results = [
-            check_no_answer_behavior(r.answer, expected_refusal=True) for r in no_answer_records
-        ]
-        aggregates["no_answer_check"] = {
-            "n": len(no_ans_results),
-            "frac_correct_refusal": round(
-                statistics.fmean([1.0 if r.correct else 0.0 for r in no_ans_results]), 3
-            ),
-            "frac_refused": round(
-                statistics.fmean([1.0 if r.refused else 0.0 for r in no_ans_results]), 3
-            ),
-        }
+        aggregates["no_answer"] = _aggregate_refusal_judgments(no_answer_records)
 
     timings_by_stage = {
         "retrieve_ms": [r.timing["retrieve_ms"] for r in records],
@@ -629,11 +709,11 @@ def build_report(
             "chunking_strategy": settings.chunking.strategy,
             "chunks_total": chunks_total,
             "generator_model": settings.generation.model_name,
-            "judge_model": (
-                settings.judge.model_name
-                if any(not r.query.is_no_answer for r in records)
-                else None
-            ),
+            # Judge is now used for no-answer queries too (refusal
+            # detection moved from regex-only to LLM-judge primary
+            # with regex as guardrail). So the judge model is recorded
+            # for every eval set.
+            "judge_model": settings.judge.model_name,
             "use_4bit_generator": settings.generation.use_4bit_quantization,
             "use_4bit_judge": settings.judge.use_4bit_quantization,
             "rerank_candidates": settings.retrieval.rerank_candidates,
@@ -738,11 +818,14 @@ def _print_summary(report: dict[str, Any]) -> None:
             f"  citations:    frac_any_marker={cc['frac_with_any_marker']:.2f}  "
             f"mean_markers/answer={cc['mean_n_markers_in_text']:.2f}"
         )
-    if "no_answer_check" in agg:
-        no = agg["no_answer_check"]
+    if "no_answer" in agg and agg["no_answer"].get("n", 0) > 0:
+        no = agg["no_answer"]
         print(
-            f"  no-answer:    frac_correct={no['frac_correct_refusal']:.2f}  "
-            f"frac_refused={no['frac_refused']:.2f}"
+            f"  no-answer:    judge={no['frac_refused_judge']:.2f}  "
+            f"rule={no['frac_refused_rule']:.2f}  "
+            f"agreement={no['agreement_rate']:.2f}  "
+            f"disagreements={no['n_disagreements']}  "
+            f"judge-parse-fails={no['n_judge_parse_failures']}"
         )
     timing = report["timing_ms_per_query"]
     print(

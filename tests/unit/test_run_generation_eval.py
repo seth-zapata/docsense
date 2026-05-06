@@ -18,7 +18,7 @@ from pathlib import Path
 import pytest
 
 from docsense.config import Settings
-from docsense.evaluation.judge import ClaimAttribution, JudgeScore
+from docsense.evaluation.judge import ClaimAttribution, JudgeScore, RefusalJudgment
 from docsense.generation.types import Answer, ChunkRef, GenerationMetadata
 
 
@@ -326,8 +326,12 @@ class TestBuildReport:
         # Judge model is recorded for in-corpus runs (judge was needed).
         assert report["config"]["judge_model"] is not None
 
-    def test_no_answer_report_uses_rule_based_only(self):
-        records = [_record("q1", is_no_answer=True, answer_text="I don't know.")]
+    def test_no_answer_report_cross_validates_judge_and_rule(self):
+        """No-answer reports surface both the LLM judge verdict and the
+        rule-based regex verdict, plus an agreement rate. Pin the new
+        cross-validation contract."""
+        records = [_record("q1", is_no_answer=True, answer_text="I don't have enough context.")]
+        records[0].refusal_judge = RefusalJudgment(refused=True, rationale="model said it")
         report = driver.build_report(
             records,
             eval_set="no-answer",
@@ -335,13 +339,66 @@ class TestBuildReport:
             chunks_total=12345,
             limit_applied=None,
         )
-        assert "no_answer_check" in report["aggregates"]
-        assert report["aggregates"]["no_answer_check"]["frac_correct_refusal"] == 1.0
+        no = report["aggregates"]["no_answer"]
+        assert no["frac_refused_judge"] == 1.0
+        assert no["frac_refused_rule"] == 1.0  # the regex catches "don't have enough context"
+        assert no["agreement_rate"] == 1.0
+        assert no["n_disagreements"] == 0
+        assert no["n_judge_parse_failures"] == 0
         # No faithfulness/relevance for no-answer set.
         assert "faithfulness" not in report["aggregates"]
         assert "relevance" not in report["aggregates"]
-        # Judge model is None when no in-corpus records were judged.
-        assert report["config"]["judge_model"] is None
+        # Judge model is now recorded for ALL eval sets — it's used
+        # for refusal detection on the no-answer set.
+        assert report["config"]["judge_model"] is not None
+
+    def test_no_answer_disagreement_surfaces_query_id(self):
+        """When the judge and the rule disagree on a query, the
+        disagreement is captured by query_id so the report carries
+        actionable debugging data."""
+        # Construct a case where the answer doesn't match any rule
+        # pattern (so rule says refused=False) but we'll set the judge
+        # to refused=True. This is the "regex coverage gap" case.
+        records = [
+            _record("q1", is_no_answer=True, answer_text="That topic isn't really my specialty."),
+        ]
+        records[0].refusal_judge = RefusalJudgment(
+            refused=True, rationale="judge interpreted as refusal"
+        )
+        report = driver.build_report(
+            records,
+            eval_set="no-answer",
+            settings=Settings(),
+            chunks_total=12345,
+            limit_applied=None,
+        )
+        no = report["aggregates"]["no_answer"]
+        assert no["frac_refused_judge"] == 1.0
+        assert no["frac_refused_rule"] == 0.0
+        assert no["agreement_rate"] == 0.0
+        assert no["n_disagreements"] == 1
+        assert no["disagreement_query_ids"] == ["q1"]
+
+    def test_no_answer_judge_parse_failure_counted(self):
+        """A PARSE_FAILED rationale on the judge verdict counts in
+        n_judge_parse_failures. The conservative refused=False default
+        from the parser means parse failures look like 'didn't refuse'
+        in the rate, but the parse-failure counter surfaces the cases
+        for review."""
+        records = [_record("q1", is_no_answer=True, answer_text="ok ok")]
+        records[0].refusal_judge = RefusalJudgment(
+            refused=False,
+            rationale="PARSE_FAILED: no REFUSED verdict in response. Raw: 'garbage'",
+        )
+        report = driver.build_report(
+            records,
+            eval_set="no-answer",
+            settings=Settings(),
+            chunks_total=12345,
+            limit_applied=None,
+        )
+        no = report["aggregates"]["no_answer"]
+        assert no["n_judge_parse_failures"] == 1
 
     def test_timing_percentiles_computed(self):
         records = [_record(f"q{i}", is_no_answer=False) for i in range(5)]
