@@ -5,9 +5,11 @@ docsense system. Per-experiment JSON in `reports/`, narrative
 interpretations in `analyses/`, raw smoke artifacts in `manual-runs/` —
 this file is the dashboard that points into them.
 
-**Last updated:** 2026-05-06 (closing pre-Phase-3 Block 1B — first
-LLM-judged generation eval landed; pre-Phase-3 baseline at
-[`baselines/pre_phase3_generation_base.json`](baselines/pre_phase3_generation_base.json)).
+**Last updated:** 2026-05-06 (faithfulness methodology refactored
+to RAGAS-style claim-level decomposition with per-chunk attribution;
+prior absolute-scale numbers superseded. See the
+[baseline](baselines/pre_phase3_generation_base.json) and
+[analysis](analyses/2026-05-06-baseline-generation-eval.md)).
 
 **Status legend:**
 
@@ -27,9 +29,9 @@ LLM-judged generation eval landed; pre-Phase-3 baseline at
 | Retrieval (hybrid+rerank, curated) | ⚠️ MRR 0.599 — see analysis | (same path) | curated MRR caveat documented |
 | Reranking (cross-encoder lift) | ✅ +0.05 to +0.20 Recall@10 | ⚠️ ~1.3 s/chunk; first-call ~10 s warmup | dominates retrieve+rerank time |
 | Generation contracts | 🔒 4 invariants pinned in CI | — | citation, budget, prompt, generator |
-| Generation faithfulness (Llama judge) | ⚠️ mean 0.75 — judge anchor saturation | — | 49/50 queries scored exactly 0.75 |
-| Generation answer relevance (Llama judge) | ✅ mean 0.74; healthy spread on structural | — | 3 low-relevance outliers identified |
-| Generation citation rate | ⚠️ 54% (cross-set agreement) | — | Qwen cites half the time despite directive |
+| Generation faithfulness (claim-level, Llama judge) | ✅ mean 0.853 / median 1.0 (cross-set agreement) | — | RAGAS-style; support rate 0.89 curated / 0.94 structural |
+| Generation answer relevance (Llama judge, 5-anchor) | ✅ mean 0.72 (curated 0.725, structural 0.717) | — | 4 low-relevance outliers across sets |
+| Generation citation rate | ⚠️ ~58% (cross-set agreement) | — | Qwen cites about half the time despite directive |
 | Generation refusal on off-corpus | ✅ 100% (8/8) | ✅ p50 2.4 s (refusals are short) | post-pattern-fix; see analysis |
 | End-to-end (in-corpus) | ✅ measured n=50 | ✅ generate p50 10–15 s, p95 20–25 s, p99 26–30 s | RTX 4070 NF4 |
 | System fit on RTX 4070 12 GB | ✅ Qwen 7B + Llama 8B at NF4 ≈ 5–6 GB each | — | sequential load; both verified |
@@ -147,19 +149,23 @@ should be able to see.
 
 Measured across **58 queries** (curated 20 + structural 30 + no-answer 8)
 running the production retrieval+rerank stack with recursive chunking.
-LLM judge: Llama 3.1 8B Instruct (NF4, temperature=0). Source data:
-[`baselines/pre_phase3_generation_base.json`](baselines/pre_phase3_generation_base.json).
+LLM judge: Llama 3.1 8B Instruct (NF4, temperature=0). **Faithfulness**
+uses RAGAS-style claim-level decomposition with per-chunk attribution
+(replaced absolute-scale anchor scoring 2026-05-06 — see analysis).
+Source data: [`baselines/pre_phase3_generation_base.json`](baselines/pre_phase3_generation_base.json).
 
 | Aspect | Status | Result | Source |
 |---|---|---|---|
 | Loads at NF4 in 12 GB VRAM | ✅ | Qwen ~5–6 GB; Llama ~5–6 GB; sequential load works on shared 12 GB GPU | [smoke.md](manual-runs/2026-05-06-smoke.md) + eval handoff (9 MB residual after each unload) |
 | Inference throughput | ✅ | 14.6 tok/s (smoke); generate p50 9.7–15 s (eval) | smoke.md, eval reports |
-| **Faithfulness (Llama judge)** | ⚠️ | mean **0.750** curated / **0.758** structural | judge anchor saturation — 49/50 in-corpus answers scored exactly 0.75; flagged for cross-judge calibration |
-| **Answer relevance (Llama judge)** | ✅ | mean **0.762** curated / **0.733** structural | structural shows 3×0.25, 23×0.75, 4×1.0 — healthier spread than faithfulness |
-| **Citation rate** (`[N]` markers in text) | ⚠️ | **54%** of in-corpus answers (55% curated, 53% structural) | cross-set agreement → real, not noise; smoke 0% was unrepresentative |
-| **Refusal on off-corpus** (rule-based) | ✅ | **100%** (8/8) | Qwen reliably refuses with "I don't have enough context"; pattern coverage gap caught + fixed mid-eval |
+| **Faithfulness — score** (claim-level) | ✅ | mean **0.853** curated / **0.853** structural (exact cross-set agreement) | median 1.0 on both; right-skewed distribution |
+| **Faithfulness — claim support** | ✅ | **0.89** curated (114/128 claims) / **0.94** structural (146/156) | per-chunk attribution; only ~10% of unsupported are real, rest are parser issues |
+| **Answer relevance** (Llama, 5-anchor) | ✅ | mean **0.725** curated / **0.717** structural | structural: 3×0.25, 25×0.75, 2×1.0; curated: 1×0.25, 19×0.75 |
+| **Citation rate** (`[N]` markers in text) | ⚠️ | **~58%** of in-corpus answers (60% curated, 57% structural) | cross-set agreement; highest-leverage Phase 3 fine-tune target |
+| **Refusal on off-corpus** (rule-based) | ✅ | **100%** (8/8) | Qwen reliably refuses with "I don't have enough context"; pattern coverage gap caught + fixed |
 | Generated answer quality (eyeball) | ✅ | technically correct on the smoke run | smoke.md §Generated answer |
-| Prompt-tuning sweep for citation rate | ◻️ followup | — | optional; the citation gap is documented and Phase 3 fine-tune may target it |
+| Claim-level parser robustness | ⚠️ | 10 of 50 in-corpus queries (20%) have at least one parser issue; only 3 (6%) had scores materially affected | curated_001 alone has 8/8 PARSE_FAILED; followup |
+| Prompt-tuning sweep for citation rate | ◻️ followup | — | the citation gap is documented and Phase 3 fine-tune may target it |
 
 ### Generation latency (Qwen 2.5 7B, NF4, RTX 4070)
 
