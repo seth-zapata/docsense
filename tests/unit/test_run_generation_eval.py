@@ -18,7 +18,7 @@ from pathlib import Path
 import pytest
 
 from docsense.config import Settings
-from docsense.evaluation.judge import JudgeScore
+from docsense.evaluation.judge import ClaimAttribution, JudgeScore
 from docsense.generation.types import Answer, ChunkRef, GenerationMetadata
 
 
@@ -122,22 +122,21 @@ class TestPercentiles:
         assert result["p99"] >= 98.0  # ~99.0 with linear interpolation
 
 
-class TestAggregateScores:
+class TestAggregateRelevanceScores:
     def test_empty_records_returns_n_zero(self):
-        result = driver._aggregate_scores([], "faithfulness")
+        result = driver._aggregate_relevance_scores([])
         assert result == {"n": 0}
 
     def test_records_without_scores_skipped(self):
         records = [_record("q1", is_no_answer=False), _record("q2", is_no_answer=False)]
-        # No faithfulness/relevance set on either — aggregation should be empty.
-        result = driver._aggregate_scores(records, "faithfulness")
+        result = driver._aggregate_relevance_scores(records)
         assert result == {"n": 0}
 
     def test_aggregates_with_anchor_distribution(self):
         records = [_record("q1", is_no_answer=False), _record("q2", is_no_answer=False)]
-        records[0].faithfulness = JudgeScore(metric="faithfulness", score=1.0, rationale="ok")
-        records[1].faithfulness = JudgeScore(metric="faithfulness", score=0.5, rationale="ok")
-        result = driver._aggregate_scores(records, "faithfulness")
+        records[0].relevance = JudgeScore(metric="relevance", score=1.0, rationale="ok")
+        records[1].relevance = JudgeScore(metric="relevance", score=0.5, rationale="ok")
+        result = driver._aggregate_relevance_scores(records)
         assert result["n"] == 2
         assert result["mean"] == 0.75
         assert result["anchor_distribution"]["1.00"] == 1
@@ -146,19 +145,123 @@ class TestAggregateScores:
 
     def test_parse_failures_counted(self):
         records = [_record("q1", is_no_answer=False)]
-        records[0].faithfulness = JudgeScore(
-            metric="faithfulness",
+        records[0].relevance = JudgeScore(
+            metric="relevance",
             score=0.0,
             rationale="PARSE_FAILED: no SCORE in response",
         )
-        result = driver._aggregate_scores(records, "faithfulness")
+        result = driver._aggregate_relevance_scores(records)
         assert result["n_parse_failures"] == 1
+
+
+class TestAggregateFaithfulnessScores:
+    def _faith_score(self, score: float, attrs: list[ClaimAttribution]) -> JudgeScore:
+        return JudgeScore(
+            metric="faithfulness",
+            score=score,
+            rationale=f"{int(score * len(attrs))} of {len(attrs)} claims supported.",
+            claim_attributions=attrs,
+        )
+
+    def test_empty_records_returns_n_zero(self):
+        result = driver._aggregate_faithfulness_scores([])
+        assert result == {"n": 0}
+
+    def test_aggregate_with_claim_breakdown(self):
+        """Two records: one fully supported, one half supported.
+        Aggregate score-mean=0.75; total claims 4 (3 supported / 1 not);
+        chunk usage shows chunk 1 cited twice, chunk 2 once, none once."""
+        rec1 = _record("q1", is_no_answer=False)
+        rec2 = _record("q2", is_no_answer=False)
+        rec1.faithfulness = self._faith_score(
+            1.0,
+            [
+                ClaimAttribution(claim_idx=1, claim_text="a", supporting_chunk_idx=1),
+                ClaimAttribution(claim_idx=2, claim_text="b", supporting_chunk_idx=2),
+            ],
+        )
+        rec2.faithfulness = self._faith_score(
+            0.5,
+            [
+                ClaimAttribution(claim_idx=1, claim_text="a", supporting_chunk_idx=1),
+                ClaimAttribution(claim_idx=2, claim_text="c", supporting_chunk_idx=None),
+            ],
+        )
+        result = driver._aggregate_faithfulness_scores([rec1, rec2])
+
+        # Score-level
+        assert result["score"]["n"] == 2
+        assert result["score"]["mean"] == 0.75
+        assert result["score"]["min"] == 0.5
+        assert result["score"]["max"] == 1.0
+
+        # Claims-level (cross-query)
+        assert result["claims"]["total_extracted"] == 4
+        assert result["claims"]["total_supported"] == 3
+        assert result["claims"]["support_rate"] == 0.75  # 3/4
+        assert result["claims"]["mean_per_answer"] == 2.0
+        assert result["claims"]["max_per_answer"] == 2
+
+        # Chunk usage histogram
+        assert result["chunk_usage_distribution"]["1"] == 2
+        assert result["chunk_usage_distribution"]["2"] == 1
+        assert result["chunk_usage_distribution"]["none"] == 1
+
+    def test_score_buckets_split_endpoints(self):
+        """Scores at exactly 0.0 and 1.0 land in their own buckets, not
+        merged with the inner ranges. Lets reports surface "all
+        unsupported" and "all supported" cases at a glance."""
+        rec_zero = _record("q1", is_no_answer=False)
+        rec_one = _record("q2", is_no_answer=False)
+        rec_partial = _record("q3", is_no_answer=False)
+        rec_zero.faithfulness = self._faith_score(
+            0.0, [ClaimAttribution(claim_idx=1, claim_text="x", supporting_chunk_idx=None)]
+        )
+        rec_one.faithfulness = self._faith_score(
+            1.0, [ClaimAttribution(claim_idx=1, claim_text="y", supporting_chunk_idx=1)]
+        )
+        rec_partial.faithfulness = self._faith_score(
+            0.5,
+            [
+                ClaimAttribution(claim_idx=1, claim_text="a", supporting_chunk_idx=1),
+                ClaimAttribution(claim_idx=2, claim_text="b", supporting_chunk_idx=None),
+            ],
+        )
+        result = driver._aggregate_faithfulness_scores([rec_zero, rec_one, rec_partial])
+        assert result["score"]["score_distribution"]["0.0"] == 1
+        assert result["score"]["score_distribution"]["1.0"] == 1
+        assert result["score"]["score_distribution"]["0.5-0.75"] == 1
+
+    def test_no_claims_extracted_counted(self):
+        """A NO_CLAIMS_EXTRACTED case (e.g., extraction parse failure)
+        gets counted in the claims aggregate but contributes 0 to
+        the score and 0 to the claim totals."""
+        rec = _record("q1", is_no_answer=False)
+        rec.faithfulness = JudgeScore(
+            metric="faithfulness",
+            score=0.0,
+            rationale="NO_CLAIMS_EXTRACTED: claim-extraction step returned no claims.",
+            claim_attributions=[],
+        )
+        result = driver._aggregate_faithfulness_scores([rec])
+        assert result["claims"]["n_no_claims_extracted"] == 1
+        assert result["claims"]["total_extracted"] == 0
 
 
 class TestBuildReport:
     def test_in_corpus_report_has_all_sections(self):
         records = [_record("q1", is_no_answer=False, answer_text="answer with [1]")]
-        records[0].faithfulness = JudgeScore(metric="faithfulness", score=0.75, rationale="ok")
+        records[0].faithfulness = JudgeScore(
+            metric="faithfulness",
+            score=0.75,
+            rationale="3 of 4 claims supported.",
+            claim_attributions=[
+                ClaimAttribution(claim_idx=1, claim_text="a", supporting_chunk_idx=1),
+                ClaimAttribution(claim_idx=2, claim_text="b", supporting_chunk_idx=2),
+                ClaimAttribution(claim_idx=3, claim_text="c", supporting_chunk_idx=3),
+                ClaimAttribution(claim_idx=4, claim_text="d", supporting_chunk_idx=None),
+            ],
+        )
         records[0].relevance = JudgeScore(metric="relevance", score=1.0, rationale="ok")
 
         report = driver.build_report(
@@ -170,11 +273,16 @@ class TestBuildReport:
         )
         assert report["eval_set"] == "curated"
         assert report["eval_set_size"] == 1
-        assert report["aggregates"]["faithfulness"]["mean"] == 0.75
+        # Faithfulness now has nested {score, claims, chunk_usage_distribution}.
+        assert report["aggregates"]["faithfulness"]["score"]["mean"] == 0.75
+        assert report["aggregates"]["faithfulness"]["claims"]["support_rate"] == 0.75
+        # Relevance keeps the flat shape.
         assert report["aggregates"]["relevance"]["mean"] == 1.0
         assert "citation_check" in report["aggregates"]
+        # Per-query carries the full claim attributions for debugging.
         assert report["per_query"][0]["query_id"] == "q1"
         assert report["per_query"][0]["faithfulness"]["score"] == 0.75
+        assert len(report["per_query"][0]["faithfulness"]["claim_attributions"]) == 4
         assert report["config"]["chunks_total"] == 12345
         # Judge model is recorded for in-corpus runs (judge was needed).
         assert report["config"]["judge_model"] is not None
@@ -199,7 +307,14 @@ class TestBuildReport:
     def test_timing_percentiles_computed(self):
         records = [_record(f"q{i}", is_no_answer=False) for i in range(5)]
         for rec in records:
-            rec.faithfulness = JudgeScore(metric="faithfulness", score=1.0, rationale="ok")
+            rec.faithfulness = JudgeScore(
+                metric="faithfulness",
+                score=1.0,
+                rationale="ok",
+                claim_attributions=[
+                    ClaimAttribution(claim_idx=1, claim_text="a", supporting_chunk_idx=1)
+                ],
+            )
             rec.relevance = JudgeScore(metric="relevance", score=1.0, rationale="ok")
 
         report = driver.build_report(

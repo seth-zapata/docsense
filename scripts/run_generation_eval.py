@@ -394,19 +394,19 @@ def _percentiles(values: list[float]) -> dict[str, float]:
     }
 
 
-def _aggregate_scores(records: list[QueryRecord], attr: str) -> dict[str, Any]:
-    """Aggregate JudgeScore values stored on ``records`` under attribute ``attr``.
+def _aggregate_relevance_scores(records: list[QueryRecord]) -> dict[str, Any]:
+    """Aggregate relevance JudgeScores (5-anchor absolute scale).
 
-    Returns mean + anchor distribution + parse-failure count. Anchor
-    distribution is a count per anchor value so an analyst can see
-    whether the judge clusters at one anchor (suspicious) or spreads
-    across the scale (healthier signal).
+    Returns mean + median + anchor distribution + parse-failure count.
+    Anchor distribution is the histogram across the five anchors; lets
+    an analyst see whether the judge clusters at one value (suspicious)
+    or spreads across the scale (healthier signal).
     """
     scores: list[float] = []
     n_parse_failed = 0
     anchor_dist: dict[str, int] = {f"{a:.2f}": 0 for a in (0.0, 0.25, 0.5, 0.75, 1.0)}
     for rec in records:
-        score: JudgeScore | None = getattr(rec, attr)
+        score = rec.relevance
         if score is None:
             continue
         scores.append(score.score)
@@ -421,6 +421,110 @@ def _aggregate_scores(records: list[QueryRecord], attr: str) -> dict[str, Any]:
         "median": round(statistics.median(scores), 3),
         "anchor_distribution": anchor_dist,
         "n_parse_failures": n_parse_failed,
+    }
+
+
+def _aggregate_faithfulness_scores(records: list[QueryRecord]) -> dict[str, Any]:
+    """Aggregate faithfulness JudgeScores (claim-level continuous).
+
+    Returns score-level summary + claim-level summary + chunk-usage
+    distribution. Three separate lenses on the same data:
+
+    - **score**: per-query aggregate. Mean / median / std / bucketed
+      histogram. The bucket histogram replaces the old anchor distribution
+      since claim-level scores are continuous (n_supported / n_total),
+      not snapped to the 5 anchors.
+    - **claims**: per-claim aggregate across all queries. Total
+      extracted, total supported, support rate (the "true" faithfulness
+      number aggregated over claims rather than per-query),
+      mean/max claims per answer, and the count of NO_CLAIMS_EXTRACTED
+      / parse-failure cases.
+    - **chunk_usage**: which retrieved chunks were cited most often.
+      Surfaces retrieval quality from a different angle: a chunk that's
+      in the top-5 but never gets cited may be a topical false positive.
+    """
+    scores: list[float] = []
+    n_no_claims = 0
+    n_parse_failed = 0
+    total_claims = 0
+    total_supported = 0
+    claims_per_answer: list[int] = []
+    chunk_citation_counts: dict[str, int] = {}
+
+    for rec in records:
+        score = rec.faithfulness
+        if score is None:
+            continue
+        scores.append(score.score)
+        if "NO_CLAIMS_EXTRACTED" in score.rationale:
+            n_no_claims += 1
+        if "PARSE_FAILED" in score.rationale:
+            n_parse_failed += 1
+
+        n_claims = len(score.claim_attributions)
+        claims_per_answer.append(n_claims)
+        total_claims += n_claims
+        for attr in score.claim_attributions:
+            if attr.supporting_chunk_idx is not None:
+                total_supported += 1
+                key = str(attr.supporting_chunk_idx)
+                chunk_citation_counts[key] = chunk_citation_counts.get(key, 0) + 1
+            else:
+                chunk_citation_counts["none"] = chunk_citation_counts.get("none", 0) + 1
+
+    if not scores:
+        return {"n": 0}
+
+    # Bucketed histogram. Endpoints get their own bucket because
+    # "all unsupported" (0.0) and "all supported" (1.0) are
+    # qualitatively different from "partial" — splitting them out
+    # surfaces those cases at a glance.
+    buckets: dict[str, int] = {
+        "0.0": 0,
+        "0.0-0.25": 0,
+        "0.25-0.5": 0,
+        "0.5-0.75": 0,
+        "0.75-1.0": 0,
+        "1.0": 0,
+    }
+    for s in scores:
+        if s == 0.0:
+            buckets["0.0"] += 1
+        elif s == 1.0:
+            buckets["1.0"] += 1
+        elif s < 0.25:
+            buckets["0.0-0.25"] += 1
+        elif s < 0.5:
+            buckets["0.25-0.5"] += 1
+        elif s < 0.75:
+            buckets["0.5-0.75"] += 1
+        else:
+            buckets["0.75-1.0"] += 1
+
+    score_summary = {
+        "n": len(scores),
+        "mean": round(statistics.fmean(scores), 3),
+        "median": round(statistics.median(scores), 3),
+        "stdev": round(statistics.stdev(scores), 3) if len(scores) > 1 else 0.0,
+        "min": round(min(scores), 3),
+        "max": round(max(scores), 3),
+        "score_distribution": buckets,
+    }
+    claims_summary = {
+        "total_extracted": total_claims,
+        "total_supported": total_supported,
+        "support_rate": round(total_supported / total_claims, 3) if total_claims > 0 else 0.0,
+        "mean_per_answer": round(statistics.fmean(claims_per_answer), 2)
+        if claims_per_answer
+        else 0.0,
+        "max_per_answer": max(claims_per_answer) if claims_per_answer else 0,
+        "n_no_claims_extracted": n_no_claims,
+        "n_parse_failures": n_parse_failed,
+    }
+    return {
+        "score": score_summary,
+        "claims": claims_summary,
+        "chunk_usage_distribution": chunk_citation_counts,
     }
 
 
@@ -459,8 +563,8 @@ def build_report(
     no_answer_records = [r for r in records if r.query.is_no_answer]
 
     if in_corpus_records:
-        aggregates["faithfulness"] = _aggregate_scores(in_corpus_records, "faithfulness")
-        aggregates["relevance"] = _aggregate_scores(in_corpus_records, "relevance")
+        aggregates["faithfulness"] = _aggregate_faithfulness_scores(in_corpus_records)
+        aggregates["relevance"] = _aggregate_relevance_scores(in_corpus_records)
         cits = [check_citations_grounded(r.answer) for r in in_corpus_records]
         aggregates["citation_check"] = {
             "n": len(cits),
@@ -589,10 +693,17 @@ def _print_summary(report: dict[str, Any]) -> None:
     print()
     print(f"=== {report['eval_set']} (n={report['eval_set_size']}) ===")
     agg = report["aggregates"]
-    if "faithfulness" in agg and agg["faithfulness"]["n"] > 0:
+    # Faithfulness now has nested {score, claims, chunk_usage_distribution}
+    # rather than flat {n, mean, anchor_distribution}. The claim-level
+    # support_rate is the most informative single number — fraction of
+    # all extracted claims that were attributed to a chunk.
+    if "faithfulness" in agg and "score" in agg["faithfulness"]:
+        sc = agg["faithfulness"]["score"]
+        cl = agg["faithfulness"]["claims"]
         print(
-            f"  faithfulness: mean={agg['faithfulness']['mean']:.3f}  "
-            f"parse-failures={agg['faithfulness'].get('n_parse_failures', 0)}"
+            f"  faithfulness: mean={sc['mean']:.3f}  median={sc['median']:.3f}  "
+            f"support={cl['total_supported']}/{cl['total_extracted']} claims "
+            f"({cl['support_rate']:.2f})  parse-failures={cl['n_parse_failures']}"
         )
     if "relevance" in agg and agg["relevance"]["n"] > 0:
         print(
