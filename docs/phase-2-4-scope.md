@@ -442,6 +442,54 @@ ship and stop here if priorities shift.
 ⏸️ **Block B pause point.** Phase 2's headline experimental result
 exists by the end of this block. Worth a journal coda.
 
+### Block B+ — Bakeoff investigation (added 2026-05-06)
+
+Block B's headline result was unexpected: the full hybrid+rerank
+pipeline flipped the strategy ranking — fixed-size chunking overtook
+recursive on rank-sensitive metrics, and recursive (the Phase 1
+winner) actually got *worse*. But ``--rerank`` enables BM25 + RRF +
+cross-encoder simultaneously, so the comparison conflates three
+additions. We can't tell whether the surprise is "rerank is bad for
+recursive," "BM25 fusion is bad for recursive," or "the eval
+over-retrieves more candidates than production would, and the
+cross-encoder gets noisy at scale." Each has different downstream
+implications.
+
+Block B+ ablates each addition and adds an independent eval set
+(structural queries) so we close out Phase 2's retrieval work with
+properly interpretable data.
+
+5+. `Update docs/phase-2-4-scope.md with Block B+ section` — formalize
+   the scope before implementing it.
+6+. `Replace --rerank with --pipeline {dense,hybrid,hybrid-rerank}` in
+   ``run_bakeoff.py``. Hybrid mode uses ``HybridRetriever`` without
+   the cross-encoder, isolating BM25 + RRF effect from the reranker
+   effect.
+7+. `Generate and commit structural eval set + add --eval-set flag` —
+   the structural query generator was committed in Phase 1 cleanup
+   but never run. Generate ~30 queries from doc headings, commit to
+   ``evaluations/eval_sets/structural.json``. Add
+   ``--eval-set {curated,structural}`` to ``run_bakeoff.py``.
+8+. `Run bakeoff in 6 configurations + commit reports` — 3 pipelines
+   × 2 eval sets. Reports go to ``evaluations/reports/`` with naming
+   ``bakeoff-<date>-<pipeline>-<eval-set>.json``. Also add
+   ``evaluations/README.md`` explaining the directory structure.
+9+. `Add bakeoff investigation analysis` —
+   ``evaluations/analyses/2026-05-06-bakeoff-investigation.md``
+   interpreting the 3×2 grid. Two possible outcomes:
+   - Result holds across all configurations → strong signal that
+     fixed-chunking + production pipeline really is best for this
+     corpus.
+   - Result reverses or attenuates somewhere → we know exactly which
+     addition (BM25 / fusion / rerank) flips the ranking, and on
+     which query distribution.
+   Either is a stronger story than the current "fixed wins, but I
+   can't tell you why."
+
+⏸️ **Block B+ pause point.** Phase 2 retrieval is properly understood
+by the end of this block. Block C (generation scaffolding) starts on
+trustworthy ground.
+
 ### Block C — Generation scaffolding
 
 10. `Add src/docsense/generation/types.py` — Answer, Citation,
