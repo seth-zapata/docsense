@@ -85,9 +85,9 @@ def _make_stub_generator(canned_text: str) -> Generator:
     config = GenerationConfig(model_name="test-model", device="cpu")
 
     class _StubGenerator(Generator):
-        def _run_inference(self, prompt: str) -> tuple[str, dict]:
-            # Capture the prompt for assertions in the test below.
-            self._last_prompt = prompt  # type: ignore[attr-defined]
+        def _run_inference(self, messages: list[dict[str, str]]) -> tuple[str, dict]:
+            # Capture the messages for assertions in the test below.
+            self._last_messages = messages  # type: ignore[attr-defined]
             return canned_text, {
                 "latency_ms": 100.0,
                 "prompt_tokens": 50,
@@ -108,7 +108,7 @@ class TestGenerationPipelineEndToEnd:
           → ContextAssembler.assemble (real)
           → context string + included chunks
           → PromptBuilder.build (real)
-          → prompt string
+          → list[dict] messages
           → Generator.generate (stubbed _run_inference)
           → typed Answer
     """
@@ -159,13 +159,16 @@ class TestGenerationPipelineEndToEnd:
         assert len(included) > 0
         assert context  # non-empty string
 
-        # Stage 4: build prompt
-        prompt = prompt_builder.build(query="how do I install transformers?", context=context)
-        assert "how do I install transformers?" in prompt
-        assert context in prompt
+        # Stage 4: build messages (chat-format) — the user's query and
+        # the assembled context land inside the user message.
+        messages = prompt_builder.build(query="how do I install transformers?", context=context)
+        # System + user, in order
+        assert [m["role"] for m in messages] == ["system", "user"]
+        assert "how do I install transformers?" in messages[1]["content"]
+        assert context in messages[1]["content"]
 
         # Stage 5: generate
-        answer = generator.generate(prompt, included)
+        answer = generator.generate(messages, included)
         assert isinstance(answer, Answer)
         assert answer.text == "To install, run pip install transformers [1]."
 
@@ -190,8 +193,8 @@ class TestGenerationPipelineEndToEnd:
             for r in retrieval_results
         ]
         context, included = assembler.assemble(chunk_refs)
-        prompt = prompt_builder.build(query="install", context=context)
-        answer = generator.generate(prompt, included)
+        messages = prompt_builder.build(query="install", context=context)
+        answer = generator.generate(messages, included)
 
         # The single citation [1] resolves to included[0] — i.e., the
         # first chunk that survived assembly, not necessarily the first
@@ -221,8 +224,8 @@ class TestGenerationPipelineEndToEnd:
             for r in results
         ]
         context, included = assembler.assemble(chunk_refs)
-        prompt = prompt_builder.build(query="query", context=context)
-        answer = generator.generate(prompt, included)
+        messages = prompt_builder.build(query="query", context=context)
+        answer = generator.generate(messages, included)
 
         # retrieved_chunks on the Answer is exactly the included list,
         # not the broader retrieval output.
@@ -250,18 +253,20 @@ class TestGenerationPipelineEndToEnd:
             for r in results
         ]
         context, included = assembler.assemble(chunk_refs)
-        prompt = prompt_builder.build(query="query", context=context)
-        answer = generator.generate(prompt, included)
+        messages = prompt_builder.build(query="query", context=context)
+        answer = generator.generate(messages, included)
 
         assert answer.metadata.model_name == "test-model"
         assert answer.metadata.latency_ms == 100.0
         assert answer.metadata.prompt_tokens == 50
         assert answer.metadata.completion_tokens == 20
 
-    def test_prompt_passed_to_llm_includes_assembled_context(self):
-        """The prompt string the generator runs inference on must contain
-        the assembled context. Verifies the wiring between PromptBuilder
-        output and Generator input — easy to break with a refactor."""
+    def test_messages_passed_to_llm_include_assembled_context(self):
+        """The messages list the generator runs inference on must contain
+        the assembled context inside the user message. Verifies the
+        wiring between PromptBuilder output and Generator input — easy
+        to break with a refactor that swaps args or drops the user
+        message."""
         hybrid, assembler, prompt_builder, generator = self._build_pipeline(
             canned_llm_text="ok",
             rerank_scores=[0.9, 0.5, 0.1],
@@ -278,13 +283,14 @@ class TestGenerationPipelineEndToEnd:
             for r in results
         ]
         context, included = assembler.assemble(chunk_refs)
-        prompt = prompt_builder.build(query="query", context=context)
-        generator.generate(prompt, included)
+        messages = prompt_builder.build(query="query", context=context)
+        generator.generate(messages, included)
 
-        # The stub captures the last prompt it saw; verify it contained
-        # the assembled context (the test would also catch e.g. a refactor
-        # that accidentally swapped query and context arguments).
-        last_prompt = generator._last_prompt  # type: ignore[attr-defined]
+        # The stub captures the last messages list it saw. Concatenate
+        # the user-message contents and verify all included chunk texts
+        # appear there.
+        last_messages = generator._last_messages  # type: ignore[attr-defined]
+        user_content = next(m["content"] for m in last_messages if m["role"] == "user")
         for chunk in included:
-            assert chunk.text in last_prompt
-        assert "Question: query" in last_prompt
+            assert chunk.text in user_content
+        assert "Question: query" in user_content

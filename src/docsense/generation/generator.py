@@ -8,8 +8,11 @@ without dragging the model into the test process:
   HuggingFace components on first use. Tests that don't need real
   inference can avoid the cost entirely by overriding ``_run_inference``
   directly.
-- ``_run_inference(prompt) -> (text, raw_metadata)`` is the override
-  point. Production runs through HuggingFace; tests stub a fixed string
+- ``_run_inference(messages) -> (text, raw_metadata)`` is the override
+  point. Production runs through HuggingFace via
+  ``tokenizer.apply_chat_template`` (so the chat formatting is
+  model-specific but the input shape stays the same — Qwen, Llama,
+  Mistral all work via the same code path); tests stub a fixed string
   and a fake latency.
 - ``parse_citations()`` turns ``[N]`` notation in the generated text into
   ``Citation`` objects pointing back at the chunks the LLM saw.
@@ -95,16 +98,36 @@ class Generator:
             self._tokenizer = AutoTokenizer.from_pretrained(self.config.model_name)
         return self._tokenizer
 
-    def _run_inference(self, prompt: str) -> tuple[str, dict]:
+    def _run_inference(self, messages: list[dict[str, str]]) -> tuple[str, dict]:
         """Run the LLM and return ``(generated_text, raw_metadata)``.
+
+        ``messages`` is the chat-format list produced by
+        ``PromptBuilder.build()`` — ``[{"role": "system", ...},
+        {"role": "user", ...}]``. The tokenizer's
+        ``apply_chat_template(..., add_generation_prompt=True)`` renders
+        them into the model-specific format (Qwen's ``<|im_start|>``,
+        Llama's ``<|begin_of_text|>``, Mistral's ``[INST]``) before
+        tokenization. This means the same Generator works against any
+        Instruct-tuned model whose tokenizer ships a chat template.
 
         Tests override this method to inject a canned response without
         loading a real model. ``raw_metadata`` carries latency and token
         counts that flow into ``GenerationMetadata``.
         """
-        # transformers' tokenizer overload returns a BatchEncoding whose
-        # __getitem__ types as Any; the .shape access is correct at runtime.
-        inputs = self.tokenizer(prompt, return_tensors="pt")
+        # apply_chat_template returns a BatchEncoding when return_dict=True,
+        # which is what we want so model.generate gets attention_mask in
+        # addition to input_ids. cast: transformers' stub overloads return
+        # too broad a union to narrow statically.
+        inputs = cast(
+            "Any",
+            self.tokenizer.apply_chat_template(
+                messages,
+                add_generation_prompt=True,
+                tokenize=True,
+                return_tensors="pt",
+                return_dict=True,
+            ),
+        )
         input_token_count = int(inputs["input_ids"].shape[1])
 
         start = time.perf_counter()
@@ -133,16 +156,17 @@ class Generator:
             "completion_tokens": completion_token_count,
         }
 
-    def generate(self, prompt: str, retrieved_chunks: list[ChunkRef]) -> Answer:
+    def generate(self, messages: list[dict[str, str]], retrieved_chunks: list[ChunkRef]) -> Answer:
         """Run inference, parse citations, and return a typed Answer.
 
-        ``retrieved_chunks`` is the list the context-assembly stage chose to
-        actually pass to the LLM (i.e., the prefix that fit within the
+        ``messages`` is the chat-format list from ``PromptBuilder.build()``.
+        ``retrieved_chunks`` is the list the context-assembly stage chose
+        to actually pass to the LLM (i.e., the prefix that fit within the
         token budget). Citations are resolved against this list, and the
         chunks themselves are stored on the returned ``Answer`` so the
         caller can audit context independently of retrieval.
         """
-        text, raw = self._run_inference(prompt)
+        text, raw = self._run_inference(messages)
         citations = parse_citations(text, retrieved_chunks)
         metadata = GenerationMetadata(
             model_name=self.config.model_name,
