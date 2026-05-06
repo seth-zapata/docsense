@@ -234,7 +234,7 @@ class LoRAFineTuner:
             eval_strategy=self.config.eval_strategy,
             logging_steps=self.config.logging_steps,
             seed=self.config.seed,
-            bf16=True,
+            bf16=self.config.bf16,
             report_to=[],
             packing=False,
             assistant_only_loss=True,
