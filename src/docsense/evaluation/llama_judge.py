@@ -11,24 +11,39 @@ hook":
   goes through ``tokenizer.apply_chat_template(...)`` so the prompt
   format is whatever Llama 3.1 ships with; tests stub a canned string.
 
-**Faithfulness** uses RAGAS-style claim-level decomposition with
-per-chunk attribution (replaced the absolute-scale anchor approach
-2026-05-06 after the baseline showed 49 of 50 in-corpus answers
-clustering at 0.75). Two LLM calls per query:
+**Output parsing (added 2026-05-06 in PR C.2):** every judge prompt
+asks for JSON output, and parsing goes through pydantic schemas
+(``_ClaimsResponse``, ``_AttributionsResponse``, ``_RelevanceResponse``,
+``_RefusalResponse``). The ``_call_with_json_retry`` helper does one
+retry on parse failure with a clarifying message. Replaces the prior
+regex-based parsing — eliminates the ``curated_001`` 8/8 PARSE_FAILED
+edge case that appeared when LLM output drifted from the regex format.
+The judge is *our* tool; we own the format; structured output is the
+right tool when we own the format.
 
-1. ``extract_claims(answer)`` — decompose into atomic factual claims.
-2. ``attribute_claims_to_chunks(claims, chunks)`` — for each claim,
-   identify which chunk supports it (or ``None``).
+**Faithfulness** uses RAGAS-style claim-level decomposition with
+per-chunk attribution. Two LLM calls per query:
+
+1. ``extract_claims(question, answer)`` — decompose into atomic
+   factual claims via ``_ClaimsResponse``.
+2. ``attribute_claims_to_chunks(claims, chunks)`` — single batched
+   call. For each claim, the judge returns a chunk index or ``null``
+   in ``_AttributionsResponse.attributions``.
 
 Aggregate: ``score = n_supported / n_total`` in ``[0, 1]``,
 continuous (no anchor snapping). Per-claim attributions are
 preserved on the JudgeScore so reports carry grounded evidence.
 
-**Relevance** still uses the absolute-scale anchor approach
-(0.0 / 0.25 / 0.5 / 0.75 / 1.0). Relevance had healthier spread in
-the baseline (3 queries at 0.25, 4 at 1.0 on structural) and
-"does the answer address the question?" doesn't naturally
-decompose into claims the way faithfulness does.
+**Relevance** uses the absolute-scale anchor approach
+(0.0 / 0.25 / 0.5 / 0.75 / 1.0). The score field on
+``_RelevanceResponse`` is constrained to ``[0, 1]``; the
+post-processor snaps to the nearest anchor (so an LLM-emitted 0.7
+becomes 0.75 silently rather than triggering retry).
+
+**Refusal** ( ``judge_refusal``) returns a ``RefusalJudgment(refused:
+bool, rationale: str)`` from the ``_RefusalResponse`` schema. Used
+on off-corpus queries; runs alongside the rule-based regex check
+(see ``run_judging_phase``) for cross-validation.
 """
 
 from __future__ import annotations
@@ -164,21 +179,6 @@ class _RefusalResponse(BaseModel):
     rationale: str
 
 
-# Tolerant of the model dropping the colon, putting the number inline
-# with text, or emitting a leading-dot decimal like ".75". Anchored to
-# avoid catching numbers inside the rationale.
-_SCORE_RE = re.compile(
-    r"SCORE\s*:?\s*([01](?:\.\d+)?|\.\d+)",
-    re.IGNORECASE,
-)
-# Captures everything from "RATIONALE:" to the next blank line or end
-# of string. DOTALL so multi-line rationales are kept.
-_RATIONALE_RE = re.compile(
-    r"RATIONALE\s*:?\s*(.+?)(?=\n\s*\n|\Z)",
-    re.IGNORECASE | re.DOTALL,
-)
-
-
 # --- Faithfulness: claim extraction -----------------------------------
 
 _EXTRACT_CLAIMS_SYSTEM = (
@@ -193,44 +193,13 @@ _EXTRACT_CLAIMS_SYSTEM = (
     "- The default cache directory is ~/.cache/huggingface.\n"
     "- Setting trust_remote_code=True allows execution of custom "
     "model code.\n\n"
-    "Output one claim per line as a numbered list:\n"
-    "1. <claim 1>\n"
-    "2. <claim 2>\n"
-    "...\n\n"
-    "If the answer contains no factual claims (e.g., it's a refusal, "
-    "or purely a code example with no surrounding statements), "
-    "output exactly: NO_CLAIMS"
+    "Respond with ONLY a JSON object matching this schema (no other "
+    "text, no markdown fences):\n"
+    '{"claims": ["<claim 1>", "<claim 2>", ...]}\n\n'
+    "If the answer has no factual claims (e.g., it's a refusal or "
+    'purely a code example), respond with: {"claims": []}'
 )
 _EXTRACT_CLAIMS_USER_TEMPLATE = "QUESTION:\n{question}\n\nANSWER:\n{answer}"
-
-# Numbered-list line: "<num>. <claim>". Multiline mode so ^ matches
-# each line. The (?:.|\n(?!\d+\.|\Z))* trick lets a claim span lines
-# until the next numbered item or end of string — handles claims that
-# wrap mid-sentence.
-_CLAIM_LINE_RE = re.compile(
-    r"^\s*(\d+)\.\s*(.+?)(?=\n\s*\d+\.|\Z)",
-    re.MULTILINE | re.DOTALL,
-)
-
-
-def parse_claims(text: str) -> list[str]:
-    """Extract claims from the LLM's claim-extraction output.
-
-    Returns an empty list if the model emitted ``NO_CLAIMS`` (its
-    sentinel for "answer has no factual content"). Otherwise returns
-    a list of claim texts in numerical order. The numbered prefixes
-    are stripped; whitespace is trimmed.
-
-    Robust to:
-    - Multi-line claims (whitespace between numbered items)
-    - Out-of-order numbering (still returns claims in document order)
-    - Missing trailing period or other punctuation
-    - Leading/trailing whitespace per claim
-    """
-    if re.search(r"\bNO_CLAIMS\b", text, re.IGNORECASE):
-        return []
-    matches = _CLAIM_LINE_RE.findall(text)
-    return [claim.strip() for _, claim in matches if claim.strip()]
 
 
 # --- Faithfulness: claim attribution ----------------------------------
@@ -241,94 +210,80 @@ _ATTRIBUTE_CLAIMS_SYSTEM = (
     '"supported by chunk N" if the chunk\'s content provides evidence '
     "for the claim via reasonable inference. Direct quotation is not "
     "required — paraphrasing and reasonable inference are fine. If no "
-    'chunk supports the claim, output "none".\n\n'
-    "Output ONE LINE PER CLAIM in this exact format:\n"
-    "CLAIM <i>: chunk <chunk_idx> | RATIONALE: <one short sentence>\n"
-    "or\n"
-    "CLAIM <i>: none | RATIONALE: <one short sentence>\n\n"
-    "Output the claims in numerical order. Do not output anything else."
+    "chunk supports the claim, set supporting_chunk_idx to null.\n\n"
+    "Respond with ONLY a JSON object matching this schema (no other "
+    "text, no markdown fences):\n"
+    "{\n"
+    '  "attributions": [\n'
+    '    {"claim_idx": <int, 1-indexed>, '
+    '"supporting_chunk_idx": <int 1..K or null>, '
+    '"rationale": "<one short sentence>"},\n'
+    "    ...\n"
+    "  ]\n"
+    "}\n\n"
+    "Output one entry per claim, in numerical order. claim_idx values "
+    "must match the numbered claims you were given."
 )
 
 _ATTRIBUTE_CLAIMS_USER_TEMPLATE = "CHUNKS:\n{chunks_block}\n\nCLAIMS:\n{claims_block}"
 
-# "CLAIM 3: chunk 2 | RATIONALE: ..." — captures claim index, the
-# chunk index (or "none"), and the optional rationale that follows
-# the pipe. Tolerant of the rationale being missing.
-_ATTRIBUTION_LINE_RE = re.compile(
-    r"^\s*CLAIM\s+(\d+)\s*:?\s*(?:chunk\s+(\d+)|(none))\s*"
-    r"(?:\|\s*RATIONALE\s*:?\s*(.+?))?\s*$",
-    re.MULTILINE | re.IGNORECASE,
-)
 
+def _post_process_attributions(
+    response: _AttributionsResponse | None,
+    claims: list[str],
+    n_chunks: int,
+) -> list[ClaimAttribution]:
+    """Convert a parsed _AttributionsResponse into ClaimAttribution per claim.
 
-def parse_claim_attributions(text: str, claims: list[str], n_chunks: int) -> list[ClaimAttribution]:
-    """Parse the LLM's per-claim attribution output into ClaimAttribution objects.
+    Validates that:
+    - Every input claim has an attribution. Missing attributions get
+      a ``PARSE_FAILED`` marker on the rationale.
+    - ``supporting_chunk_idx`` is in ``[1, n_chunks]``. Out-of-range
+      values get an ``OUT_OF_RANGE`` marker (and supporting_chunk_idx
+      is set to None — the LLM hallucinated a chunk that doesn't
+      exist).
+    - Extra attributions for claim_idx values we didn't ask about
+      are silently ignored.
 
-    Returns one ClaimAttribution per claim in ``claims``, in order.
-    For each claim:
-    - If the LLM output a parseable line with a chunk index in
-      ``[1, n_chunks]``, ``supporting_chunk_idx`` is populated.
-    - If the LLM said "none" or the chunk index was out of range,
-      ``supporting_chunk_idx`` is ``None``.
-    - If the LLM omitted the line for this claim entirely (parse
-      failure), ``supporting_chunk_idx`` is ``None`` and the
-      rationale carries a ``PARSE_FAILED`` marker.
-
-    Returning a typed result for every input claim — rather than
-    raising — keeps the eval loop robust. Parse failures show up in
-    the per-claim data on the report so a reviewer can spot which
-    queries to recheck.
+    If ``response`` is ``None`` (parse failure after retry), every
+    claim gets a ``PARSE_FAILED`` marker — same end-state as the
+    prior regex parser.
     """
-    # Index the LLM's output by claim_idx for direct lookup.
-    by_idx: dict[int, tuple[str | None, str | None]] = {}
-    for match in _ATTRIBUTION_LINE_RE.finditer(text):
-        claim_idx = int(match.group(1))
-        chunk_idx_str = match.group(2)
-        none_marker = match.group(3)
-        rationale = match.group(4)
-        rationale_clean = rationale.strip() if rationale else None
-        if none_marker is not None:
-            by_idx[claim_idx] = (None, rationale_clean)
-        elif chunk_idx_str is not None:
-            by_idx[claim_idx] = (chunk_idx_str, rationale_clean)
+    if response is None:
+        return [
+            ClaimAttribution(
+                claim_idx=i,
+                claim_text=claim_text,
+                supporting_chunk_idx=None,
+                rationale="PARSE_FAILED: judge response did not produce valid JSON",
+            )
+            for i, claim_text in enumerate(claims, start=1)
+        ]
 
+    by_idx: dict[int, _AttributionEntry] = {a.claim_idx: a for a in response.attributions}
     results: list[ClaimAttribution] = []
     for i, claim_text in enumerate(claims, start=1):
-        if i not in by_idx:
+        entry = by_idx.get(i)
+        if entry is None:
             results.append(
                 ClaimAttribution(
                     claim_idx=i,
                     claim_text=claim_text,
                     supporting_chunk_idx=None,
-                    rationale=f"PARSE_FAILED: no attribution line for claim {i}",
+                    rationale=f"PARSE_FAILED: no attribution for claim {i}",
                 )
             )
             continue
 
-        chunk_str, rationale = by_idx[i]
-        if chunk_str is None:
-            # Explicit "none" from the model.
-            results.append(
-                ClaimAttribution(
-                    claim_idx=i,
-                    claim_text=claim_text,
-                    supporting_chunk_idx=None,
-                    rationale=rationale,
-                )
-            )
-            continue
-
-        chunk_idx = int(chunk_str)
-        if chunk_idx < 1 or chunk_idx > n_chunks:
-            # Out-of-range index — model hallucinated a chunk number
-            # that doesn't exist. Treat as unsupported and flag it.
+        chunk_idx = entry.supporting_chunk_idx
+        if chunk_idx is not None and (chunk_idx < 1 or chunk_idx > n_chunks):
             note = f"OUT_OF_RANGE: chunk {chunk_idx} not in [1, {n_chunks}]"
             results.append(
                 ClaimAttribution(
                     claim_idx=i,
                     claim_text=claim_text,
                     supporting_chunk_idx=None,
-                    rationale=f"{note}. {rationale}" if rationale else note,
+                    rationale=f"{note}. {entry.rationale}" if entry.rationale else note,
                 )
             )
             continue
@@ -338,7 +293,7 @@ def parse_claim_attributions(text: str, claims: list[str], n_chunks: int) -> lis
                 claim_idx=i,
                 claim_text=claim_text,
                 supporting_chunk_idx=chunk_idx,
-                rationale=rationale,
+                rationale=entry.rationale,
             )
         )
     return results
@@ -358,9 +313,10 @@ _RELEVANCE_SYSTEM = (
     "- 0.5: Partially answers; misses key parts of the question.\n"
     "- 0.25: Mostly off-topic; only minor relevance.\n"
     "- 0.0: Does not address the question.\n\n"
-    "Respond in EXACTLY this format and nothing else:\n"
-    "SCORE: <one of 0.0, 0.25, 0.5, 0.75, 1.0>\n"
-    "RATIONALE: <one or two sentences explaining the score>"
+    "Respond with ONLY a JSON object matching this schema (no other "
+    "text, no markdown fences):\n"
+    '{"score": <one of 0.0, 0.25, 0.5, 0.75, 1.0>, '
+    '"rationale": "<one or two sentences explaining the score>"}'
 )
 
 _RELEVANCE_USER_TEMPLATE = "QUESTION:\n{question}\n\nANSWER:\n{answer}"
@@ -405,39 +361,22 @@ _REFUSAL_SYSTEM = (
 
 _REFUSAL_USER_TEMPLATE = "QUESTION:\n{question}\n\nANSWER:\n{answer}"
 
-# "REFUSED: yes" or "REFUSED: no" — case-insensitive, optional colon.
-_REFUSAL_RE = re.compile(
-    r"REFUSED\s*:?\s*(yes|no|y|n|true|false)\b",
-    re.IGNORECASE,
-)
 
+def _post_process_refusal(response: _RefusalResponse | None) -> RefusalJudgment:
+    """Convert a parsed _RefusalResponse into a RefusalJudgment.
 
-def parse_refusal_response(text: str) -> RefusalJudgment:
-    """Extract REFUSED yes/no + RATIONALE from the refusal-judge response.
-
-    Falls back to ``refused=False`` on parse failure. The conservative
-    default is intentional: a parse failure shouldn't accidentally
-    flag a confabulated answer as a refusal — that would silently
-    inflate the refusal rate. The rationale carries a PARSE_FAILED
-    marker so reviewers can spot the cases.
+    Falls back to ``refused=False`` on parse failure (after retry).
+    Same conservative default as the prior regex parser: a parse
+    failure shouldn't accidentally inflate the refusal rate by
+    classifying a confabulated answer as a refusal. The PARSE_FAILED
+    marker on the rationale flags the case for review.
     """
-    match = _REFUSAL_RE.search(text)
-    if match is None:
+    if response is None:
         return RefusalJudgment(
             refused=False,
-            rationale=f"PARSE_FAILED: no REFUSED verdict in response. Raw: {text[:200]!r}",
+            rationale="PARSE_FAILED: judge response did not produce valid JSON",
         )
-
-    verdict = match.group(1).lower()
-    refused = verdict in ("yes", "y", "true")
-
-    rationale_match = _RATIONALE_RE.search(text)
-    rationale = (
-        rationale_match.group(1).strip()
-        if rationale_match is not None
-        else "(no RATIONALE produced)"
-    )
-    return RefusalJudgment(refused=refused, rationale=rationale)
+    return RefusalJudgment(refused=response.refused, rationale=response.rationale)
 
 
 def _snap_to_anchor(raw: float) -> float:
@@ -453,34 +392,43 @@ def _snap_to_anchor(raw: float) -> float:
     return min(_RELEVANCE_ANCHORS, key=lambda a: abs(a - clamped))
 
 
-def parse_relevance_response(text: str, metric: JudgeMetric = "relevance") -> JudgeScore:
-    """Extract SCORE and RATIONALE from the relevance judge's response.
+def _post_process_relevance(
+    response: _RelevanceResponse | None, metric: JudgeMetric = "relevance"
+) -> JudgeScore:
+    """Convert a parsed _RelevanceResponse into a JudgeScore.
 
-    Robust to: missing colon, lowercase keys, leading-dot decimals,
-    multi-line rationales. Out-of-range scores (e.g., "SCORE: 5.0")
-    fall through to the parse-failure path rather than being clamped
-    silently — an LLM that ignored the [0, 1] scale should be flagged
-    for review, not have its bad output coerced.
+    Snaps the raw score to the nearest five-anchor value
+    (0.0/0.25/0.5/0.75/1.0). Even with JSON output the LLM may emit
+    an off-anchor value like 0.7 — that's a "model meant 0.75" case,
+    not a parse failure, so we snap silently.
+
+    Falls back to ``score=0.0`` with a ``PARSE_FAILED`` marker if
+    ``response`` is ``None`` (parse failure after retry). Same
+    end-state as the prior regex parser.
     """
-    score_match = _SCORE_RE.search(text)
-    if score_match is None:
+    if response is None:
         return JudgeScore(
             metric=metric,
             score=0.0,
-            rationale=f"PARSE_FAILED: no SCORE in response. Raw: {text[:200]!r}",
+            rationale="PARSE_FAILED: judge response did not produce valid JSON",
         )
+    snapped = _snap_to_anchor(response.score)
+    return JudgeScore(metric=metric, score=snapped, rationale=response.rationale)
 
-    raw_score = float(score_match.group(1))
-    score = _snap_to_anchor(raw_score)
 
-    rationale_match = _RATIONALE_RE.search(text)
-    rationale = (
-        rationale_match.group(1).strip()
-        if rationale_match is not None
-        else "(no RATIONALE produced)"
-    )
+def _post_process_claims(response: _ClaimsResponse | None) -> list[str]:
+    """Convert a parsed _ClaimsResponse into a list of claim strings.
 
-    return JudgeScore(metric=metric, score=score, rationale=rationale)
+    Empty list signals "no factual claims" (e.g., refusal). ``None``
+    signals parse failure — propagated as empty list since the caller
+    (judge_faithfulness) treats both the same way (skips attribution).
+    The score-level rationale on the caller's JudgeScore distinguishes
+    "no claims to extract" (NO_CLAIMS_EXTRACTED) from "parse failure"
+    (PARSE_FAILED).
+    """
+    if response is None:
+        return []
+    return [c.strip() for c in response.claims if c.strip()]
 
 
 def _format_chunks_for_attribution(chunks: list[ChunkRef]) -> str:
@@ -610,14 +558,57 @@ class LlamaJudge(LLMJudge):
         completion_ids = output_ids[0][input_token_count:]
         return cast("str", self.tokenizer.decode(completion_ids, skip_special_tokens=True))
 
+    _RETRY_REMINDER = (
+        "Your previous response was not valid JSON matching the "
+        "requested schema. Please respond with ONLY the JSON object. "
+        "Do not include any other text, explanations, or markdown "
+        "code fences."
+    )
+
+    def _call_with_json_retry[T: BaseModel](
+        self,
+        messages: list[dict[str, str]],
+        schema: type[T],
+        *,
+        max_new_tokens: int | None = None,
+    ) -> T | None:
+        """Single LLM call + JSON parse + one retry on parse failure.
+
+        Returns the validated pydantic instance, or ``None`` if both
+        the initial call and the retry fail to produce parseable
+        output. The caller's post-processing layer (`_post_process_*`)
+        handles the None case by emitting a `PARSE_FAILED` marker.
+
+        The retry appends the assistant's first response and a
+        clarifying user message to the conversation, asking for the
+        JSON-only output again. This catches the most common failure
+        mode (LLM added a prose preamble or wrapped in fences in a
+        way `_extract_json_block` couldn't handle) without spending
+        more than one extra LLM call.
+        """
+        text = self._run_inference(messages, max_new_tokens=max_new_tokens)
+        parsed = _parse_json_response(text, schema)
+        if parsed is not None:
+            return parsed
+
+        retry_messages = [
+            *messages,
+            {"role": "assistant", "content": text},
+            {"role": "user", "content": self._RETRY_REMINDER},
+        ]
+        retry_text = self._run_inference(retry_messages, max_new_tokens=max_new_tokens)
+        return _parse_json_response(retry_text, schema)
+
     def extract_claims(self, question: str, answer: str) -> list[str]:
         """LLM call 1 of faithfulness: decompose the answer into claims.
 
-        Single LLM call. Returns the claims as a list of strings; an
-        empty list signals the model emitted ``NO_CLAIMS`` (e.g., the
-        answer was a refusal or pure code with no factual statements).
-        Public so eval drivers and tests can call it directly without
-        going through the full faithfulness flow.
+        Single LLM call (with one retry on JSON parse failure).
+        Returns the claims as a list of strings. An empty list
+        signals either the model emitted ``{"claims": []}`` (refusal
+        or pure-code answer with no factual content) OR a parse
+        failure after retry. ``judge_faithfulness`` distinguishes
+        these via the score-level rationale on the resulting
+        JudgeScore.
         """
         messages = [
             {"role": "system", "content": _EXTRACT_CLAIMS_SYSTEM},
@@ -626,25 +617,30 @@ class LlamaJudge(LLMJudge):
                 "content": _EXTRACT_CLAIMS_USER_TEMPLATE.format(question=question, answer=answer),
             },
         ]
-        text = self._run_inference(messages, max_new_tokens=self._EXTRACTION_MAX_TOKENS)
-        return parse_claims(text)
+        response = self._call_with_json_retry(
+            messages, _ClaimsResponse, max_new_tokens=self._EXTRACTION_MAX_TOKENS
+        )
+        return _post_process_claims(response)
 
     def attribute_claims_to_chunks(
         self, claims: list[str], chunks: list[ChunkRef]
     ) -> list[ClaimAttribution]:
         """LLM call 2 of faithfulness: attribute each claim to a chunk.
 
-        Single batched LLM call covering all claims at once — N×K
-        verification scaling collapses to a single inference. Returns
-        one ClaimAttribution per claim, in input order. Out-of-range
-        chunk indices and missing attribution lines are surfaced as
-        ``supporting_chunk_idx=None`` with a marker in the rationale.
+        Single batched LLM call (with one retry on JSON parse
+        failure) covering all claims at once — N×K verification
+        scaling collapses to a single inference. Returns one
+        ClaimAttribution per claim, in input order. Out-of-range
+        chunk indices and missing attribution entries are surfaced as
+        ``supporting_chunk_idx=None`` with a marker in the rationale
+        (``PARSE_FAILED`` for missing entries, ``OUT_OF_RANGE`` for
+        chunk indices outside ``[1, n_chunks]``).
 
         Uses a much larger ``max_new_tokens`` than the default config —
-        attribution output scales linearly with claim count (~75 tokens
-        per attribution line), and the default 256-token cap was
-        silently truncating output on long answers. See the class-level
-        ``_ATTRIBUTION_MAX_TOKENS`` constant for sizing rationale.
+        attribution output scales linearly with claim count
+        (~75 tokens per JSON entry), and the default 256-token cap
+        was silently truncating output on long answers. See the
+        class-level ``_ATTRIBUTION_MAX_TOKENS`` constant for sizing.
 
         Empty ``claims`` returns an empty list without invoking the
         LLM (no work to do).
@@ -661,8 +657,10 @@ class LlamaJudge(LLMJudge):
                 ),
             },
         ]
-        text = self._run_inference(messages, max_new_tokens=self._ATTRIBUTION_MAX_TOKENS)
-        return parse_claim_attributions(text, claims=claims, n_chunks=len(chunks))
+        response = self._call_with_json_retry(
+            messages, _AttributionsResponse, max_new_tokens=self._ATTRIBUTION_MAX_TOKENS
+        )
+        return _post_process_attributions(response, claims=claims, n_chunks=len(chunks))
 
     def judge_faithfulness(self, question: str, chunks: list[ChunkRef], answer: str) -> JudgeScore:
         """RAGAS-style claim-level faithfulness with per-chunk attribution.
@@ -711,6 +709,7 @@ class LlamaJudge(LLMJudge):
         )
 
     def judge_relevance(self, question: str, answer: str) -> JudgeScore:
+        """Score relevance on the 5-anchor scale via JSON output."""
         messages = [
             {"role": "system", "content": _RELEVANCE_SYSTEM},
             {
@@ -718,15 +717,16 @@ class LlamaJudge(LLMJudge):
                 "content": _RELEVANCE_USER_TEMPLATE.format(question=question, answer=answer),
             },
         ]
-        text = self._run_inference(messages)
-        return parse_relevance_response(text, "relevance")
+        response = self._call_with_json_retry(messages, _RelevanceResponse)
+        return _post_process_relevance(response, "relevance")
 
     def judge_refusal(self, question: str, answer: str) -> RefusalJudgment:
         """Decide whether ``answer`` indicates context-unavailability refusal.
 
-        Single LLM call. Output format is ``REFUSED: yes/no`` plus a
-        one-sentence RATIONALE. Default JudgeConfig.max_new_tokens (256)
-        is plenty — the response is at most ~50 tokens.
+        Single LLM call (with one retry on JSON parse failure). Output
+        format is a JSON object ``{"refused": bool, "rationale": str}``
+        — small response, default JudgeConfig.max_new_tokens (256)
+        is plenty.
 
         Replaces the regex-based ``check_no_answer_behavior`` heuristic
         as the primary measurement. The rule-based check is still run
@@ -741,5 +741,5 @@ class LlamaJudge(LLMJudge):
                 "content": _REFUSAL_USER_TEMPLATE.format(question=question, answer=answer),
             },
         ]
-        text = self._run_inference(messages)
-        return parse_refusal_response(text)
+        response = self._call_with_json_retry(messages, _RefusalResponse)
+        return _post_process_refusal(response)

@@ -17,13 +17,13 @@ from docsense.evaluation.llama_judge import (
     _ClaimsResponse,
     _extract_json_block,
     _parse_json_response,
+    _post_process_attributions,
+    _post_process_claims,
+    _post_process_refusal,
+    _post_process_relevance,
     _RefusalResponse,
     _RelevanceResponse,
     _snap_to_anchor,
-    parse_claim_attributions,
-    parse_claims,
-    parse_refusal_response,
-    parse_relevance_response,
 )
 from docsense.generation.types import ChunkRef
 
@@ -208,193 +208,161 @@ class TestSnapToAnchor:
 
 
 # --------------------------------------------------------------------
-# Relevance parser (unchanged behavior, renamed function)
+# Post-processing helpers (replace the old regex parsers)
 # --------------------------------------------------------------------
 
 
-class TestParseRelevanceResponse:
-    def test_clean_response(self):
-        text = "SCORE: 0.75\nRATIONALE: directly addresses the question"
-        score = parse_relevance_response(text, "relevance")
-        assert score.score == 0.75
-        assert "directly addresses" in score.rationale
+class TestPostProcessClaims:
+    def test_extracts_claim_strings(self):
+        response = _ClaimsResponse(claims=["alpha", "beta", "gamma"])
+        assert _post_process_claims(response) == ["alpha", "beta", "gamma"]
 
-    def test_lowercase_keys_accepted(self):
-        text = "score: 1.0\nrationale: spot on"
-        score = parse_relevance_response(text, "relevance")
-        assert score.score == 1.0
+    def test_strips_whitespace(self):
+        response = _ClaimsResponse(claims=["  padded  ", "\tindented", "trailing\n"])
+        assert _post_process_claims(response) == ["padded", "indented", "trailing"]
 
-    def test_off_anchor_value_snapped(self):
-        text = "SCORE: 0.7\nRATIONALE: pretty good"
-        score = parse_relevance_response(text, "relevance")
-        assert score.score == 0.75
+    def test_drops_empty_claims(self):
+        """If the LLM emits {"claims": ["valid", "", " "]}, drop the
+        whitespace-only entries — they're not real claims."""
+        response = _ClaimsResponse(claims=["valid claim", "", "   "])
+        assert _post_process_claims(response) == ["valid claim"]
 
-    def test_no_score_returns_parse_failure(self):
-        text = "Sorry, I don't know how to answer this."
-        score = parse_relevance_response(text, "relevance")
-        assert score.score == 0.0
-        assert "PARSE_FAILED" in score.rationale
+    def test_empty_claims_list_passes_through(self):
+        """Empty list signals 'no factual claims' — pass through, not
+        the same as parse failure."""
+        response = _ClaimsResponse(claims=[])
+        assert _post_process_claims(response) == []
 
-    def test_score_present_but_no_rationale(self):
-        text = "SCORE: 1.0"
-        score = parse_relevance_response(text, "relevance")
-        assert score.score == 1.0
-        assert "no RATIONALE" in score.rationale
-
-    def test_obviously_invalid_score_flagged(self):
-        text = "SCORE: 5.0\nRATIONALE: out of range"
-        score = parse_relevance_response(text, "relevance")
-        assert score.score == 0.0
-        assert "PARSE_FAILED" in score.rationale
+    def test_parse_failure_returns_empty_list(self):
+        """None response (parse failure after retry) → empty list.
+        judge_faithfulness distinguishes from intentional empty via
+        the rationale on the resulting JudgeScore (NO_CLAIMS_EXTRACTED
+        marker applies in both cases since downstream behavior is
+        the same)."""
+        assert _post_process_claims(None) == []
 
 
-# --------------------------------------------------------------------
-# Claim extraction parser
-# --------------------------------------------------------------------
-
-
-class TestParseClaims:
-    def test_clean_numbered_list(self):
-        text = (
-            "1. AutoModel.from_pretrained accepts a model name.\n"
-            "2. The default cache is ~/.cache/huggingface.\n"
-            "3. trust_remote_code=True allows custom model code execution."
+class TestPostProcessAttributions:
+    def test_clean_response_one_per_claim(self):
+        response = _AttributionsResponse(
+            attributions=[
+                _AttributionEntry(claim_idx=1, supporting_chunk_idx=2, rationale="found in 2"),
+                _AttributionEntry(claim_idx=2, supporting_chunk_idx=None, rationale="no chunk"),
+                _AttributionEntry(
+                    claim_idx=3, supporting_chunk_idx=1, rationale="paraphrased in 1"
+                ),
+            ]
         )
-        claims = parse_claims(text)
-        assert len(claims) == 3
-        assert "AutoModel.from_pretrained" in claims[0]
-        assert "trust_remote_code" in claims[2]
-
-    def test_no_claims_sentinel(self):
-        """Refusal answers / pure code should produce empty claims list."""
-        assert parse_claims("NO_CLAIMS") == []
-        assert parse_claims("There are no claims to extract.\n\nNO_CLAIMS") == []
-        assert parse_claims("no_claims") == []  # case-insensitive
-
-    def test_multiline_claim(self):
-        """A claim that wraps to a second line should be captured whole."""
-        text = (
-            "1. AutoModel.from_pretrained accepts either a model name from\n"
-            "the HuggingFace Hub or a local directory path.\n"
-            "2. The cache directory defaults to ~/.cache/huggingface."
-        )
-        claims = parse_claims(text)
-        assert len(claims) == 2
-        assert "local directory path" in claims[0]
-
-    def test_empty_input(self):
-        assert parse_claims("") == []
-
-    def test_handles_extra_whitespace(self):
-        text = "  1.   leading whitespace claim   \n  2.   another   "
-        claims = parse_claims(text)
-        assert len(claims) == 2
-        assert claims[0] == "leading whitespace claim"
-
-
-# --------------------------------------------------------------------
-# Claim attribution parser
-# --------------------------------------------------------------------
-
-
-class TestParseClaimAttributions:
-    def test_clean_attribution(self):
-        text = (
-            "CLAIM 1: chunk 2 | RATIONALE: chunk 2 directly states this.\n"
-            "CLAIM 2: none | RATIONALE: no chunk discusses this point.\n"
-            "CLAIM 3: chunk 1 | RATIONALE: chunk 1 paraphrases the same idea."
-        )
-        attrs = parse_claim_attributions(text, claims=["a", "b", "c"], n_chunks=3)
+        attrs = _post_process_attributions(response, claims=["a", "b", "c"], n_chunks=3)
         assert len(attrs) == 3
         assert attrs[0].supporting_chunk_idx == 2
         assert attrs[1].supporting_chunk_idx is None
         assert attrs[2].supporting_chunk_idx == 1
-        assert "directly states" in attrs[0].rationale  # type: ignore[operator]
+        assert attrs[0].rationale == "found in 2"
 
     def test_out_of_range_chunk_flagged(self):
-        """Model emitted chunk 7 when only 3 chunks exist — treat as
-        unsupported and flag with OUT_OF_RANGE marker."""
-        text = "CLAIM 1: chunk 7 | RATIONALE: misattributed.\nCLAIM 2: chunk 1 | RATIONALE: ok."
-        attrs = parse_claim_attributions(text, claims=["a", "b"], n_chunks=3)
+        """LLM emitted chunk 7 when only 3 exist — treat as unsupported
+        and flag with OUT_OF_RANGE marker. Same semantic as the prior
+        regex parser, just sourced from the JSON path."""
+        response = _AttributionsResponse(
+            attributions=[
+                _AttributionEntry(claim_idx=1, supporting_chunk_idx=7, rationale="misattributed"),
+                _AttributionEntry(claim_idx=2, supporting_chunk_idx=1, rationale="ok"),
+            ]
+        )
+        attrs = _post_process_attributions(response, claims=["a", "b"], n_chunks=3)
         assert attrs[0].supporting_chunk_idx is None
         assert "OUT_OF_RANGE" in attrs[0].rationale  # type: ignore[operator]
         assert attrs[1].supporting_chunk_idx == 1
 
-    def test_missing_attribution_line_flagged(self):
-        """LLM only emitted lines for claims 1 and 3; claim 2 is missing.
-        Parser should fill in claim 2 with a parse-failure marker."""
-        text = "CLAIM 1: chunk 1 | RATIONALE: ok.\nCLAIM 3: chunk 2 | RATIONALE: ok."
-        attrs = parse_claim_attributions(text, claims=["a", "b", "c"], n_chunks=3)
+    def test_missing_claim_entry_flagged(self):
+        """LLM only emitted entries for claims 1 and 3; claim 2 missing
+        from the JSON. Post-processing fills it with PARSE_FAILED."""
+        response = _AttributionsResponse(
+            attributions=[
+                _AttributionEntry(claim_idx=1, supporting_chunk_idx=1),
+                _AttributionEntry(claim_idx=3, supporting_chunk_idx=2),
+            ]
+        )
+        attrs = _post_process_attributions(response, claims=["a", "b", "c"], n_chunks=3)
         assert len(attrs) == 3
         assert attrs[0].supporting_chunk_idx == 1
         assert attrs[1].supporting_chunk_idx is None
         assert "PARSE_FAILED" in attrs[1].rationale  # type: ignore[operator]
         assert attrs[2].supporting_chunk_idx == 2
 
-    def test_rationale_optional(self):
-        """Lines without a RATIONALE pipe should still parse cleanly."""
-        text = "CLAIM 1: chunk 2\nCLAIM 2: none"
-        attrs = parse_claim_attributions(text, claims=["a", "b"], n_chunks=3)
-        assert attrs[0].supporting_chunk_idx == 2
+    def test_extra_attributions_ignored(self):
+        """LLM emitted an entry for claim_idx=99 we didn't ask about;
+        silently drop it. Don't fail or insert phantom attributions."""
+        response = _AttributionsResponse(
+            attributions=[
+                _AttributionEntry(claim_idx=1, supporting_chunk_idx=1),
+                _AttributionEntry(claim_idx=99, supporting_chunk_idx=2, rationale="who?"),
+            ]
+        )
+        attrs = _post_process_attributions(response, claims=["a"], n_chunks=3)
+        assert len(attrs) == 1
+        assert attrs[0].supporting_chunk_idx == 1
+
+    def test_optional_rationale_preserved(self):
+        response = _AttributionsResponse(
+            attributions=[_AttributionEntry(claim_idx=1, supporting_chunk_idx=1)]
+        )
+        attrs = _post_process_attributions(response, claims=["a"], n_chunks=3)
         assert attrs[0].rationale is None
-        assert attrs[1].supporting_chunk_idx is None
-        assert attrs[1].rationale is None
 
-    def test_lowercase_keywords_accepted(self):
-        text = "claim 1: chunk 2 | rationale: ok"
-        attrs = parse_claim_attributions(text, claims=["a"], n_chunks=3)
-        assert attrs[0].supporting_chunk_idx == 2
-
-    def test_empty_claims_list(self):
-        attrs = parse_claim_attributions("anything", claims=[], n_chunks=3)
+    def test_empty_claims_list_returns_empty(self):
+        response = _AttributionsResponse(attributions=[])
+        attrs = _post_process_attributions(response, claims=[], n_chunks=3)
         assert attrs == []
 
+    def test_parse_failure_marks_every_claim(self):
+        """None response → every claim gets a PARSE_FAILED marker.
+        Matches the prior regex parser's behavior so downstream
+        aggregation (n_claim_parse_failures) keeps working."""
+        attrs = _post_process_attributions(None, claims=["a", "b", "c"], n_chunks=3)
+        assert len(attrs) == 3
+        assert all(a.supporting_chunk_idx is None for a in attrs)
+        assert all("PARSE_FAILED" in (a.rationale or "") for a in attrs)
 
-# --------------------------------------------------------------------
-# Refusal parser
-# --------------------------------------------------------------------
+
+class TestPostProcessRelevance:
+    def test_snaps_to_anchor(self):
+        """LLM emitted 0.7 instead of an anchor — snap to 0.75 silently."""
+        response = _RelevanceResponse(score=0.7, rationale="pretty good")
+        result = _post_process_relevance(response)
+        assert result.score == 0.75
+        assert result.metric == "relevance"
+
+    def test_already_at_anchor(self):
+        response = _RelevanceResponse(score=1.0, rationale="on point")
+        assert _post_process_relevance(response).score == 1.0
+
+    def test_parse_failure_returns_zero(self):
+        """None → score=0.0 with PARSE_FAILED marker. Same conservative
+        default as the prior regex parser."""
+        result = _post_process_relevance(None)
+        assert result.score == 0.0
+        assert "PARSE_FAILED" in result.rationale
 
 
-class TestParseRefusalResponse:
-    def test_clean_yes(self):
-        text = "REFUSED: yes\nRATIONALE: model said it doesn't have enough context"
-        j = parse_refusal_response(text)
-        assert j.refused is True
-        assert "doesn't have enough context" in j.rationale
+class TestPostProcessRefusal:
+    def test_refused_pass_through(self):
+        response = _RefusalResponse(refused=True, rationale="model said it")
+        result = _post_process_refusal(response)
+        assert result.refused is True
+        assert result.rationale == "model said it"
 
-    def test_clean_no(self):
-        text = "REFUSED: no\nRATIONALE: model attempted an answer with hedging"
-        j = parse_refusal_response(text)
-        assert j.refused is False
+    def test_not_refused_pass_through(self):
+        response = _RefusalResponse(refused=False, rationale="model attempted")
+        assert _post_process_refusal(response).refused is False
 
-    def test_lowercase_keywords_accepted(self):
-        text = "refused: yes\nrationale: ok"
-        j = parse_refusal_response(text)
-        assert j.refused is True
-
-    def test_y_n_shorthand_accepted(self):
-        """Some LLM outputs abbreviate to y/n. Accept the shorthand."""
-        assert parse_refusal_response("REFUSED: y\nRATIONALE: ok").refused is True
-        assert parse_refusal_response("REFUSED: n\nRATIONALE: ok").refused is False
-
-    def test_true_false_accepted(self):
-        """Defensive — some LLMs output true/false instead of yes/no."""
-        assert parse_refusal_response("REFUSED: true").refused is True
-        assert parse_refusal_response("REFUSED: false").refused is False
-
-    def test_no_refused_returns_parse_failure_conservative(self):
-        """Conservative default: parse failure → refused=False. We do
-        NOT want a parse failure to silently inflate the refusal rate
-        by classifying a confabulation as a refusal. The PARSE_FAILED
-        marker on the rationale flags the case for review."""
-        j = parse_refusal_response("Sorry, I'm not sure how to evaluate that.")
-        assert j.refused is False
-        assert "PARSE_FAILED" in j.rationale
-
-    def test_score_present_but_no_rationale(self):
-        j = parse_refusal_response("REFUSED: yes")
-        assert j.refused is True
-        assert "no RATIONALE" in j.rationale
+    def test_parse_failure_conservative_default(self):
+        """None → refused=False with PARSE_FAILED. Conservative default
+        prevents parse failures from silently inflating the refusal rate."""
+        result = _post_process_refusal(None)
+        assert result.refused is False
+        assert "PARSE_FAILED" in result.rationale
 
 
 # --------------------------------------------------------------------
@@ -403,16 +371,21 @@ class TestParseRefusalResponse:
 
 
 class TestJudgeFaithfulnessClaimLevel:
+    """Integration tests via StubJudge. The judge now expects JSON
+    output for both extract_claims and attribute_claims, so test
+    fixtures inject JSON strings rather than the prior numbered-list
+    + 'CLAIM N: chunk K' formats."""
+
     def test_full_flow_supported_claims(self):
-        """Two LLM calls (extract + attribute) → JudgeScore with
-        per-claim attributions and supported/total fraction."""
         judge = StubJudge()
-        # Call 1 response: extract two claims
-        # Call 2 response: attribute both to chunks
         judge.queue(
-            "1. Alpha is foo.\n2. Beta is bar.",
-            "CLAIM 1: chunk 1 | RATIONALE: alpha verbatim.\n"
-            "CLAIM 2: chunk 2 | RATIONALE: beta paraphrased.",
+            '{"claims": ["Alpha is foo.", "Beta is bar."]}',
+            (
+                '{"attributions": ['
+                '{"claim_idx": 1, "supporting_chunk_idx": 1, "rationale": "alpha verbatim"},'
+                '{"claim_idx": 2, "supporting_chunk_idx": 2, "rationale": "beta paraphrased"}'
+                "]}"
+            ),
         )
         result = judge.judge_faithfulness(
             "What are alpha and beta?",
@@ -429,85 +402,83 @@ class TestJudgeFaithfulnessClaimLevel:
     def test_partial_support(self):
         judge = StubJudge()
         judge.queue(
-            "1. Supported claim.\n2. Unsupported claim.\n3. Also unsupported.",
-            "CLAIM 1: chunk 1 | RATIONALE: yes.\n"
-            "CLAIM 2: none | RATIONALE: no chunk.\n"
-            "CLAIM 3: none | RATIONALE: no chunk.",
+            '{"claims": ["Supported.", "Unsupported.", "Also unsupported."]}',
+            (
+                '{"attributions": ['
+                '{"claim_idx": 1, "supporting_chunk_idx": 1, "rationale": "yes"},'
+                '{"claim_idx": 2, "supporting_chunk_idx": null, "rationale": "no chunk"},'
+                '{"claim_idx": 3, "supporting_chunk_idx": null, "rationale": "no chunk"}'
+                "]}"
+            ),
         )
-        result = judge.judge_faithfulness(
-            "q?",
-            chunks=_chunks("a", "b"),
-            answer="a b c",
-        )
+        result = judge.judge_faithfulness("q?", chunks=_chunks("a", "b"), answer="a b c")
         assert result.score == pytest.approx(1 / 3)
         assert "1 of 3" in result.rationale
 
     def test_no_claims_extracted(self):
-        """When extraction returns NO_CLAIMS, attribution is skipped
-        and the score is 0.0 with a flag in the rationale. This
-        shouldn't happen on real in-corpus answers but the eval driver
-        should still get a typed JudgeScore back."""
+        """Empty claims array → JudgeScore with NO_CLAIMS_EXTRACTED
+        marker, no attribution call. Pin the early-exit contract."""
         judge = StubJudge()
-        judge.queue("NO_CLAIMS")
-        result = judge.judge_faithfulness(
-            "q?",
-            chunks=_chunks("a"),
-            answer="(refusal)",
-        )
+        judge.queue('{"claims": []}')
+        result = judge.judge_faithfulness("q?", chunks=_chunks("a"), answer="(refusal)")
         assert result.score == 0.0
         assert "NO_CLAIMS_EXTRACTED" in result.rationale
         assert result.claim_attributions == []
-        # Only one inference call was made (no attribution call after empty extract).
+        # Only one inference call was made (no attribution call after
+        # an empty extract).
         assert len(judge.calls) == 1
 
-    def test_extract_claims_includes_question(self):
-        """The extract-claims prompt should embed the question so the
-        LLM can decide which content is "factual" relative to context.
-        Pin this so a future prompt refactor doesn't drop the question."""
+    def test_extract_claims_parse_failure_retries_then_falls_back(self):
+        """If JSON parse fails on the first call, the helper retries
+        once with a clarifying message. If the retry also fails, the
+        flow short-circuits the same as the empty-claims case."""
         judge = StubJudge()
-        judge.queue("NO_CLAIMS")  # short-circuits the rest
+        judge.queue("not valid json", "still not valid json")
+        result = judge.judge_faithfulness("q?", chunks=_chunks("a"), answer="ans")
+        assert result.score == 0.0
+        assert "NO_CLAIMS_EXTRACTED" in result.rationale
+        # Two calls — initial + retry — for extraction. Then early exit
+        # because empty claims, so no attribution call.
+        assert len(judge.calls) == 2
+
+    def test_extract_claims_includes_question(self):
+        """Pin: the extract-claims prompt embeds the question."""
+        judge = StubJudge()
+        judge.queue('{"claims": []}')
         judge.judge_faithfulness("Question about X", chunks=_chunks("x"), answer="ans")
         msgs = judge.calls[0]
         assert "Question about X" in msgs[1]["content"]
 
     def test_extract_and_attribute_use_larger_token_budgets(self):
-        """Pin the per-call max_new_tokens override contract: extraction
-        and attribution need substantially larger token budgets than the
-        default JudgeConfig.max_new_tokens (256). The default is sized for
-        relevance; faithfulness flows would silently truncate output without
-        the override (caught in the first PR-B run — long answers had
-        attribution output cut off mid-list, producing PARSE_FAILED on
-        every claim past the cap)."""
+        """Pin the per-call max_new_tokens override: extraction and
+        attribution need bigger budgets than relevance default (256)."""
         judge = StubJudge()
-        judge.queue("1. claim", "CLAIM 1: chunk 1 | RATIONALE: ok.")
+        judge.queue(
+            '{"claims": ["one"]}',
+            '{"attributions": [{"claim_idx": 1, "supporting_chunk_idx": 1}]}',
+        )
         judge.judge_faithfulness("q", chunks=_chunks("a"), answer="ans")
-        # Two calls: extraction then attribution.
         assert len(judge.max_new_tokens_seen) == 2
         extraction_budget, attribution_budget = judge.max_new_tokens_seen
         assert extraction_budget is not None
         assert attribution_budget is not None
         assert extraction_budget > judge.config.max_new_tokens
         assert attribution_budget > judge.config.max_new_tokens
-        # Attribution needs more headroom than extraction (~75 tok/line × N
-        # claims vs ~30 tok/claim).
         assert attribution_budget > extraction_budget
 
     def test_relevance_uses_default_token_budget(self):
-        """Relevance keeps the default JudgeConfig.max_new_tokens budget
-        — single SCORE+RATIONALE response is small."""
+        """Relevance keeps the default JudgeConfig.max_new_tokens —
+        small JSON response."""
         judge = StubJudge()
-        judge.queue("SCORE: 0.75\nRATIONALE: ok")
+        judge.queue('{"score": 0.75, "rationale": "ok"}')
         judge.judge_relevance("q?", "ans")
-        assert judge.max_new_tokens_seen == [None]  # i.e., no override
+        assert judge.max_new_tokens_seen == [None]
 
     def test_attribute_call_includes_chunks_and_claims(self):
-        """The attribution prompt must include both the chunks block
-        and the claims block — drift would mean the judge can't see
-        what it's attributing claims against."""
         judge = StubJudge()
         judge.queue(
-            "1. Single claim.",
-            "CLAIM 1: chunk 1 | RATIONALE: ok.",
+            '{"claims": ["Single claim."]}',
+            '{"attributions": [{"claim_idx": 1, "supporting_chunk_idx": 1}]}',
         )
         judge.judge_faithfulness(
             "q?",
@@ -521,26 +492,46 @@ class TestJudgeFaithfulnessClaimLevel:
         assert "[2]" in attribute_msg
         assert "1. Single claim." in attribute_msg
 
+    def test_attribution_parse_failure_retries(self):
+        """Pin the retry path on the attribution call. Initial response
+        is malformed; the retry succeeds and we get a real JudgeScore."""
+        judge = StubJudge()
+        judge.queue(
+            '{"claims": ["one"]}',  # extract: clean
+            "garbage attribution output",  # attribute: malformed
+            '{"attributions": [{"claim_idx": 1, "supporting_chunk_idx": 1, "rationale": "after retry"}]}',
+        )
+        result = judge.judge_faithfulness("q?", chunks=_chunks("a"), answer="ans")
+        assert result.score == 1.0
+        assert result.claim_attributions[0].rationale == "after retry"
+        # 3 calls: extract (1) + attribute initial (1) + attribute retry (1).
+        assert len(judge.calls) == 3
+
 
 # --------------------------------------------------------------------
-# Relevance end-to-end (still single judgment)
+# Relevance end-to-end (single LLM call, JSON output)
 # --------------------------------------------------------------------
 
 
 class TestJudgeRelevance:
     def test_clean_response(self):
         judge = StubJudge()
-        judge.queue("SCORE: 1.0\nRATIONALE: direct hit")
+        judge.queue('{"score": 1.0, "rationale": "direct hit"}')
         result = judge.judge_relevance("What is X?", "X is foo.")
         assert result.score == 1.0
         assert result.metric == "relevance"
         assert result.claim_attributions == []  # relevance never decomposes
 
-    def test_relevance_does_not_send_chunks(self):
-        """Pin the contract difference: relevance prompt has only
-        QUESTION and ANSWER, not CHUNKS or CONTEXT."""
+    def test_off_anchor_score_snapped(self):
+        """LLM emitted 0.7 — snap to 0.75 silently in post-processing."""
         judge = StubJudge()
-        judge.queue("SCORE: 0.75\nRATIONALE: ok")
+        judge.queue('{"score": 0.7, "rationale": "pretty good"}')
+        result = judge.judge_relevance("q?", "ans")
+        assert result.score == 0.75
+
+    def test_relevance_does_not_send_chunks(self):
+        judge = StubJudge()
+        judge.queue('{"score": 0.75, "rationale": "ok"}')
         judge.judge_relevance("q?", "ans")
         user_content = judge.calls[0][1]["content"]
         assert "QUESTION" in user_content
@@ -548,48 +539,51 @@ class TestJudgeRelevance:
         assert "CHUNKS" not in user_content
         assert "CONTEXT" not in user_content
 
-    def test_garbage_does_not_crash(self):
+    def test_parse_failure_falls_back(self):
+        """Garbage response after retry → score=0.0 with PARSE_FAILED."""
         judge = StubJudge()
-        judge.queue("I'm sorry, as an AI language model I cannot...")
+        judge.queue("not json", "still not json")
         result = judge.judge_relevance("q?", "ans")
         assert result.score == 0.0
         assert "PARSE_FAILED" in result.rationale
 
+    def test_first_response_invalid_retry_succeeds(self):
+        """Pin retry path: malformed first response; valid second."""
+        judge = StubJudge()
+        judge.queue("garbage", '{"score": 1.0, "rationale": "ok"}')
+        result = judge.judge_relevance("q?", "ans")
+        assert result.score == 1.0
+        assert len(judge.calls) == 2
+
 
 # --------------------------------------------------------------------
-# Refusal end-to-end (single LLM call, REFUSED: yes/no)
+# Refusal end-to-end (single LLM call, JSON output)
 # --------------------------------------------------------------------
 
 
 class TestJudgeRefusalEndToEnd:
     def test_refusal_yes(self):
         judge = StubJudge()
-        judge.queue("REFUSED: yes\nRATIONALE: model said it doesn't have context")
+        judge.queue('{"refused": true, "rationale": "model said it does not have context"}')
         result = judge.judge_refusal("Off-corpus q?", "I don't have enough context.")
         assert result.refused is True
-        assert "doesn't have context" in result.rationale
+        assert "does not have context" in result.rationale
 
     def test_refusal_no(self):
         judge = StubJudge()
-        judge.queue("REFUSED: no\nRATIONALE: model attempted an answer")
+        judge.queue('{"refused": false, "rationale": "model attempted an answer"}')
         result = judge.judge_refusal("In-corpus q?", "AutoModel takes a name.")
         assert result.refused is False
 
     def test_refusal_uses_default_token_budget(self):
-        """Pin the contract: refusal-judging is a single REFUSED: yes/no
-        + one-sentence RATIONALE — fits in the default JudgeConfig.max_new_tokens
-        (256). No per-call override needed (unlike faithfulness)."""
         judge = StubJudge()
-        judge.queue("REFUSED: no\nRATIONALE: ok")
+        judge.queue('{"refused": false, "rationale": "ok"}')
         judge.judge_refusal("q?", "ans")
-        assert judge.max_new_tokens_seen == [None]  # default-budget path
+        assert judge.max_new_tokens_seen == [None]
 
     def test_refusal_prompt_no_chunks(self):
-        """Refusal judgment doesn't need retrieved chunks — just the
-        question/answer pair. Pin the contract by checking the user
-        message contains QUESTION and ANSWER but not CHUNKS or CONTEXT."""
         judge = StubJudge()
-        judge.queue("REFUSED: yes\nRATIONALE: ok")
+        judge.queue('{"refused": true, "rationale": "ok"}')
         judge.judge_refusal("q?", "ans")
         user_content = judge.calls[0][1]["content"]
         assert "QUESTION" in user_content
@@ -598,10 +592,8 @@ class TestJudgeRefusalEndToEnd:
         assert "CONTEXT" not in user_content
 
     def test_garbage_response_falls_back_to_not_refused(self):
-        """Conservative default: parse failure → refused=False so a
-        parse failure can't accidentally inflate the refusal rate."""
         judge = StubJudge()
-        judge.queue("I'm sorry, I cannot evaluate that.")
+        judge.queue("garbage", "still garbage")
         result = judge.judge_refusal("q?", "ans")
         assert result.refused is False
         assert "PARSE_FAILED" in result.rationale
