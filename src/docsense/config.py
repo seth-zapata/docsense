@@ -36,6 +36,10 @@ class RerankingConfig(BaseSettings):
 class GenerationConfig(BaseSettings):
     model_name: str = "mistralai/Mistral-7B-Instruct-v0.3"
     max_new_tokens: int = 512
+    # Token budget reserved for retrieved context inside the prompt.
+    # Independent of max_new_tokens; the LLM's full context window must
+    # accommodate system prompt + this + query + max_new_tokens.
+    max_context_tokens: int = 3500
     temperature: float = 0.1
     top_p: float = 0.9
     device: str = "auto"
