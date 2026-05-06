@@ -240,32 +240,77 @@ These prep for fine-tuning. Not Phase 2 blockers; gating point is
 ### C1. LLM-judge eval scaffolding
 
 Faithfulness, answer relevance, citation accuracy, and *real* no-answer
-behavior all require an LLM judge. Use Claude via the `anthropic` SDK.
+behavior all require an LLM judge.
 
-Two judge functions returning `{score: float, rationale: str}`:
+**Default judge: local Llama 3.1 8B Instruct** (NF4 4-bit), invoked via
+HuggingFace transformers. Decision locked 2026-05-06 after weighing
+local-judge vs Anthropic SDK. Reasoning summary:
+
+- **Cost**: $0 vs ~$0.20 per full eval run with Claude Haiku. Real but
+  small; not the deciding factor by itself.
+- **Reproducibility**: pinned local weights vs API drift. Frozen
+  baseline numbers can be reproduced years later.
+- **Self-containment**: no external dependencies for normal operation.
+  Important for the project's "I built this from scratch" narrative.
+- **Acknowledged tradeoff**: smaller-model judges are noisier and less
+  well-calibrated than frontier models. Egocentric bias would be an
+  issue if judge=system; mitigated by using Llama (judge) +
+  Qwen (system) — different model families.
+
+An **optional Anthropic-judge mode** (`AnthropicJudge` class, gated
+behind an env var like `DOCSENSE_USE_ANTHROPIC_JUDGE=1`) is acceptable
+as a calibration check — "how do my Llama-judge scores correlate with
+Claude-judge scores on the same outputs?" — but it is NOT the default
+path. Adding it stays optional; full project must run without an
+Anthropic API key.
+
+Pluggable judge interface: an `LLMJudge` protocol (or ABC) with
+implementations for local + (optional) Anthropic. Judge functions:
+
 - `judge_faithfulness(question, context, answer)` — does the answer
-  follow from the chunks?
+  follow from the chunks? Returns `{score: float ∈ [0,1], rationale: str}`.
 - `judge_relevance(question, answer)` — does the answer address the
   question?
 
-Plus rule-based-but-uses-real-LLM-output evals:
+Plus rule-based-but-uses-real-LLM-output evals (no judge call needed,
+just pattern matching on real generated output):
+
 - `check_no_answer_behavior(answer)` — when retrieval returns
-  irrelevant chunks, does the model produce a refusal? (Pattern
-  match against the prompt template's refusal directive.)
+  irrelevant chunks, does the model produce a refusal? Pattern match
+  against the prompt template's refusal directive ("I don't have
+  enough context").
 - `check_citations_grounded(answer, retrieved_chunks)` — every
-  citation references a real retrieved chunk.
+  citation references a real retrieved chunk. Already enforced as a
+  pydantic invariant on `Answer` (Block D.1); the eval just confirms
+  the invariant holds on the model's actual outputs at scale.
 
 **These run manually or on a `nightly.yml` schedule, never on every
-PR.** Cost + latency + score noise make per-PR gating false-positive
-prone.
+PR.** Latency + score noise make per-PR gating false-positive prone.
 
 ### C2. Baseline generation eval (before fine-tuning)
 
-`evaluations/baselines/phase2_generation_base.json` — the base model's
-faithfulness / answer relevance / citation accuracy / no-answer
-behavior numbers, on a held-out eval set, captured *before* any
-fine-tuning. Phase 3's fine-tuned model is measured against this.
-Without it, the fine-tune has nothing to claim improvement over.
+`evaluations/baselines/pre_phase3_generation_base.json` — the base
+model's faithfulness / answer relevance / citation accuracy /
+no-answer behavior numbers, on the curated + structural eval sets,
+captured *before* any fine-tuning. Phase 3's fine-tuned model is
+measured against this. Without it, the fine-tune has nothing to
+claim improvement over.
+
+**System (generator) model: `Qwen/Qwen2.5-7B-Instruct`.** Decision
+locked 2026-05-06. Chosen over Mistral 7B Instruct v0.3 because
+HumanEval ~85 vs Mistral ~40 directly reflects code-comprehension
+quality, and the HF Transformers corpus is heavily Python documentation.
+Apache 2.0 license matches our existing dep posture. Update
+`GenerationConfig.model_name` default accordingly when the wiring
+lands.
+
+**Hardware reality**: vanilla RTX 4070 (12 GB VRAM). Both system and
+judge models must load at NF4 4-bit quantization (~5-6 GB each) and
+must be **swapped sequentially** during eval — load system, run all
+queries through the pipeline, save intermediate outputs to disk, free
+VRAM, load judge, score outputs. Code path must be device-agnostic
+(`device="auto"`); also runnable on CPU for users without GPU
+(slower, but functional).
 
 ### C3. Synthetic Q&A dataset generator
 
@@ -527,6 +572,104 @@ judges.)
 
 ⏸️ **Phase 2 closes.** ~19 commits, paced through five blocks, each
 with an explicit pause for approval.
+
+### Pre-Phase-3 Block 1 — Generation infrastructure + LLM-judge scaffolding (added 2026-05-06)
+
+Phase 2 closed with the generation surface scaffolded but never run
+against a real LLM (only mocked). Pre-Phase-3 Block 1 closes that gap:
+loads a real model end-to-end, wires NF4 quantization for the 12 GB
+hardware constraint, refactors prompt construction to use the
+tokenizer's chat template, and stands up the local-judge framework so
+generation quality can be measured and tracked.
+
+Split into **two sub-blocks** so the infrastructure (1A) can land and
+be smoke-tested before committing to the larger judge work (1B). Each
+has its own pause point.
+
+#### Block 1A — Generation infrastructure
+
+20. `Update scope doc with Pre-Phase-3 Block 1 spec + journal entry`
+    — formalize before implementing (this commit).
+21. `Switch GenerationConfig defaults to Qwen 2.5 7B Instruct` —
+    `model_name = "Qwen/Qwen2.5-7B-Instruct"` and any related
+    config (e.g., a new `use_4bit_quantization: bool = True`).
+    Update tests that assert defaults.
+22. `Refactor Generator._run_inference to use tokenizer chat template`
+    — replace the raw "Question:/Answer:" completion-style invocation
+    with `tokenizer.apply_chat_template([{role: ..., content: ...}, ...],
+    add_generation_prompt=True, tokenize=True, return_tensors="pt")`.
+    `PromptBuilder` returns a *list of messages* rather than a flat
+    string; the chat-template formatting is the tokenizer's job. This
+    makes Generator model-agnostic — Qwen, Llama, Mistral all work
+    via the same code path. Update prompt snapshot test (snapshot is
+    now the rendered chat-template output for the configured model).
+23. `Wire NF4 4-bit quantization via bitsandbytes into Generator` —
+    `BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_quant_type="nf4",
+    bnb_4bit_compute_dtype=torch.float16)` passed to
+    `AutoModelForCausalLM.from_pretrained` when
+    `config.use_4bit_quantization` is True (default). Bitsandbytes is
+    already in `pyproject.toml`'s `gpu` extras. Tests use the existing
+    `_run_inference` override path; quantization is only exercised when
+    a real model loads.
+24. `Add scripts/smoke_generate.py and run it manually` — small driver
+    that loads the configured model, runs one query through the full
+    pipeline (retrieve → rerank → assemble → prompt → generate → typed
+    Answer), prints the answer + citations + metadata. **Manual
+    verification step**, not part of CI. User runs once on their
+    hardware to confirm the model loads, generates plausible output,
+    and the chat template is formatted correctly. Capture stdout in
+    `evaluations/manual-runs/2026-05-XX-smoke.txt` and commit.
+
+⏸️ **Block 1A pause point.** First real end-to-end generation works
+on the user's hardware. We know the model loads, fits in 12 GB, and
+produces plausible output. No automated quality measurement yet.
+
+#### Block 1B — LLM-judge framework + baseline eval
+
+25. `Add LLMJudge protocol/ABC in src/docsense/evaluation/judge.py`
+    — abstract base with methods `judge_faithfulness(question, context,
+    answer) -> JudgeScore` and `judge_relevance(question, answer) ->
+    JudgeScore`. Plus the `JudgeScore` pydantic model
+    (`{score: float, rationale: str}`).
+26. `Add LlamaJudge implementation (Llama 3.1 8B Instruct, NF4 4-bit)`
+    — concrete `LLMJudge` subclass. Same lazy-load pattern as
+    `Generator`. Test with mocked `_run_inference` override.
+27. `Add rule-based evals: check_no_answer_behavior + check_citations_grounded`
+    — these don't need a judge call, only the model's actual output.
+    Pure functions taking `Answer`. Tested with synthetic Answer
+    instances.
+28. `Add scripts/run_generation_eval.py` — end-to-end eval driver:
+    load system → run all queries through pipeline (saving raw Answer
+    objects to disk) → free system VRAM → load judge → score each
+    Answer → save reports. Sequential model loading is the headline
+    constraint; the script must explicitly free CUDA memory between
+    stages.
+29. `Run the eval, commit baseline reports` — first real LLM-judged
+    eval run. Reports go to `evaluations/reports/generation-<date>-{curated,structural}.json`
+    and `evaluations/baselines/pre_phase3_generation_base.json`.
+30. `Add evaluations/analyses/2026-05-XX-baseline-generation-eval.md`
+    — interpret the scores. What did Qwen 2.5 7B answer correctly?
+    Where did it confabulate? Did the refusal directive activate? Did
+    citations come out properly? This is Phase 3's starting line.
+
+⏸️ **Block 1B pause point.** Phase 2 retrieval + Phase 2 generation
+are now empirically measured end-to-end. Phase 3 fine-tuning has a
+real baseline to improve on.
+
+### Optional follow-up — AnthropicJudge calibration mode
+
+Not in Block 1 by default. Add later as a separate small PR if/when
+the value of judge calibration justifies the API key + spend:
+
+- `Add AnthropicJudge (env-var gated)` — same `LLMJudge` interface,
+  uses Anthropic SDK. Only constructable if `DOCSENSE_USE_ANTHROPIC_JUDGE=1`
+  and `ANTHROPIC_API_KEY` are set; otherwise raises a clear error.
+- `Run calibration check + commit comparison report` — score the same
+  Answer outputs with both LlamaJudge and AnthropicJudge, compute
+  per-metric correlation, write `evaluations/analyses/judge-calibration.md`.
+  This becomes a portfolio artifact: "I demonstrated that local-judge
+  scores correlate with frontier-judge scores at ρ=X on my eval set,
+  validating the local-only default."
 
 ---
 
