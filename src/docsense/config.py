@@ -34,7 +34,12 @@ class RerankingConfig(BaseSettings):
 
 
 class GenerationConfig(BaseSettings):
-    model_name: str = "mistralai/Mistral-7B-Instruct-v0.3"
+    # Default chosen 2026-05-06 over Mistral 7B Instruct v0.3 for the
+    # HF Transformers (Python) corpus: Qwen 2.5 7B Instruct's HumanEval
+    # ~85 vs Mistral's ~40 directly reflects code-comprehension quality.
+    # Apache 2.0 license. See docs/journal/2026-05-06-pre-phase-3-model-decisions.md
+    # for the full rationale.
+    model_name: str = "Qwen/Qwen2.5-7B-Instruct"
     max_new_tokens: int = 512
     # Token budget reserved for retrieved context inside the prompt.
     # Independent of max_new_tokens; the LLM's full context window must
@@ -43,6 +48,12 @@ class GenerationConfig(BaseSettings):
     temperature: float = 0.1
     top_p: float = 0.9
     device: str = "auto"
+    # Load the model at NF4 4-bit precision via bitsandbytes. Required to
+    # fit a 7-8B model in 12 GB VRAM (vanilla RTX 4070). Set False for CPU
+    # inference or environments without bitsandbytes installed; the model
+    # then loads at default precision (float16/bfloat16 depending on dtype).
+    # Bitsandbytes ships in the `gpu` extras (`pip install -e ".[gpu]"`).
+    use_4bit_quantization: bool = True
 
 
 class ChunkingConfig(BaseSettings):
