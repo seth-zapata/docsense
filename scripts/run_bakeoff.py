@@ -18,14 +18,17 @@ runner you actually invoke during dev.
 
 Usage:
     python scripts/run_bakeoff.py
-    python scripts/run_bakeoff.py --eval-k 10 --strategies recursive header
+    python scripts/run_bakeoff.py --pipeline hybrid
+    python scripts/run_bakeoff.py --pipeline hybrid-rerank --strategies recursive header
     python scripts/run_bakeoff.py --eval-k 5 --out evaluations/reports/k5.json
 
 Defaults:
-    --eval-k 10  (matches the committed Phase 1 baseline)
+    --pipeline dense  (matches Phase 1 baseline; use hybrid or hybrid-rerank
+                      to ablate BM25/RRF and the cross-encoder respectively)
+    --eval-k 10       (matches the committed Phase 1 baseline)
     --strategies fixed recursive header
     --baseline evaluations/baselines/phase1_chunking.json
-    --out      evaluations/reports/bakeoff-<UTC-date>.json
+    --out      evaluations/reports/bakeoff-<UTC-date>-<pipeline>.json
 """
 
 from __future__ import annotations
@@ -147,7 +150,47 @@ def _eval_strategy_dense(
     return _aggregate_metrics(per_query, eval_k=eval_k, chunks_total=len(chunks))
 
 
-def _eval_strategy_rerank(
+def _eval_strategy_hybrid(
+    strategy: str,
+    embedder: Embedder,
+    eval_set: list[EvalQuery],
+    eval_k: int,
+    settings: Settings,
+) -> dict:
+    """Run HybridRetriever WITHOUT the cross-encoder reranker.
+
+    Adds BM25 + RRF fusion of dense+sparse on top of the dense-only path,
+    but skips the cross-encoder. Run together with the dense and
+    hybrid-rerank pipelines to ablate which addition causes a given
+    metric change vs the Phase 1 baseline.
+    """
+    index, chunks = _load_index_and_chunks(strategy)
+    logger.info("  %s: index=%d vectors, %d chunks", strategy, index.ntotal, len(chunks))
+
+    dense = DenseRetriever(dimension=index.d)
+    dense.index = index
+    dense.chunks = chunks
+
+    sparse = SparseRetriever()
+    sparse.add(chunks)
+
+    # No reranker — HybridRetriever fuses dense + sparse via RRF and returns top_k.
+    hybrid = HybridRetriever(dense, sparse, embedder, settings.retrieval, reranker=None)
+
+    # Same ×4 over-retrieval as the dense-only path so the eval is symmetric.
+    eval_top_k = min(eval_k * 4, index.ntotal)
+
+    per_query: list[dict] = []
+    for query, prefixes in eval_set:
+        results = hybrid.search(query, top_k=eval_top_k)
+        retrieved = deduplicate_preserving_order([r.chunk.doc_id for r in results])
+        relevant = {c.doc_id for c in chunks if _is_relevant(c.doc_id, prefixes)}
+        per_query.append({"retrieved": retrieved, "relevant": relevant})
+
+    return _aggregate_metrics(per_query, eval_k=eval_k, chunks_total=len(chunks))
+
+
+def _eval_strategy_hybrid_rerank(
     strategy: str,
     embedder: Embedder,
     eval_set: list[EvalQuery],
@@ -156,12 +199,9 @@ def _eval_strategy_rerank(
 ) -> dict:
     """Run the full HybridRetriever + cross-encoder pipeline for one strategy.
 
-    Methodological note: this differs from the dense-only path in *three*
-    ways simultaneously — it adds BM25, adds RRF fusion of dense+sparse,
-    and adds the cross-encoder reranker. The bakeoff therefore measures
-    the combined effect of "the production retrieval stack" vs. the
-    Phase 1 dense-only baseline. A future `--hybrid` flag (no rerank)
-    would let us ablate the reranker contribution alone.
+    This is the production-style retrieval stack — dense + sparse + RRF +
+    cross-encoder. Compare against the dense-only and hybrid pipelines
+    to isolate the cross-encoder's contribution from BM25 + RRF.
     """
     index, chunks = _load_index_and_chunks(strategy)
     logger.info("  %s: index=%d vectors, %d chunks", strategy, index.ntotal, len(chunks))
@@ -281,18 +321,20 @@ def main() -> int:
         default=None,
         help=(
             "Path to a YAML config that overrides Settings defaults. See "
-            "configs/default.yaml for the schema. Pipeline selection (--rerank) "
-            "stays an explicit flag and is not encoded in the config."
+            "configs/default.yaml for the schema. Pipeline selection "
+            "(--pipeline) stays an explicit flag and is not encoded in the "
+            "config."
         ),
     )
     parser.add_argument(
-        "--rerank",
-        action="store_true",
+        "--pipeline",
+        choices=("dense", "hybrid", "hybrid-rerank"),
+        default="dense",
         help=(
-            "Use the full HybridRetriever + cross-encoder pipeline instead of "
-            "dense-only. Note: this also enables BM25 + RRF fusion, so the "
-            "comparison vs Phase 1 conflates three additions; see the "
-            "methodology note in the report."
+            "Retrieval pipeline to evaluate. dense = raw FAISS only "
+            "(matches Phase 1 baseline). hybrid = dense + BM25 + RRF, no "
+            "reranker. hybrid-rerank = full production stack. Run all three "
+            "to ablate each addition."
         ),
     )
     parser.add_argument(
@@ -313,10 +355,11 @@ def main() -> int:
     logger.info("Embedder: %s", settings.embedding.model_name)
     logger.info("eval_k=%d, strategies=%s", args.eval_k, args.strategies)
 
-    pipeline = "hybrid+rerank" if args.rerank else "dense-only"
-    suffix = f"-{pipeline.replace('+', '-')}"
+    pipeline = args.pipeline  # one of: dense, hybrid, hybrid-rerank
+    uses_hybrid = pipeline in ("hybrid", "hybrid-rerank")
+    uses_rerank = pipeline == "hybrid-rerank"
     out_path = args.out or DEFAULT_REPORTS_DIR / (
-        f"bakeoff-{datetime.now(tz=UTC).strftime('%Y%m%d')}{suffix}.json"
+        f"bakeoff-{datetime.now(tz=UTC).strftime('%Y%m%d')}-{pipeline}.json"
     )
 
     results: dict = {
@@ -325,11 +368,11 @@ def main() -> int:
         "eval_k": args.eval_k,
         "pipeline": pipeline,
         "embedding_model": settings.embedding.model_name,
-        "reranker_model": (settings.reranking.model_name if args.rerank else None),
+        "reranker_model": settings.reranking.model_name if uses_rerank else None,
         "retrieval": {
-            "rerank_candidates": (settings.retrieval.rerank_candidates if args.rerank else None),
-            "dense_weight": (settings.retrieval.dense_weight if args.rerank else None),
-            "sparse_weight": (settings.retrieval.sparse_weight if args.rerank else None),
+            "rerank_candidates": settings.retrieval.rerank_candidates if uses_hybrid else None,
+            "dense_weight": settings.retrieval.dense_weight if uses_hybrid else None,
+            "sparse_weight": settings.retrieval.sparse_weight if uses_hybrid else None,
         },
         "eval_set": "curated",
         "eval_set_size": len(CURATED_QUERIES),
@@ -337,13 +380,17 @@ def main() -> int:
     }
     for strategy in args.strategies:
         logger.info("Evaluating %s ...", strategy)
-        if args.rerank:
-            results["strategies"][strategy] = _eval_strategy_rerank(
-                strategy, embedder, CURATED_QUERIES, eval_k=args.eval_k, settings=settings
-            )
-        else:
+        if pipeline == "dense":
             results["strategies"][strategy] = _eval_strategy_dense(
                 strategy, embedder, CURATED_QUERIES, eval_k=args.eval_k
+            )
+        elif pipeline == "hybrid":
+            results["strategies"][strategy] = _eval_strategy_hybrid(
+                strategy, embedder, CURATED_QUERIES, eval_k=args.eval_k, settings=settings
+            )
+        else:  # hybrid-rerank
+            results["strategies"][strategy] = _eval_strategy_hybrid_rerank(
+                strategy, embedder, CURATED_QUERIES, eval_k=args.eval_k, settings=settings
             )
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
