@@ -62,11 +62,34 @@ class ChunkingConfig(BaseSettings):
     chunk_overlap: int = 64
 
 
+class JudgeConfig(BaseSettings):
+    # Llama 3.1 8B Instruct as the local LLM-judge. Picked 2026-05-06
+    # for permissive license, strong instruction-following, and
+    # conveniently different lineage from Qwen so judge ↔ generator
+    # disagreement signal isn't swamped by family resemblance.
+    # See docs/journal/2026-05-06-pre-phase-3-model-decisions.md.
+    model_name: str = "meta-llama/Meta-Llama-3.1-8B-Instruct"
+    # Short generations: judge output is SCORE + 1-2 sentence
+    # rationale, not free-form prose.
+    max_new_tokens: int = 256
+    # Deterministic by default — eval reproducibility matters more than
+    # creative variation when grading the same Answer.
+    temperature: float = 0.0
+    top_p: float = 1.0
+    device: str = "auto"
+    # NF4 4-bit quantization, same constraint as the generator: 8B at
+    # full precision doesn't fit alongside other resident processes on
+    # 12 GB. The eval driver loads judge and generator sequentially,
+    # but each must individually fit.
+    use_4bit_quantization: bool = True
+
+
 class Settings(BaseSettings):
     embedding: EmbeddingConfig = EmbeddingConfig()
     retrieval: RetrievalConfig = RetrievalConfig()
     reranking: RerankingConfig = RerankingConfig()
     generation: GenerationConfig = GenerationConfig()
+    judge: JudgeConfig = JudgeConfig()
     chunking: ChunkingConfig = ChunkingConfig()
 
     data_dir: Path = DATA_DIR
