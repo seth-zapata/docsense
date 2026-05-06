@@ -11,7 +11,7 @@ generation metadata for tracing/debug.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class ChunkRef(BaseModel):
@@ -62,9 +62,31 @@ class Answer(BaseModel):
     LLM's output. `retrieved_chunks` is the full set of chunks the LLM
     saw — kept on the answer so callers can audit context independently
     of retrieval re-runs. `metadata` is for tracing and cost accounting.
+
+    **Citation-preservation invariant:** every entry in `citations` must
+    identify a chunk that's also in `retrieved_chunks`. The pydantic
+    validator below enforces this at construction; if it fires, something
+    upstream produced a Citation pointing at a chunk the LLM didn't see —
+    typically a bug in citation parsing or a hallucinated index. Failing
+    loudly here is preferable to letting an unverifiable Answer reach
+    downstream consumers.
     """
 
     text: str
     citations: list[Citation] = Field(default_factory=list)
     retrieved_chunks: list[ChunkRef] = Field(default_factory=list)
     metadata: GenerationMetadata
+
+    @model_validator(mode="after")
+    def _validate_citations_preserved(self) -> Answer:
+        chunk_keys = {(c.doc_id, c.chunk_id) for c in self.retrieved_chunks}
+        for cit in self.citations:
+            if (cit.doc_id, cit.chunk_id) not in chunk_keys:
+                msg = (
+                    f"Citation references chunk_id={cit.chunk_id!r} "
+                    f"(doc_id={cit.doc_id!r}) but no such chunk is in "
+                    f"retrieved_chunks. Every citation must point at a chunk "
+                    f"the LLM actually saw."
+                )
+                raise ValueError(msg)
+        return self

@@ -106,3 +106,107 @@ class TestAnswer:
             }
         )
         assert ans.text == "hi"
+
+
+class TestCitationPreservationInvariant:
+    """Block D.1: pin the invariant that every Citation in
+    Answer.citations must reference a chunk that's in
+    Answer.retrieved_chunks. Enforced by the model_validator on Answer."""
+
+    def _meta(self) -> GenerationMetadata:
+        return GenerationMetadata(model_name="m", latency_ms=1.0)
+
+    def test_citations_referencing_retrieved_chunks_are_valid(self):
+        """Happy path: citation matches a retrieved chunk."""
+        Answer(
+            text="ok",
+            citations=[Citation(doc_id="d.md", chunk_id="d.md::chunk_0")],
+            retrieved_chunks=[
+                ChunkRef(doc_id="d.md", chunk_id="d.md::chunk_0", score=0.9, text="x")
+            ],
+            metadata=self._meta(),
+        )
+
+    def test_empty_citations_with_retrieved_chunks_is_valid(self):
+        """LLM produced text without citations — vacuously valid."""
+        Answer(
+            text="no citations here",
+            citations=[],
+            retrieved_chunks=[
+                ChunkRef(doc_id="d.md", chunk_id="d.md::chunk_0", score=0.9, text="x")
+            ],
+            metadata=self._meta(),
+        )
+
+    def test_empty_citations_and_empty_chunks_is_valid(self):
+        """Edge case: LLM short-circuited or eval-only Answer."""
+        Answer(text="hi", metadata=self._meta())
+
+    def test_citation_without_matching_chunk_rejected(self):
+        """A Citation pointing at a chunk that wasn't in retrieved_chunks
+        means something upstream produced a hallucinated reference. The
+        invariant must reject this at construction time."""
+        with pytest.raises(ValidationError, match="no such chunk is in retrieved_chunks"):
+            Answer(
+                text="see [1]",
+                citations=[Citation(doc_id="ghost.md", chunk_id="ghost.md::chunk_0")],
+                retrieved_chunks=[
+                    ChunkRef(doc_id="real.md", chunk_id="real.md::chunk_0", score=0.9, text="x")
+                ],
+                metadata=self._meta(),
+            )
+
+    def test_citation_with_correct_doc_but_wrong_chunk_id_rejected(self):
+        """Identity is (doc_id, chunk_id) — matching only on doc_id is
+        not enough. Catches a regression where someone might use doc_id
+        as the citation key and silently lose chunk-level precision."""
+        with pytest.raises(ValidationError, match="no such chunk is in retrieved_chunks"):
+            Answer(
+                text="see [1]",
+                citations=[Citation(doc_id="d.md", chunk_id="d.md::chunk_99")],
+                retrieved_chunks=[
+                    ChunkRef(doc_id="d.md", chunk_id="d.md::chunk_0", score=0.9, text="x")
+                ],
+                metadata=self._meta(),
+            )
+
+    def test_one_valid_one_invalid_still_rejects(self):
+        """If any citation in the list is invalid, the whole Answer is
+        rejected. Partial validity is not validity."""
+        with pytest.raises(ValidationError, match="no such chunk is in retrieved_chunks"):
+            Answer(
+                text="see [1] and [2]",
+                citations=[
+                    Citation(doc_id="real.md", chunk_id="real.md::chunk_0"),
+                    Citation(doc_id="ghost.md", chunk_id="ghost.md::chunk_0"),
+                ],
+                retrieved_chunks=[
+                    ChunkRef(doc_id="real.md", chunk_id="real.md::chunk_0", score=0.9, text="x")
+                ],
+                metadata=self._meta(),
+            )
+
+    def test_citations_with_no_retrieved_chunks_rejected(self):
+        """An Answer claiming citations against an empty retrieved_chunks
+        list is incoherent — there's nothing to ground the citation in."""
+        with pytest.raises(ValidationError, match="no such chunk is in retrieved_chunks"):
+            Answer(
+                text="see [1]",
+                citations=[Citation(doc_id="d.md", chunk_id="d.md::chunk_0")],
+                retrieved_chunks=[],
+                metadata=self._meta(),
+            )
+
+    def test_validator_runs_on_model_validate_too(self):
+        """The invariant must hold whether Answer is constructed directly
+        or built from a dict via model_validate (the latter is what
+        FastAPI will exercise on inbound JSON)."""
+        with pytest.raises(ValidationError, match="no such chunk is in retrieved_chunks"):
+            Answer.model_validate(
+                {
+                    "text": "see [1]",
+                    "citations": [{"doc_id": "ghost.md", "chunk_id": "ghost.md::chunk_0"}],
+                    "retrieved_chunks": [],
+                    "metadata": {"model_name": "m", "latency_ms": 1.0},
+                }
+            )
