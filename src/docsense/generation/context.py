@@ -71,31 +71,35 @@ class ContextAssembler:
         ``Answer.retrieved_chunks``) should use this rather than the
         original list so the audit trail reflects what the LLM actually
         saw.
+
+        Implementation note: the budget check tokenizes the *candidate*
+        joined string each iteration rather than summing per-chunk
+        counts. Real BPE tokenizers are non-additive — ``tokenize(a) +
+        tokenize(b)`` doesn't always equal ``tokenize(a + sep + b)`` —
+        so the additive approximation can drift past the budget by a few
+        tokens with non-trivial inputs. Tokenizing the joined string is
+        O(N²) but N is small (top-k retrieval is typically 5–20 chunks)
+        and the cost is dwarfed by everything downstream.
         """
         if not chunks:
             return "", []
 
         included: list[ChunkRef] = []
         formatted_parts: list[str] = []
-        used_tokens = 0
-        # The "\n\n" separator costs tokens too; account for it once per
-        # chunk-after-the-first.
-        separator_tokens = self._tokenize("\n\n")
 
         for chunk in chunks:
             rank = len(included) + 1
             formatted = _format_chunk(rank, chunk)
-            chunk_tokens = self._tokenize(formatted)
-            sep_cost = separator_tokens if included else 0
+            candidate_parts = [*formatted_parts, formatted]
+            candidate_text = "\n\n".join(candidate_parts)
 
-            if used_tokens + sep_cost + chunk_tokens > self.max_tokens:
+            if self._tokenize(candidate_text) > self.max_tokens:
                 # Adding this chunk would exceed budget — stop assembling.
-                # We drop this chunk and all subsequent ones rather than
+                # Drop this chunk and all subsequent ones rather than
                 # truncating mid-text.
                 break
 
             included.append(chunk)
             formatted_parts.append(formatted)
-            used_tokens += sep_cost + chunk_tokens
 
         return "\n\n".join(formatted_parts), included

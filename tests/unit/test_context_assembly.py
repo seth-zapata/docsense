@@ -159,3 +159,57 @@ class TestContextAssemblerIncludedChunks:
         included_doc_ids = [c.doc_id for c in included]
         original_doc_ids = [c.doc_id for c in chunks[: len(included)]]
         assert included_doc_ids == original_doc_ids
+
+
+class TestContextAssemblerBudgetIsTokenizerAgnostic:
+    """Block D.2: pin the contract that ContextAssembler respects its
+    configured budget *regardless of which tokenizer is plugged in*.
+
+    The assembler's correctness shouldn't depend on a specific tokenizer's
+    behavior — only on the contract that ``tokenize_fn(text)`` returns a
+    monotonically-increasing count of "tokens" for that text. Production
+    will pass the LLM's actual tokenizer; tests use synthetic counters.
+    These tests exercise three different tokenizers and assert the same
+    invariant for each: assembled context's token count never exceeds
+    the configured budget.
+    """
+
+    @pytest.mark.parametrize(
+        ("name", "tokenize_fn"),
+        [
+            ("word_count", lambda s: len(s.split())),
+            ("char_div_3", lambda s: len(s) // 3),
+            ("char_div_5", lambda s: max(len(s) // 5, 1)),
+        ],
+    )
+    def test_assembled_context_never_exceeds_budget(self, name, tokenize_fn):
+        """Across multiple tokenizers, the assembled context's token count
+        is always within the configured budget. Three calls per tokenizer
+        with increasing budget sizes pin behavior across the typical
+        range a real RAG system would use."""
+        chunks = [
+            _ref(f"d{i}.md", "alpha beta gamma delta epsilon zeta eta theta iota kappa")
+            for i in range(8)
+        ]
+        for max_tokens in (5, 50, 200):
+            assembler = ContextAssembler(max_tokens=max_tokens, tokenize_fn=tokenize_fn)
+            text, _ = assembler.assemble(chunks)
+            assert tokenize_fn(text) <= max_tokens, (
+                f"Budget violation with tokenizer={name}, max_tokens={max_tokens}: "
+                f"assembled context has {tokenize_fn(text)} tokens"
+            )
+
+    def test_default_tokenizer_also_respects_budget(self):
+        """The production-default tokenizer (char/4 heuristic) must
+        also respect the budget — verify directly without going through
+        parameterization since we want the exact default path."""
+        chunks = [_ref(f"d{i}.md", "x" * 200) for i in range(10)]
+        for max_tokens in (10, 100, 500):
+            # Default tokenize_fn (char/4)
+            assembler = ContextAssembler(max_tokens=max_tokens)
+            text, _ = assembler.assemble(chunks)
+            # Use the same heuristic the assembler uses internally for the assertion
+            assert (len(text) // 4) <= max_tokens, (
+                f"Default char/4 budget violation: max_tokens={max_tokens}, "
+                f"assembled context has {len(text) // 4} tokens"
+            )
