@@ -22,6 +22,7 @@ data/raw/
 data/processed/
 data/embeddings/
 data/index/
+data/eval-runs/
 *.faiss
 *.pkl
 

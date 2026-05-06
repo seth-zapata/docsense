@@ -1,0 +1,688 @@
+#!/usr/bin/env python3
+"""LLM-judged end-to-end generation eval driver.
+
+Runs the full pipeline (retrieve → rerank → assemble → generate)
+against an eval set, then judges each Answer for faithfulness and
+relevance using a separate LLM judge. Rule-based checks (no-answer
+behavior, citation grounding) run alongside the judge calls.
+
+Sequential model loading is the headline constraint:
+
+    Phase A — setup retrieval stack (embedder, retriever, reranker).
+    Phase B — load Generator, run all queries, save Answer JSONs to
+              disk, free Generator VRAM.
+    Phase C — load LlamaJudge, score each saved Answer, free judge
+              VRAM.
+    Phase D — aggregate per-query results, write the JSON report.
+
+Generator and judge are both 7-8B Instruct models loaded at NF4.
+Each individually fits in ~5-6 GB; together they don't fit in 12 GB.
+The save-to-disk handoff between Phases B and C is what makes the
+sequential schedule reliable — Phase C reads its inputs from disk
+rather than relying on Python-process state survival.
+
+Usage::
+
+    # Full eval, one eval set at a time
+    python scripts/run_generation_eval.py --eval-set curated
+    python scripts/run_generation_eval.py --eval-set structural
+    python scripts/run_generation_eval.py --eval-set no-answer
+
+    # Dry-run with a small N to validate the script before a long run
+    python scripts/run_generation_eval.py --eval-set curated --limit 5
+
+    # Force all-GPU placement on a 12 GB shared GPU
+    python scripts/run_generation_eval.py --eval-set curated --device cuda:0
+
+Reports land at ``evaluations/reports/generation-<UTC-date>-<set>.json``.
+Per-query Answer dumps land at ``data/eval-runs/<run-id>/<set>/`` —
+gitignored, kept for debugging across runs.
+"""
+
+from __future__ import annotations
+
+import argparse
+import gc
+import json
+import logging
+import pickle
+import statistics
+import sys
+import time
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
+
+import faiss
+
+from docsense.config import (
+    DATA_DIR,
+    GenerationConfig,
+    JudgeConfig,
+    Settings,
+)
+from docsense.embedding.embedder import Embedder
+from docsense.evaluation.eval_queries import CURATED_QUERIES
+from docsense.evaluation.llama_judge import LlamaJudge
+from docsense.evaluation.no_answer_queries import NO_ANSWER_QUERIES
+from docsense.evaluation.rule_based import (
+    check_citations_grounded,
+    check_no_answer_behavior,
+)
+from docsense.generation.context import ContextAssembler
+from docsense.generation.generator import Generator
+from docsense.generation.prompt import PromptBuilder
+from docsense.generation.types import Answer, ChunkRef
+from docsense.reranking.reranker import CrossEncoderReranker
+from docsense.retrieval.dense import DenseRetriever
+from docsense.retrieval.hybrid import HybridRetriever
+from docsense.retrieval.sparse import SparseRetriever
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    from docsense.evaluation.judge import JudgeScore
+
+logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+logger = logging.getLogger(__name__)
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+INDEX_DIR = DATA_DIR / "index"
+EVAL_SETS_DIR = PROJECT_ROOT / "evaluations" / "eval_sets"
+REPORTS_DIR = PROJECT_ROOT / "evaluations" / "reports"
+EVAL_RUNS_DIR = DATA_DIR / "eval-runs"
+
+ALL_EVAL_SETS = ("curated", "structural", "no-answer")
+
+
+@dataclass(frozen=True)
+class EvalQuery:
+    """One eval-set entry, normalized across in-corpus and off-corpus sets.
+
+    ``query_id`` is the stable identifier we key per-query records on.
+    ``is_no_answer`` flips judge selection — off-corpus queries skip
+    LLM-judge metrics (faithfulness/relevance don't apply when context
+    is meant to be irrelevant) and only get the rule-based refusal
+    check.
+    """
+
+    query_id: str
+    text: str
+    is_no_answer: bool
+
+
+@dataclass
+class QueryRecord:
+    """In-memory carrier from Phase B (generation) into Phase C (judging).
+
+    Phase B fills ``answer`` and ``timing``. Phase C fills the score
+    fields if applicable. Phase D dumps the whole thing to the report.
+    """
+
+    query: EvalQuery
+    answer: Answer
+    timing: dict[str, float]
+    faithfulness: JudgeScore | None = None
+    relevance: JudgeScore | None = None
+
+
+# ---------------------------------------------------------------------------
+# Eval-set loading
+# ---------------------------------------------------------------------------
+
+
+def _load_curated() -> list[EvalQuery]:
+    return [
+        EvalQuery(query_id=f"curated_{i:03d}", text=q, is_no_answer=False)
+        for i, (q, _prefixes) in enumerate(CURATED_QUERIES, start=1)
+    ]
+
+
+def _load_structural() -> list[EvalQuery]:
+    path = EVAL_SETS_DIR / "structural.json"
+    if not path.exists():
+        msg = (
+            f"Structural eval set not found at {path}. "
+            "Generate with: python scripts/generate_structural_queries.py"
+        )
+        raise FileNotFoundError(msg)
+    raw = json.loads(path.read_text())
+    return [
+        EvalQuery(query_id=f"structural_{i:03d}", text=item["query"], is_no_answer=False)
+        for i, item in enumerate(raw, start=1)
+    ]
+
+
+def _load_no_answer() -> list[EvalQuery]:
+    return [
+        EvalQuery(query_id=f"no_answer_{i:03d}", text=q, is_no_answer=True)
+        for i, q in enumerate(NO_ANSWER_QUERIES, start=1)
+    ]
+
+
+def load_eval_set(name: str) -> list[EvalQuery]:
+    if name == "curated":
+        return _load_curated()
+    if name == "structural":
+        return _load_structural()
+    if name == "no-answer":
+        return _load_no_answer()
+    msg = f"Unknown eval set: {name!r}"
+    raise ValueError(msg)
+
+
+# ---------------------------------------------------------------------------
+# Phase A — retrieval stack
+# ---------------------------------------------------------------------------
+
+
+def _load_index_and_chunks(strategy: str) -> tuple[faiss.Index, list]:
+    idx_dir = INDEX_DIR / strategy
+    if not idx_dir.exists():
+        msg = (
+            f"No index at {idx_dir}. Run "
+            f"`python scripts/build_index.py --strategy {strategy}` first."
+        )
+        raise FileNotFoundError(msg)
+    index = faiss.read_index(str(idx_dir / "index.faiss"))
+    with open(idx_dir / "chunks.pkl", "rb") as f:
+        chunks = pickle.load(f)  # noqa: S301
+    return index, chunks
+
+
+def build_retrieval_stack(settings: Settings, strategy: str) -> tuple[HybridRetriever, int]:
+    """Return a configured production-style HybridRetriever (with reranker).
+
+    The eval intentionally uses the production stack — hybrid + cross-
+    encoder rerank — because that's what downstream generation will see
+    in practice. Running the eval against a different retrieval pipeline
+    would measure a system we never serve.
+    """
+    index, chunks = _load_index_and_chunks(strategy)
+    logger.info("Loaded %s index: %d vectors / %d chunks", strategy, index.ntotal, len(chunks))
+
+    embedder = Embedder(settings.embedding)
+
+    dense = DenseRetriever(dimension=index.d)
+    dense.index = index
+    dense.chunks = chunks
+
+    sparse = SparseRetriever()
+    sparse.add(chunks)
+
+    reranker = CrossEncoderReranker(settings.reranking)
+    hybrid = HybridRetriever(dense, sparse, embedder, settings.retrieval, reranker=reranker)
+    return hybrid, len(chunks)
+
+
+# ---------------------------------------------------------------------------
+# Phase B — generation
+# ---------------------------------------------------------------------------
+
+
+def _free_cuda(label: str) -> None:
+    """Release CUDA memory between Phase B and Phase C.
+
+    Calls ``gc.collect()`` first so any lingering Python references to
+    the just-deleted model are dropped before ``empty_cache``. Without
+    the explicit gc, accelerate hooks and BitsAndBytes parameter
+    objects can survive a ``del`` and pin VRAM. Logs the post-free
+    allocated bytes so the eval log shows the handoff worked.
+    """
+    gc.collect()
+    try:
+        import torch
+
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            allocated_mb = torch.cuda.memory_allocated() / (1024**2)
+            logger.info("After %s: CUDA allocated = %.0f MB", label, allocated_mb)
+    except ImportError:
+        # CPU-only environment: nothing to free.
+        pass
+
+
+def run_generation_phase(
+    queries: list[EvalQuery],
+    retriever: HybridRetriever,
+    settings: Settings,
+    run_dir: Path,
+    eval_set: str,
+) -> list[QueryRecord]:
+    """Run all queries through the pipeline; return per-query records.
+
+    Generator is loaded inside this function so its lifecycle is
+    contained — at function exit the local reference goes out of scope
+    and ``_free_cuda`` releases the VRAM before Phase C tries to load
+    the judge.
+
+    Per-query Answer JSON dumps go to disk as a debugging side-effect.
+    The records returned in-memory carry the same data; the disk dumps
+    are mainly for post-mortem when something looks off in the report.
+    """
+    prompt_builder = PromptBuilder()
+    assembler = ContextAssembler(max_tokens=settings.generation.max_context_tokens)
+    generator = Generator(settings.generation)
+
+    answers_dir = run_dir / eval_set
+    answers_dir.mkdir(parents=True, exist_ok=True)
+
+    records: list[QueryRecord] = []
+    for i, q in enumerate(queries, start=1):
+        logger.info("[%d/%d] %s — %s", i, len(queries), q.query_id, q.text[:80])
+
+        t0 = time.perf_counter()
+        results = retriever.search(q.text)
+        retrieve_ms = (time.perf_counter() - t0) * 1000
+
+        chunk_refs = [
+            ChunkRef(
+                doc_id=r.chunk.doc_id,
+                chunk_id=r.chunk.chunk_id,
+                score=r.score,
+                text=r.chunk.text,
+            )
+            for r in results
+        ]
+
+        t0 = time.perf_counter()
+        context, included = assembler.assemble(chunk_refs)
+        messages = prompt_builder.build(query=q.text, context=context)
+        assemble_ms = (time.perf_counter() - t0) * 1000
+
+        answer = generator.generate(messages, included)
+        timing = {
+            "retrieve_ms": retrieve_ms,
+            "assemble_ms": assemble_ms,
+            "generate_ms": float(answer.metadata.latency_ms),
+        }
+        records.append(QueryRecord(query=q, answer=answer, timing=timing))
+
+        # Best-effort dump for debugging; failure to dump shouldn't kill
+        # the run since the in-memory record still flows through Phase C.
+        try:
+            (answers_dir / f"{q.query_id}.json").write_text(answer.model_dump_json(indent=2) + "\n")
+        except OSError as exc:
+            logger.warning("Could not dump %s answer JSON: %s", q.query_id, exc)
+
+    del generator
+    _free_cuda("generator unload")
+    return records
+
+
+# ---------------------------------------------------------------------------
+# Phase C — judging
+# ---------------------------------------------------------------------------
+
+
+def _format_context_for_judge(chunks: Iterable[ChunkRef]) -> str:
+    """Render retrieved chunks as the judge sees them.
+
+    Uses the same numbered ``[N]`` shape PromptBuilder uses for the
+    generator, so the judge's view of "context" matches what was
+    actually in the prompt. Drift here would make faithfulness scores
+    measure a different thing than the generator was given.
+    """
+    pieces: list[str] = []
+    for i, c in enumerate(chunks, start=1):
+        pieces.append(f"[{i}] (source: {c.doc_id})\n{c.text}")
+    return "\n\n".join(pieces)
+
+
+def run_judging_phase(records: list[QueryRecord], settings: Settings) -> None:
+    """Score each record's Answer in-place.
+
+    For in-corpus queries: faithfulness + relevance via the LLM judge.
+    For no-answer queries: skipped — the judge prompts assume a
+    well-formed in-corpus question, and grading "I don't know" for
+    relevance produces meaningless scores.
+
+    The rule-based checks (citation grounding, refusal behavior) run
+    on every record and are computed in Phase D from the Answer
+    state — they don't need the judge to be loaded.
+    """
+    if all(r.query.is_no_answer for r in records):
+        logger.info("All-no-answer eval set: skipping LLM-judge load.")
+        return
+
+    judge = LlamaJudge(settings.judge)
+
+    for i, rec in enumerate(records, start=1):
+        if rec.query.is_no_answer:
+            continue
+        logger.info("[%d/%d] judging %s", i, len(records), rec.query.query_id)
+        ctx = _format_context_for_judge(rec.answer.retrieved_chunks)
+        rec.faithfulness = judge.judge_faithfulness(rec.query.text, ctx, rec.answer.text)
+        rec.relevance = judge.judge_relevance(rec.query.text, rec.answer.text)
+
+    del judge
+    _free_cuda("judge unload")
+
+
+# ---------------------------------------------------------------------------
+# Phase D — aggregation + report
+# ---------------------------------------------------------------------------
+
+
+def _percentiles(values: list[float]) -> dict[str, float]:
+    """Return p50/p90/max plus mean. Empty input returns NaN-ish dict."""
+    if not values:
+        return {"p50": 0.0, "p90": 0.0, "max": 0.0, "mean": 0.0, "n": 0}
+    sorted_vals = sorted(values)
+
+    def _pct(p: float) -> float:
+        # Linear interpolation between the two nearest ranks.
+        if len(sorted_vals) == 1:
+            return sorted_vals[0]
+        idx = (len(sorted_vals) - 1) * p
+        lo = int(idx)
+        hi = min(lo + 1, len(sorted_vals) - 1)
+        frac = idx - lo
+        return sorted_vals[lo] + frac * (sorted_vals[hi] - sorted_vals[lo])
+
+    return {
+        "p50": round(_pct(0.5), 2),
+        "p90": round(_pct(0.9), 2),
+        "max": round(max(sorted_vals), 2),
+        "mean": round(statistics.fmean(sorted_vals), 2),
+        "n": len(sorted_vals),
+    }
+
+
+def _aggregate_scores(records: list[QueryRecord], attr: str) -> dict[str, Any]:
+    """Aggregate JudgeScore values stored on ``records`` under attribute ``attr``.
+
+    Returns mean + anchor distribution + parse-failure count. Anchor
+    distribution is a count per anchor value so an analyst can see
+    whether the judge clusters at one anchor (suspicious) or spreads
+    across the scale (healthier signal).
+    """
+    scores: list[float] = []
+    n_parse_failed = 0
+    anchor_dist: dict[str, int] = {f"{a:.2f}": 0 for a in (0.0, 0.25, 0.5, 0.75, 1.0)}
+    for rec in records:
+        score: JudgeScore | None = getattr(rec, attr)
+        if score is None:
+            continue
+        scores.append(score.score)
+        anchor_dist[f"{score.score:.2f}"] = anchor_dist.get(f"{score.score:.2f}", 0) + 1
+        if "PARSE_FAILED" in score.rationale:
+            n_parse_failed += 1
+    if not scores:
+        return {"n": 0}
+    return {
+        "n": len(scores),
+        "mean": round(statistics.fmean(scores), 3),
+        "median": round(statistics.median(scores), 3),
+        "anchor_distribution": anchor_dist,
+        "n_parse_failures": n_parse_failed,
+    }
+
+
+def build_report(
+    records: list[QueryRecord],
+    *,
+    eval_set: str,
+    settings: Settings,
+    chunks_total: int,
+    limit_applied: int | None,
+) -> dict[str, Any]:
+    """Assemble the final report dict from all records."""
+    per_query: list[dict[str, Any]] = []
+    for rec in records:
+        cit = check_citations_grounded(rec.answer)
+        entry: dict[str, Any] = {
+            "query_id": rec.query.query_id,
+            "query": rec.query.text,
+            "answer_text": rec.answer.text,
+            "is_no_answer_query": rec.query.is_no_answer,
+            "n_retrieved_chunks": len(rec.answer.retrieved_chunks),
+            "timing": rec.timing,
+            "citation_check": cit.model_dump(),
+        }
+        if rec.query.is_no_answer:
+            no_ans = check_no_answer_behavior(rec.answer, expected_refusal=True)
+            entry["no_answer_check"] = no_ans.model_dump()
+        else:
+            entry["faithfulness"] = rec.faithfulness.model_dump() if rec.faithfulness else None
+            entry["relevance"] = rec.relevance.model_dump() if rec.relevance else None
+        per_query.append(entry)
+
+    # Aggregates
+    aggregates: dict[str, Any] = {}
+    in_corpus_records = [r for r in records if not r.query.is_no_answer]
+    no_answer_records = [r for r in records if r.query.is_no_answer]
+
+    if in_corpus_records:
+        aggregates["faithfulness"] = _aggregate_scores(in_corpus_records, "faithfulness")
+        aggregates["relevance"] = _aggregate_scores(in_corpus_records, "relevance")
+        cits = [check_citations_grounded(r.answer) for r in in_corpus_records]
+        aggregates["citation_check"] = {
+            "n": len(cits),
+            "frac_with_any_marker": round(
+                statistics.fmean([1.0 if c.any_marker_present else 0.0 for c in cits]), 3
+            ),
+            "frac_all_in_range": round(
+                statistics.fmean([1.0 if c.all_markers_in_range else 0.0 for c in cits]), 3
+            ),
+            "mean_n_markers_in_text": round(
+                statistics.fmean([c.n_markers_in_text for c in cits]), 3
+            ),
+        }
+    if no_answer_records:
+        no_ans_results = [
+            check_no_answer_behavior(r.answer, expected_refusal=True) for r in no_answer_records
+        ]
+        aggregates["no_answer_check"] = {
+            "n": len(no_ans_results),
+            "frac_correct_refusal": round(
+                statistics.fmean([1.0 if r.correct else 0.0 for r in no_ans_results]), 3
+            ),
+            "frac_refused": round(
+                statistics.fmean([1.0 if r.refused else 0.0 for r in no_ans_results]), 3
+            ),
+        }
+
+    timings_by_stage = {
+        "retrieve_ms": [r.timing["retrieve_ms"] for r in records],
+        "assemble_ms": [r.timing["assemble_ms"] for r in records],
+        "generate_ms": [r.timing["generate_ms"] for r in records],
+    }
+    timing_percentiles = {stage: _percentiles(values) for stage, values in timings_by_stage.items()}
+
+    return {
+        "schema_version": 1,
+        "captured_at": datetime.now(tz=UTC).isoformat(timespec="seconds"),
+        "eval_set": eval_set,
+        "eval_set_size": len(records),
+        "limit_applied": limit_applied,
+        "config": {
+            "chunking_strategy": settings.chunking.strategy,
+            "chunks_total": chunks_total,
+            "generator_model": settings.generation.model_name,
+            "judge_model": (
+                settings.judge.model_name
+                if any(not r.query.is_no_answer for r in records)
+                else None
+            ),
+            "use_4bit_generator": settings.generation.use_4bit_quantization,
+            "use_4bit_judge": settings.judge.use_4bit_quantization,
+            "rerank_candidates": settings.retrieval.rerank_candidates,
+            "top_k": settings.retrieval.top_k,
+            "max_context_tokens": settings.generation.max_context_tokens,
+            "max_new_tokens_generator": settings.generation.max_new_tokens,
+            "max_new_tokens_judge": settings.judge.max_new_tokens,
+        },
+        "aggregates": aggregates,
+        "timing_ms_per_query": timing_percentiles,
+        "per_query": per_query,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+
+def _apply_device_override(settings: Settings, device: str | None) -> None:
+    if device is None:
+        return
+    settings.generation = GenerationConfig(**{**settings.generation.model_dump(), "device": device})
+    settings.judge = JudgeConfig(**{**settings.judge.model_dump(), "device": device})
+
+
+def run_one_eval_set(
+    eval_set: str,
+    *,
+    settings: Settings,
+    strategy: str,
+    limit: int | None,
+    run_id: str,
+) -> Path:
+    """Run Phases A-D for one eval set; return the path to the report.
+
+    Each eval set is a self-contained run (its own retrieval load, its
+    own generator load, its own judge load). When --eval-set all is
+    used the outer loop just calls this three times.
+    """
+    queries = load_eval_set(eval_set)
+    if limit is not None:
+        queries = queries[:limit]
+    logger.info("=== Eval set: %s (%d queries) ===", eval_set, len(queries))
+
+    retriever, chunks_total = build_retrieval_stack(settings, strategy)
+
+    run_dir = EVAL_RUNS_DIR / run_id
+    records = run_generation_phase(
+        queries=queries,
+        retriever=retriever,
+        settings=settings,
+        run_dir=run_dir,
+        eval_set=eval_set,
+    )
+
+    run_judging_phase(records, settings)
+
+    report = build_report(
+        records,
+        eval_set=eval_set,
+        settings=settings,
+        chunks_total=chunks_total,
+        limit_applied=limit,
+    )
+    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    out_path = REPORTS_DIR / f"generation-{run_id}-{eval_set}.json"
+    out_path.write_text(json.dumps(report, indent=2, sort_keys=False) + "\n")
+    logger.info("Report written to %s", out_path)
+    _print_summary(report)
+    return out_path
+
+
+def _print_summary(report: dict[str, Any]) -> None:
+    """Brief stdout summary so the operator sees results without
+    opening the JSON."""
+    print()
+    print(f"=== {report['eval_set']} (n={report['eval_set_size']}) ===")
+    agg = report["aggregates"]
+    if "faithfulness" in agg and agg["faithfulness"]["n"] > 0:
+        print(
+            f"  faithfulness: mean={agg['faithfulness']['mean']:.3f}  "
+            f"parse-failures={agg['faithfulness'].get('n_parse_failures', 0)}"
+        )
+    if "relevance" in agg and agg["relevance"]["n"] > 0:
+        print(
+            f"  relevance:    mean={agg['relevance']['mean']:.3f}  "
+            f"parse-failures={agg['relevance'].get('n_parse_failures', 0)}"
+        )
+    if "citation_check" in agg:
+        cc = agg["citation_check"]
+        print(
+            f"  citations:    frac_any_marker={cc['frac_with_any_marker']:.2f}  "
+            f"mean_markers/answer={cc['mean_n_markers_in_text']:.2f}"
+        )
+    if "no_answer_check" in agg:
+        no = agg["no_answer_check"]
+        print(
+            f"  no-answer:    frac_correct={no['frac_correct_refusal']:.2f}  "
+            f"frac_refused={no['frac_refused']:.2f}"
+        )
+    timing = report["timing_ms_per_query"]
+    print(
+        f"  timing/query: retrieve p50={timing['retrieve_ms']['p50']:.0f}ms  "
+        f"generate p50={timing['generate_ms']['p50']:.0f}ms  "
+        f"generate p90={timing['generate_ms']['p90']:.0f}ms"
+    )
+    print()
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        "--eval-set",
+        choices=(*ALL_EVAL_SETS, "all"),
+        required=True,
+        help=(
+            "Which eval set to evaluate. 'all' runs curated → structural → "
+            "no-answer in sequence with a separate retrieval+generator+judge "
+            "load per set."
+        ),
+    )
+    parser.add_argument(
+        "--strategy",
+        choices=("fixed", "recursive", "header"),
+        default="recursive",
+        help="Chunking strategy whose index to load (default: recursive).",
+    )
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help=(
+            "Cap each eval set to the first N queries. Use 5 for a fast "
+            "dry-run that still exercises every phase before committing "
+            "to a full ~45-minute run."
+        ),
+    )
+    parser.add_argument(
+        "--device",
+        default=None,
+        help=(
+            "Override device for both generator and judge. 'auto' is the "
+            "default in config; pass 'cuda:0' to force all-GPU placement "
+            "on a 12 GB shared GPU (avoids accelerate spilling weights to "
+            "CPU and thrashing). 'cpu' for CPU-only runs."
+        ),
+    )
+    args = parser.parse_args()
+
+    settings = Settings()
+    _apply_device_override(settings, args.device)
+
+    run_id = datetime.now(tz=UTC).strftime("%Y%m%dT%H%M%SZ")
+    logger.info("Run ID: %s", run_id)
+    logger.info("Generator model: %s", settings.generation.model_name)
+    logger.info("Judge model:     %s", settings.judge.model_name)
+    logger.info("Chunking:        %s", args.strategy)
+    logger.info("Limit:           %s", args.limit or "(none)")
+    logger.info("Device override: %s", args.device or "(default)")
+
+    eval_sets_to_run: tuple[str, ...] = (
+        ALL_EVAL_SETS if args.eval_set == "all" else (args.eval_set,)
+    )
+    for es in eval_sets_to_run:
+        run_one_eval_set(
+            es,
+            settings=settings,
+            strategy=args.strategy,
+            limit=args.limit,
+            run_id=run_id,
+        )
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
