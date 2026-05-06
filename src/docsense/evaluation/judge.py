@@ -1,15 +1,19 @@
 """LLM-judge abstraction for generation-quality evals.
 
-Two judge methods, deliberately minimal:
+Three judge methods, deliberately minimal:
 
-- ``judge_faithfulness(question, context, answer)`` — does the answer
-  follow from the supplied context, without inventing facts?
+- ``judge_faithfulness(question, chunks, answer)`` — does the answer
+  follow from the retrieved chunks, without inventing facts?
 - ``judge_relevance(question, answer)`` — does the answer actually
   address the question that was asked?
+- ``judge_refusal(question, answer)`` — does the answer indicate the
+  model could not answer because the necessary information wasn't in
+  the retrieved context? Used for off-corpus queries to measure
+  refusal robustness.
 
-Faithfulness needs context (the retrieved chunks the LLM saw).
-Relevance does not — an off-topic answer is off-topic regardless of
-what was retrieved. This shape mirrors the metrics in eval-methodology.md.
+Faithfulness needs chunks (the retrieved chunks the LLM saw).
+Relevance and refusal do not — both are between the question and the
+answer alone. This shape mirrors the metrics in eval-methodology.md.
 
 **Faithfulness scoring approach (as of 2026-05-06):** RAGAS-style
 claim-level decomposition. The judge first extracts atomic factual
@@ -17,17 +21,30 @@ claims from the answer, then attributes each claim to a specific
 retrieved chunk (or marks it unsupported). The score is
 ``n_supported_claims / n_total_claims``, computed continuously in
 ``[0.0, 1.0]``. This replaced an earlier 5-anchor absolute-scale
-approach that exhibited LLM-as-judge anchor saturation at 0.75
-(49 of 50 in-corpus answers scored exactly 0.75 — see the
-2026-05-06 baseline analysis). Per-chunk attribution makes the
-score grounded in concrete evidence and produces actionable
+approach that exhibited LLM-as-judge anchor saturation at 0.75 —
+see the 2026-05-06 baseline analysis. Per-chunk attribution makes
+the score grounded in concrete evidence and produces actionable
 debugging data.
 
-Relevance still uses the absolute-scale anchor approach
-(0.0 / 0.25 / 0.5 / 0.75 / 1.0). It showed less saturation in the
-baseline and a per-claim decomposition for "does the answer address
-the question?" is awkward (the answer is one thing). We can revisit
-if Phase 3 measurements suggest relevance also needs decomposition.
+Relevance uses the absolute-scale anchor approach (0.0 / 0.25 /
+0.5 / 0.75 / 1.0). It showed less saturation in the baseline and a
+per-claim decomposition for "does the answer address the question?"
+is awkward (the answer is one thing).
+
+**Refusal detection (added 2026-05-06):** previously done by regex
+pattern-matching against the answer text (`check_no_answer_behavior`
+in `rule_based.py`). That worked but had a foreseeable failure
+mode — Phase 3 fine-tuning will shift Qwen's refusal phrasing in
+ways the regex can't anticipate. ``judge_refusal`` replaces the
+regex with an LLM judgment: pass the answer to Llama, ask "did this
+indicate inability to answer due to missing context?" The rule-based
+check is still run alongside as a guardrail and cross-validation
+signal — disagreements between the two surface either regex coverage
+gaps or judge hallucinations.
+
+Refusal is a bool decision (``RefusalJudgment``), not a [0, 1] score.
+Forcing it into a score-on-a-scale shape would over-engineer for
+naturally categorical data.
 """
 
 from __future__ import annotations
@@ -41,6 +58,28 @@ if TYPE_CHECKING:
     from docsense.generation.types import ChunkRef
 
 JudgeMetric = Literal["faithfulness", "relevance"]
+
+
+class RefusalJudgment(BaseModel):
+    """LLM-judge verdict on whether an answer indicates refusal.
+
+    Used for off-corpus eval queries. The judge reads the answer and
+    decides whether the model acknowledged it couldn't answer because
+    the required information wasn't in the retrieved context. This is
+    distinct from:
+
+    - The answer being wrong (low faithfulness)
+    - The answer being off-topic (low relevance)
+    - The model hedging while still attempting an answer
+
+    Bool rather than a [0, 1] score because refusal is naturally
+    categorical — there's no meaningful "70% refused" middle state.
+    Forcing it into ``JudgeScore``'s shape would be type-system
+    cosplay.
+    """
+
+    refused: bool
+    rationale: str
 
 
 class ClaimAttribution(BaseModel):
@@ -167,4 +206,26 @@ class LLMJudge(ABC):
         5-anchor scale (claim_attributions empty for relevance —
         the question/answer pair is a single judgment, not a
         decomposition). No ``context`` is needed.
+        """
+
+    @abstractmethod
+    def judge_refusal(self, question: str, answer: str) -> RefusalJudgment:
+        """Decide whether ``answer`` indicates the model could not answer.
+
+        For off-corpus eval queries the well-behaved system refuses
+        with a phrase like "I don't have enough context to answer
+        that." The judge inspects the answer and produces a typed
+        ``RefusalJudgment(refused: bool, rationale: str)``.
+
+        This is distinct from a wrong answer or an off-topic answer:
+        we're detecting *acknowledged inability*, not quality. The
+        prompt explicitly distinguishes refusal from hedging
+        ("I'm not sure but I think..." attempts an answer while
+        hedging — not a refusal).
+
+        Replaces the prior regex-based refusal detection. The
+        rule-based check is still useful as a cheap guardrail and
+        cross-validation signal in the eval driver, but the LLM judge
+        is the primary measurement going forward — robust to phrasing
+        drift from Phase 3 fine-tuning.
         """

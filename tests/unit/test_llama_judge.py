@@ -15,6 +15,7 @@ from docsense.evaluation.llama_judge import (
     _snap_to_anchor,
     parse_claim_attributions,
     parse_claims,
+    parse_refusal_response,
     parse_relevance_response,
 )
 from docsense.generation.types import ChunkRef
@@ -233,6 +234,53 @@ class TestParseClaimAttributions:
 
 
 # --------------------------------------------------------------------
+# Refusal parser
+# --------------------------------------------------------------------
+
+
+class TestParseRefusalResponse:
+    def test_clean_yes(self):
+        text = "REFUSED: yes\nRATIONALE: model said it doesn't have enough context"
+        j = parse_refusal_response(text)
+        assert j.refused is True
+        assert "doesn't have enough context" in j.rationale
+
+    def test_clean_no(self):
+        text = "REFUSED: no\nRATIONALE: model attempted an answer with hedging"
+        j = parse_refusal_response(text)
+        assert j.refused is False
+
+    def test_lowercase_keywords_accepted(self):
+        text = "refused: yes\nrationale: ok"
+        j = parse_refusal_response(text)
+        assert j.refused is True
+
+    def test_y_n_shorthand_accepted(self):
+        """Some LLM outputs abbreviate to y/n. Accept the shorthand."""
+        assert parse_refusal_response("REFUSED: y\nRATIONALE: ok").refused is True
+        assert parse_refusal_response("REFUSED: n\nRATIONALE: ok").refused is False
+
+    def test_true_false_accepted(self):
+        """Defensive — some LLMs output true/false instead of yes/no."""
+        assert parse_refusal_response("REFUSED: true").refused is True
+        assert parse_refusal_response("REFUSED: false").refused is False
+
+    def test_no_refused_returns_parse_failure_conservative(self):
+        """Conservative default: parse failure → refused=False. We do
+        NOT want a parse failure to silently inflate the refusal rate
+        by classifying a confabulation as a refusal. The PARSE_FAILED
+        marker on the rationale flags the case for review."""
+        j = parse_refusal_response("Sorry, I'm not sure how to evaluate that.")
+        assert j.refused is False
+        assert "PARSE_FAILED" in j.rationale
+
+    def test_score_present_but_no_rationale(self):
+        j = parse_refusal_response("REFUSED: yes")
+        assert j.refused is True
+        assert "no RATIONALE" in j.rationale
+
+
+# --------------------------------------------------------------------
 # Faithfulness end-to-end (claim-level decomposition)
 # --------------------------------------------------------------------
 
@@ -388,4 +436,55 @@ class TestJudgeRelevance:
         judge.queue("I'm sorry, as an AI language model I cannot...")
         result = judge.judge_relevance("q?", "ans")
         assert result.score == 0.0
+        assert "PARSE_FAILED" in result.rationale
+
+
+# --------------------------------------------------------------------
+# Refusal end-to-end (single LLM call, REFUSED: yes/no)
+# --------------------------------------------------------------------
+
+
+class TestJudgeRefusalEndToEnd:
+    def test_refusal_yes(self):
+        judge = StubJudge()
+        judge.queue("REFUSED: yes\nRATIONALE: model said it doesn't have context")
+        result = judge.judge_refusal("Off-corpus q?", "I don't have enough context.")
+        assert result.refused is True
+        assert "doesn't have context" in result.rationale
+
+    def test_refusal_no(self):
+        judge = StubJudge()
+        judge.queue("REFUSED: no\nRATIONALE: model attempted an answer")
+        result = judge.judge_refusal("In-corpus q?", "AutoModel takes a name.")
+        assert result.refused is False
+
+    def test_refusal_uses_default_token_budget(self):
+        """Pin the contract: refusal-judging is a single REFUSED: yes/no
+        + one-sentence RATIONALE — fits in the default JudgeConfig.max_new_tokens
+        (256). No per-call override needed (unlike faithfulness)."""
+        judge = StubJudge()
+        judge.queue("REFUSED: no\nRATIONALE: ok")
+        judge.judge_refusal("q?", "ans")
+        assert judge.max_new_tokens_seen == [None]  # default-budget path
+
+    def test_refusal_prompt_no_chunks(self):
+        """Refusal judgment doesn't need retrieved chunks — just the
+        question/answer pair. Pin the contract by checking the user
+        message contains QUESTION and ANSWER but not CHUNKS or CONTEXT."""
+        judge = StubJudge()
+        judge.queue("REFUSED: yes\nRATIONALE: ok")
+        judge.judge_refusal("q?", "ans")
+        user_content = judge.calls[0][1]["content"]
+        assert "QUESTION" in user_content
+        assert "ANSWER" in user_content
+        assert "CHUNKS" not in user_content
+        assert "CONTEXT" not in user_content
+
+    def test_garbage_response_falls_back_to_not_refused(self):
+        """Conservative default: parse failure → refused=False so a
+        parse failure can't accidentally inflate the refusal rate."""
+        judge = StubJudge()
+        judge.queue("I'm sorry, I cannot evaluate that.")
+        result = judge.judge_refusal("q?", "ans")
+        assert result.refused is False
         assert "PARSE_FAILED" in result.rationale

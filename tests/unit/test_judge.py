@@ -5,7 +5,12 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from docsense.evaluation.judge import ClaimAttribution, JudgeScore, LLMJudge
+from docsense.evaluation.judge import (
+    ClaimAttribution,
+    JudgeScore,
+    LLMJudge,
+    RefusalJudgment,
+)
 from docsense.generation.types import ChunkRef
 
 
@@ -16,13 +21,16 @@ class MockJudge(LLMJudge):
         self,
         faith_score: float = 1.0,
         rel_score: float = 1.0,
+        refused: bool = True,
         rationale: str = "mock",
     ) -> None:
         self.faith_score = faith_score
         self.rel_score = rel_score
+        self.refused = refused
         self.rationale = rationale
         self.faith_calls: list[tuple[str, list[ChunkRef], str]] = []
         self.rel_calls: list[tuple[str, str]] = []
+        self.refusal_calls: list[tuple[str, str]] = []
 
     def judge_faithfulness(self, question: str, chunks: list[ChunkRef], answer: str) -> JudgeScore:
         self.faith_calls.append((question, chunks, answer))
@@ -31,6 +39,10 @@ class MockJudge(LLMJudge):
     def judge_relevance(self, question: str, answer: str) -> JudgeScore:
         self.rel_calls.append((question, answer))
         return JudgeScore(metric="relevance", score=self.rel_score, rationale=self.rationale)
+
+    def judge_refusal(self, question: str, answer: str) -> RefusalJudgment:
+        self.refusal_calls.append((question, answer))
+        return RefusalJudgment(refused=self.refused, rationale=self.rationale)
 
 
 class TestJudgeScore:
@@ -139,14 +151,16 @@ class TestLLMJudgeABC:
             LLMJudge()  # type: ignore[abstract]
 
     def test_mock_subclass_satisfies_interface(self):
-        judge = MockJudge(faith_score=0.5, rel_score=0.75)
+        judge = MockJudge(faith_score=0.5, rel_score=0.75, refused=True)
         chunks = [ChunkRef(doc_id="a.md", chunk_id="1", score=1.0, text="alpha")]
         f = judge.judge_faithfulness("q", chunks, "ans")
         r = judge.judge_relevance("q", "ans")
+        ref = judge.judge_refusal("q", "ans")
         assert f.score == 0.5
         assert f.metric == "faithfulness"
         assert r.score == 0.75
         assert r.metric == "relevance"
+        assert ref.refused is True
 
     def test_mock_records_calls(self):
         """Confirms the test double's call-recording works — used by
@@ -155,5 +169,24 @@ class TestLLMJudgeABC:
         chunks = [ChunkRef(doc_id="a.md", chunk_id="1", score=1.0, text="alpha")]
         judge.judge_faithfulness("q1", chunks, "a1")
         judge.judge_relevance("q1", "a1")
+        judge.judge_refusal("q1", "a1")
         assert judge.faith_calls == [("q1", chunks, "a1")]
         assert judge.rel_calls == [("q1", "a1")]
+        assert judge.refusal_calls == [("q1", "a1")]
+
+
+class TestRefusalJudgment:
+    def test_refused_construction(self):
+        j = RefusalJudgment(refused=True, rationale="model said don't have context")
+        assert j.refused is True
+        assert "don't have context" in j.rationale
+
+    def test_not_refused_construction(self):
+        j = RefusalJudgment(refused=False, rationale="model attempted to answer")
+        assert j.refused is False
+
+    def test_round_trip(self):
+        j = RefusalJudgment(refused=True, rationale="r")
+        rehydrated = RefusalJudgment.model_validate(j.model_dump())
+        assert rehydrated.refused is True
+        assert rehydrated.rationale == "r"
