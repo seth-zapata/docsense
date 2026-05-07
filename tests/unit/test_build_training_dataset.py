@@ -345,6 +345,201 @@ class TestReadApiKey:
 # --------------------------------------------------------------------
 
 
+# --------------------------------------------------------------------
+# Resumability helpers
+# --------------------------------------------------------------------
+
+
+class TestRawJsonlPath:
+    def test_json_output(self, tmp_path):
+        out = tmp_path / "dataset.json"
+        assert distill._raw_jsonl_path(out) == tmp_path / "dataset.raw.jsonl"
+
+    def test_other_extension(self, tmp_path):
+        out = tmp_path / "out.txt"
+        assert distill._raw_jsonl_path(out) == tmp_path / "out.raw.jsonl"
+
+    def test_no_extension(self, tmp_path):
+        out = tmp_path / "noext"
+        assert distill._raw_jsonl_path(out) == tmp_path / "noext.raw.jsonl"
+
+
+class TestCacheKey:
+    def test_query_and_chunk_ids_both_in_key(self):
+        chunks = [_chunk(1), _chunk(2)]
+        key = distill._cache_key("how do I X?", chunks)
+        assert "how do I X?" in key
+        assert "1" in key  # chunk_id from _chunk(1)
+        assert "2" in key
+
+    def test_same_query_different_chunks_distinct_keys(self):
+        """If retrieval returns different chunks for the same query
+        (e.g., re-ran Stage 1 with different sampling), the cached
+        answer is correctly invalidated."""
+        a = distill._cache_key("q", [_chunk(1)])
+        b = distill._cache_key("q", [_chunk(2)])
+        assert a != b
+
+    def test_chunk_order_matters(self):
+        """Chunk order is preserved in the key. Same chunks reordered
+        → different key. This is conservative — could relax to
+        order-independent if it becomes a problem, but order does
+        affect the citation indices in the answer."""
+        a = distill._cache_key("q", [_chunk(1), _chunk(2)])
+        b = distill._cache_key("q", [_chunk(2), _chunk(1)])
+        assert a != b
+
+
+class TestReadDoneExamples:
+    def test_returns_empty_for_missing_file(self, tmp_path):
+        assert distill._read_done_examples(tmp_path / "nonexistent.jsonl") == {}
+
+    def test_round_trip_via_jsonl(self, tmp_path):
+        path = tmp_path / "raw.jsonl"
+        ex = TrainingExample(
+            query="how do I X?",
+            retrieved_chunks=[_chunk(1)],
+            ideal_answer="Use X [1].",
+            is_refusal=False,
+        )
+        distill._append_example(path, ex)
+        loaded = distill._read_done_examples(path)
+        assert len(loaded) == 1
+        key = distill._cache_key(ex.query, ex.retrieved_chunks)
+        assert key in loaded
+        assert loaded[key].query == ex.query
+        assert loaded[key].ideal_answer == "Use X [1]."
+
+    def test_skips_blank_lines(self, tmp_path):
+        path = tmp_path / "raw.jsonl"
+        ex = TrainingExample(
+            query="q1",
+            retrieved_chunks=[_chunk(1)],
+            ideal_answer="A [1]",
+            is_refusal=False,
+        )
+        distill._append_example(path, ex)
+        # Inject a blank line in the middle.
+        with path.open("a") as f:
+            f.write("\n")
+        ex2 = TrainingExample(
+            query="q2",
+            retrieved_chunks=[_chunk(2)],
+            ideal_answer="B [1]",
+            is_refusal=False,
+        )
+        distill._append_example(path, ex2)
+        assert len(distill._read_done_examples(path)) == 2
+
+    def test_skips_corrupt_lines(self, tmp_path):
+        """One malformed line shouldn't lose all other examples in the
+        checkpoint — partial-write tolerance for crashed runs."""
+        path = tmp_path / "raw.jsonl"
+        ex = TrainingExample(
+            query="q1",
+            retrieved_chunks=[_chunk(1)],
+            ideal_answer="A [1]",
+            is_refusal=False,
+        )
+        distill._append_example(path, ex)
+        # Write a line that's NOT valid JSON.
+        with path.open("a") as f:
+            f.write("not-json-at-all\n")
+            f.write('{"incomplete": "valid json but wrong shape"}\n')
+        ex2 = TrainingExample(
+            query="q2",
+            retrieved_chunks=[_chunk(2)],
+            ideal_answer="B [1]",
+            is_refusal=False,
+        )
+        distill._append_example(path, ex2)
+        loaded = distill._read_done_examples(path)
+        assert len(loaded) == 2  # the two valid examples; corruption skipped
+
+
+class TestAppendExample:
+    def test_creates_file_if_absent(self, tmp_path):
+        path = tmp_path / "subdir" / "raw.jsonl"
+        assert not path.exists()
+        ex = TrainingExample(
+            query="q",
+            retrieved_chunks=[_chunk(1)],
+            ideal_answer="A [1]",
+            is_refusal=False,
+        )
+        distill._append_example(path, ex)
+        assert path.exists()
+        assert path.read_text().strip().startswith("{")
+
+
+class TestProcessOneInput:
+    """Verifies the per-input wrapper catches both parse failures
+    (RuntimeError) and citation hallucinations (ValueError) so a
+    single bad output doesn't crash the entire run."""
+
+    def test_returns_training_example_on_success(self):
+        client = _StubClient('{"answer": "Use save_pretrained() [1]."}')
+        inp = distill._PilotInput(query="how do I X?", retrieved_chunks=[_chunk(1)])
+        ex = distill._process_one_input(
+            client,  # type: ignore[arg-type]
+            inp,
+            model="claude-sonnet-4-5",
+            enable_thinking=False,
+        )
+        assert ex is not None
+        assert ex.query == "how do I X?"
+
+    def test_parse_failure_returns_none(self):
+        client = _StubClient("not json at all")
+        inp = distill._PilotInput(query="q", retrieved_chunks=[_chunk(1)])
+        ex = distill._process_one_input(
+            client,  # type: ignore[arg-type]
+            inp,
+            model="claude-sonnet-4-5",
+            enable_thinking=False,
+        )
+        assert ex is None
+
+    def test_citation_hallucination_returns_none(self):
+        """Critical regression guard: Sonnet citing [99] when only 1
+        chunk exists triggers TrainingExample's citation-grounding
+        validator (ValueError). Previously this would crash the entire
+        run and lose all prior progress; now it's caught and skipped
+        like any other bad output."""
+        client = _StubClient('{"answer": "Use [1] [99]."}')  # [99] out of range
+        inp = distill._PilotInput(query="q", retrieved_chunks=[_chunk(1)])
+        ex = distill._process_one_input(
+            client,  # type: ignore[arg-type]
+            inp,
+            model="claude-sonnet-4-5",
+            enable_thinking=False,
+        )
+        assert ex is None
+
+    def test_propagates_pool_metadata(self):
+        client = _StubClient('{"answer": "Use [1]."}')
+        inp = distill._PilotInput(
+            query="q",
+            retrieved_chunks=[_chunk(1)],
+            question_type="procedural",
+            query_gen_metadata={"gen_model": "claude-haiku-4-5"},
+        )
+        ex = distill._process_one_input(
+            client,  # type: ignore[arg-type]
+            inp,
+            model="claude-sonnet-4-5",
+            enable_thinking=False,
+        )
+        assert ex is not None
+        assert ex.metadata["question_type"] == "procedural"
+        assert ex.metadata["query_gen"]["gen_model"] == "claude-haiku-4-5"
+
+
+# --------------------------------------------------------------------
+# Pilot/pool input loading
+# --------------------------------------------------------------------
+
+
 class TestLoadInputs:
     def test_load_pilot_input_format(self, tmp_path):
         import json
