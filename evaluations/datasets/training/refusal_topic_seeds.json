@@ -1,0 +1,186 @@
+{
+  "version": "v1",
+  "description": "Hand-curated off-corpus topic seeds for Block 3B.2 refusal training data. Each seed names a topic NOT covered by the HuggingFace Transformers documentation. The seeder generates ~3 questions per seed via Haiku 4.5, pairs each with retrieved chunks (which won't actually answer the question), and uses the result as a training example teaching the canonical refusal phrase. Three categories: adjacent_ml (ML topics outside transformers), general_cs (developer questions outside ML), unrelated (calibration sanity-check). Target: ~30 seeds × ~3 queries = ~90 off-corpus refusals (slight buffer over the 80 target).",
+  "seeds": [
+    {
+      "id": "tf-graph-mode",
+      "category": "adjacent_ml",
+      "topic": "TensorFlow graph mode and tf.function tracing internals",
+      "notes": "HF docs reference TensorFlow model loading; tracing internals are TF-specific."
+    },
+    {
+      "id": "jax-xla",
+      "category": "adjacent_ml",
+      "topic": "JAX HLO compilation and XLA optimization passes",
+      "notes": "HF has Flax model support; XLA compilation internals are not covered."
+    },
+    {
+      "id": "xgboost-tuning",
+      "category": "adjacent_ml",
+      "topic": "XGBoost hyperparameter tuning and tree pruning strategies",
+      "notes": ""
+    },
+    {
+      "id": "reinforcement-learning",
+      "category": "adjacent_ml",
+      "topic": "Reinforcement learning algorithms (PPO, SAC, DDPG)",
+      "notes": "HF has TRL for RLHF, but classical RL algorithm theory is not covered."
+    },
+    {
+      "id": "computer-vision-opencv",
+      "category": "adjacent_ml",
+      "topic": "OpenCV image processing pipelines and feature detection",
+      "notes": ""
+    },
+    {
+      "id": "time-series-models",
+      "category": "adjacent_ml",
+      "topic": "Time series forecasting with Prophet and ARIMA models",
+      "notes": ""
+    },
+    {
+      "id": "bayesian-inference",
+      "category": "adjacent_ml",
+      "topic": "Bayesian inference with PyMC and variational methods",
+      "notes": ""
+    },
+    {
+      "id": "onnx-runtime-passes",
+      "category": "adjacent_ml",
+      "topic": "ONNX Runtime graph optimization passes and operator fusion",
+      "notes": "HF docs cover ONNX export; runtime-side optimization is not."
+    },
+    {
+      "id": "vector-db-architecture",
+      "category": "adjacent_ml",
+      "topic": "Pinecone and Weaviate vector database sharding architecture",
+      "notes": "HF uses FAISS for some dataset operations; vector DB internals are out-of-scope."
+    },
+    {
+      "id": "model-serving-frameworks",
+      "category": "adjacent_ml",
+      "topic": "TorchServe and NVIDIA Triton Inference Server deployment",
+      "notes": ""
+    },
+    {
+      "id": "linux-kernel-scheduling",
+      "category": "general_cs",
+      "topic": "Linux kernel CFS scheduler and process priority",
+      "notes": ""
+    },
+    {
+      "id": "aws-lambda-cold-starts",
+      "category": "general_cs",
+      "topic": "AWS Lambda cold start optimization techniques",
+      "notes": ""
+    },
+    {
+      "id": "aws-s3-lifecycle",
+      "category": "general_cs",
+      "topic": "AWS S3 bucket lifecycle policies and storage class transitions",
+      "notes": ""
+    },
+    {
+      "id": "docker-networking",
+      "category": "general_cs",
+      "topic": "Docker networking modes and bridge driver configuration",
+      "notes": ""
+    },
+    {
+      "id": "kubernetes-operators",
+      "category": "general_cs",
+      "topic": "Kubernetes operator pattern and Custom Resource Definitions",
+      "notes": ""
+    },
+    {
+      "id": "postgres-vacuum",
+      "category": "general_cs",
+      "topic": "PostgreSQL VACUUM scheduling and bloat management",
+      "notes": ""
+    },
+    {
+      "id": "redis-persistence",
+      "category": "general_cs",
+      "topic": "Redis RDB and AOF persistence trade-offs",
+      "notes": ""
+    },
+    {
+      "id": "git-internals",
+      "category": "general_cs",
+      "topic": "Git object model, packfiles, and reflog garbage collection",
+      "notes": ""
+    },
+    {
+      "id": "bash-signal-handling",
+      "category": "general_cs",
+      "topic": "Bash signal handling and trap commands for cleanup",
+      "notes": ""
+    },
+    {
+      "id": "tcp-congestion-control",
+      "category": "general_cs",
+      "topic": "TCP congestion control algorithms (Reno, Cubic, BBR)",
+      "notes": ""
+    },
+    {
+      "id": "llvm-optimization",
+      "category": "general_cs",
+      "topic": "LLVM optimization passes and IR transformations",
+      "notes": ""
+    },
+    {
+      "id": "raft-consensus",
+      "category": "general_cs",
+      "topic": "Raft consensus algorithm and leader election",
+      "notes": ""
+    },
+    {
+      "id": "cooking-techniques",
+      "category": "unrelated",
+      "topic": "Cooking techniques and food chemistry",
+      "notes": ""
+    },
+    {
+      "id": "music-theory",
+      "category": "unrelated",
+      "topic": "Music theory, harmony, and chord progressions",
+      "notes": ""
+    },
+    {
+      "id": "sports-statistics",
+      "category": "unrelated",
+      "topic": "Sports analytics and performance metrics",
+      "notes": ""
+    },
+    {
+      "id": "travel-planning",
+      "category": "unrelated",
+      "topic": "International travel planning and visa requirements",
+      "notes": ""
+    },
+    {
+      "id": "personal-finance",
+      "category": "unrelated",
+      "topic": "Personal finance, investing, and retirement planning",
+      "notes": ""
+    },
+    {
+      "id": "home-diy",
+      "category": "unrelated",
+      "topic": "Home repair and DIY plumbing projects",
+      "notes": ""
+    },
+    {
+      "id": "gardening",
+      "category": "unrelated",
+      "topic": "Vegetable gardening and soil preparation",
+      "notes": ""
+    },
+    {
+      "id": "fitness-training",
+      "category": "unrelated",
+      "topic": "Strength training and cardio programming",
+      "notes": ""
+    }
+  ]
+}
