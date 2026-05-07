@@ -177,34 +177,67 @@ GOOD: {"answer": "I don't have enough context to answer that."}"""
 
 @dataclass
 class _PilotInput:
-    """One (query, chunks) pair from the pilot input file.
+    """One (query, chunks) pair from an input file.
 
-    ``expected_refusal`` is metadata for human review — does the
-    distilled answer match the expectation? Not consumed by the API
-    call itself, just by the reviewer.
+    Two file formats are supported:
+
+    - **Pilot JSON** (``pilot_input.json``): hand-curated array of
+      ``{query, retrieved_chunks, expected_refusal, note}`` entries
+      from Block 3B.1.
+    - **Pool JSONL** (``query_pool.jsonl``): newline-separated entries
+      from Block 3B.2.e's ``build_query_pool.py``, with extra fields
+      ``question_type``, ``seed_chunks``, ``seed_topic``, ``metadata``.
+
+    Pool-only fields default to ``None`` / empty so the same dataclass
+    serves both inputs. ``query_gen_metadata`` carries the generation
+    provenance (gen_model, prompt_version, captured_at, tokens, cost)
+    forward into the distilled ``TrainingExample.metadata`` so the
+    final dataset has full end-to-end provenance.
     """
 
     query: str
     retrieved_chunks: list[ChunkRef]
     expected_refusal: bool = False
     note: str = ""
+    question_type: str | None = None
+    query_gen_metadata: dict[str, Any] | None = None
+
+
+def _input_to_pilot(item: dict[str, Any]) -> _PilotInput:
+    """Build a _PilotInput from one dict (pilot or pool entry).
+
+    Common fields come from the same keys; pool-specific fields
+    (``question_type``, ``metadata``) are picked up if present.
+    """
+    chunks = [ChunkRef.model_validate(c) for c in item["retrieved_chunks"]]
+    return _PilotInput(
+        query=item["query"],
+        retrieved_chunks=chunks,
+        expected_refusal=item.get("expected_refusal", False),
+        note=item.get("note", ""),
+        question_type=item.get("question_type"),
+        query_gen_metadata=item.get("metadata"),
+    )
 
 
 def _load_inputs(path: Path) -> list[_PilotInput]:
-    """Parse the input JSON into PilotInput records."""
-    raw = json.loads(path.read_text())
-    inputs: list[_PilotInput] = []
-    for item in raw:
-        chunks = [ChunkRef.model_validate(c) for c in item["retrieved_chunks"]]
-        inputs.append(
-            _PilotInput(
-                query=item["query"],
-                retrieved_chunks=chunks,
-                expected_refusal=item.get("expected_refusal", False),
-                note=item.get("note", ""),
-            )
-        )
-    return inputs
+    """Parse the input file into PilotInput records.
+
+    Dispatches by file extension: ``.jsonl`` → newline-separated
+    (pool format), anything else → JSON array (pilot format). The
+    pilot-input dispatch is kept as the default so existing
+    ``pilot_input.json`` callers don't break.
+    """
+    if path.suffix == ".jsonl":
+        items: list[dict[str, Any]] = []
+        for line in path.read_text().splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            items.append(json.loads(line))
+    else:
+        items = json.loads(path.read_text())
+    return [_input_to_pilot(item) for item in items]
 
 
 def _read_api_key() -> str:
@@ -301,6 +334,8 @@ def distill_one_example(
     chunks: list[ChunkRef],
     model: str,
     enable_thinking: bool = False,
+    question_type: str | None = None,
+    query_gen_metadata: dict[str, Any] | None = None,
 ) -> TrainingExample:
     """Produce one TrainingExample by calling the Anthropic API.
 
@@ -376,6 +411,13 @@ def distill_one_example(
         "input_tokens": response.usage.input_tokens,
         "output_tokens": response.usage.output_tokens,
     }
+    # Pool-only provenance: nest under a sub-key so distill fields
+    # remain at the top level (existing test contracts unchanged) while
+    # query-gen provenance is preserved end-to-end.
+    if question_type is not None:
+        metadata["question_type"] = question_type
+    if query_gen_metadata is not None:
+        metadata["query_gen"] = query_gen_metadata
 
     return TrainingExample(
         query=query,
@@ -398,10 +440,11 @@ def main() -> int:
         type=Path,
         required=True,
         help=(
-            "Path to a pilot-input JSON file: a list of "
-            '{"query", "retrieved_chunks": [...]} entries. The pilot '
-            "input is hand-curated for Block 3B.1; Block 3B.2 generates "
-            "this file from a different seed of generate_structural_queries.py."
+            "Path to a JSON or JSONL input file. Accepts two formats:\n"
+            "  - .json: pilot-input array (Block 3B.1 hand-curated).\n"
+            "  - .jsonl: query_pool entries from build_query_pool.py "
+            "(Block 3B.2). Pool-only fields (question_type, gen "
+            "metadata) are propagated into TrainingExample.metadata."
         ),
     )
     parser.add_argument(
@@ -479,6 +522,8 @@ def main() -> int:
                 chunks=inp.retrieved_chunks,
                 model=args.model,
                 enable_thinking=args.enable_thinking,
+                question_type=inp.question_type,
+                query_gen_metadata=inp.query_gen_metadata,
             )
         except RuntimeError as exc:
             logger.warning("Parse failure on example %d: %s", i, exc)
