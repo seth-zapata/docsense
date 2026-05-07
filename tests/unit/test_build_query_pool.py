@@ -377,23 +377,29 @@ class TestFilterReportMarkdown:
         )
         r2 = FilterReport(
             kept=[_make_query()] * 85,
-            dropped=[(_make_query(), "duplicate_within_procedural")] * 5,
+            dropped=[(_make_query(), "type_mismatch_comparison")] * 5,
         )
         r3 = FilterReport(
             kept=[_make_query()] * 80,
+            dropped=[(_make_query(), "duplicate_within_procedural")] * 5,
+        )
+        r4 = FilterReport(
+            kept=[_make_query()] * 75,
             dropped=[(_make_query(), "eval_contamination_sim=0.812")] * 5,
         )
         md = pool._format_filter_report_markdown(
             initial_count=100,
             after_length=r1,
-            after_dedupe=r2,
-            after_contamination=r3,
+            after_type_shape=r2,
+            after_dedupe=r3,
+            after_contamination=r4,
         )
         assert "Started with **100**" in md
         assert "length floor" in md
+        assert "type shape" in md
         assert "dedupe" in md
         assert "eval contamination" in md
-        assert "**80**" in md  # final count
+        assert "**75**" in md  # final count
 
 
 class TestPreviewMarkdown:

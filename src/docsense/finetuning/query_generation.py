@@ -195,6 +195,10 @@ class TypeAwareQueryGenerator:
     ) -> GeneratedQuery:
         """Generate one in-corpus query for ``chunk`` targeting ``question_type``.
 
+        Uses ``temperature=0`` so the same chunk + type always produces the
+        same query (resumability invariant: re-running the script after a
+        crash yields identical output for completed tasks).
+
         Raises ``ValueError`` if ``question_type=REFUSAL`` (use
         ``generate_for_topic`` instead). Raises ``RuntimeError`` on
         parse failure so the caller can decide skip-vs-abort.
@@ -212,7 +216,7 @@ class TypeAwareQueryGenerator:
             chunk_text=chunk.text,
             doc_id=chunk.doc_id,
         )
-        query, in_tokens, out_tokens = self._call_api(prompt)
+        query, in_tokens, out_tokens = self._call_api(prompt, temperature=0.0)
         if query is None:
             msg = f"parse failure for chunk {chunk.doc_id}::{chunk.chunk_id}"
             raise RuntimeError(msg)
@@ -222,16 +226,24 @@ class TypeAwareQueryGenerator:
             question_type=question_type,
             seed_chunks=[chunk],
             seed_topic=None,
-            metadata=self._build_metadata(in_tokens, out_tokens),
+            metadata=self._build_metadata(in_tokens, out_tokens, temperature=0.0),
         )
 
     def generate_for_topic(self, topic: str) -> GeneratedQuery:
         """Generate one off-corpus refusal query for ``topic`` seed.
 
+        Uses ``temperature=0.7`` so repeated calls per seed produce
+        diverse questions. The seeder calls this N times per topic
+        (default 3); at temperature=0 those N calls would return
+        near-identical outputs and dedupe would discard most of them
+        (observed 67% within-seed dedupe rate in the first run). 0.7
+        restores diversity without losing coherence — calibrated for
+        "creative but on-topic" generation.
+
         Raises ``RuntimeError`` on parse failure.
         """
         prompt = _TOPIC_PROMPT.format(topic=topic)
-        query, in_tokens, out_tokens = self._call_api(prompt)
+        query, in_tokens, out_tokens = self._call_api(prompt, temperature=0.7)
         if query is None:
             msg = f"parse failure for topic seed {topic!r}"
             raise RuntimeError(msg)
@@ -241,15 +253,20 @@ class TypeAwareQueryGenerator:
             question_type=QuestionType.REFUSAL,
             seed_chunks=[],
             seed_topic=topic,
-            metadata=self._build_metadata(in_tokens, out_tokens),
+            metadata=self._build_metadata(in_tokens, out_tokens, temperature=0.7),
         )
 
-    def _call_api(self, prompt: str) -> tuple[str | None, int, int]:
+    def _call_api(
+        self,
+        prompt: str,
+        *,
+        temperature: float = 0.0,
+    ) -> tuple[str | None, int, int]:
         """Send prompt; return (parsed_query | None, in_tokens, out_tokens)."""
         response = self.client.messages.create(
             model=self.model,
             max_tokens=200,
-            temperature=0.0,
+            temperature=temperature,
             messages=[{"role": "user", "content": prompt}],
         )
         text_blocks = [b.text for b in response.content if b.type == "text"]
@@ -260,7 +277,13 @@ class TypeAwareQueryGenerator:
             response.usage.output_tokens,
         )
 
-    def _build_metadata(self, in_tokens: int, out_tokens: int) -> dict[str, Any]:
+    def _build_metadata(
+        self,
+        in_tokens: int,
+        out_tokens: int,
+        *,
+        temperature: float = 0.0,
+    ) -> dict[str, Any]:
         """Compose the provenance metadata dict for a GeneratedQuery."""
         cost: float | None
         if self.model in _PRICING:
@@ -271,6 +294,7 @@ class TypeAwareQueryGenerator:
         return {
             "gen_model": self.model,
             "prompt_version": _QUERY_GEN_PROMPT_VERSION,
+            "temperature": temperature,
             "captured_at": datetime.now(UTC).isoformat(),
             "input_tokens": in_tokens,
             "output_tokens": out_tokens,

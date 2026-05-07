@@ -245,12 +245,21 @@ class TestGenerateForChunk:
         with pytest.raises(RuntimeError, match="parse failure"):
             gen.generate_for_chunk(_chunk(), QuestionType.PROCEDURAL)
 
-    def test_temperature_zero(self):
-        """Deterministic decoding for reproducibility — pin temperature."""
+    def test_temperature_zero_for_chunk(self):
+        """In-corpus generation is deterministic (same chunk → same query)
+        so a crashed run resumed via raw_queries.jsonl produces identical
+        output for completed tasks. Pin temperature=0."""
         client = _StubClient('{"query": "x"}')
         gen = TypeAwareQueryGenerator(client)  # type: ignore[arg-type]
         gen.generate_for_chunk(_chunk(), QuestionType.PROCEDURAL)
         assert client.messages.create_kwargs["temperature"] == 0.0
+
+    def test_metadata_records_temperature_for_chunk(self):
+        """Temperature is recorded in metadata for full provenance."""
+        client = _StubClient('{"query": "x"}')
+        gen = TypeAwareQueryGenerator(client)  # type: ignore[arg-type]
+        result = gen.generate_for_chunk(_chunk(), QuestionType.PROCEDURAL)
+        assert result.metadata["temperature"] == 0.0
 
     def test_default_model_is_haiku(self):
         client = _StubClient('{"query": "x"}')
@@ -291,6 +300,22 @@ class TestGenerateForTopic:
         sent = client.messages.create_kwargs["messages"][0]["content"]
         assert "AVOID" in sent
         assert "transformers" in sent.lower()
+
+    def test_temperature_07_for_topic(self):
+        """Refusal generation uses temperature=0.7 so repeated calls per
+        seed produce diverse questions. Pin so a future change doesn't
+        silently drop diversity (regression: 67% within-seed dedupe at
+        temperature=0)."""
+        client = _StubClient('{"query": "x"}')
+        gen = TypeAwareQueryGenerator(client)  # type: ignore[arg-type]
+        gen.generate_for_topic("AWS Lambda cold starts")
+        assert client.messages.create_kwargs["temperature"] == 0.7
+
+    def test_metadata_records_temperature_for_topic(self):
+        client = _StubClient('{"query": "x"}')
+        gen = TypeAwareQueryGenerator(client)  # type: ignore[arg-type]
+        result = gen.generate_for_topic("AWS Lambda cold starts")
+        assert result.metadata["temperature"] == 0.7
 
     def test_metadata_includes_provenance(self):
         client = _StubClient('{"query": "x"}')
