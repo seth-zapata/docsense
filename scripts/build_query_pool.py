@@ -57,6 +57,7 @@ from docsense.finetuning.chunk_classifier import QuestionType, classify_chunk
 from docsense.finetuning.query_filters import (
     FilterReport,
     filter_by_length,
+    filter_by_type_shape,
     filter_duplicates,
     filter_eval_contamination,
 )
@@ -521,6 +522,7 @@ def _format_filter_report_markdown(
     *,
     initial_count: int,
     after_length: FilterReport,
+    after_type_shape: FilterReport,
     after_dedupe: FilterReport,
     after_contamination: FilterReport,
 ) -> str:
@@ -537,6 +539,7 @@ def _format_filter_report_markdown(
     ]
     for label, report in [
         ("length floor", after_length),
+        ("type shape", after_type_shape),
         ("dedupe (within-type)", after_dedupe),
         ("eval contamination", after_contamination),
     ]:
@@ -765,22 +768,28 @@ def main() -> int:  # noqa: PLR0915 — orchestration script, sequential by natu
 
     queries_only = [pe.generated for pe in pool_entries]
     initial_count = len(queries_only)
+    # Order: length → type-shape → dedupe → contamination. Length is
+    # cheap; type-shape is a soft check that drops obvious type drift
+    # before dedupe wastes work on duplicates of bad queries; dedupe
+    # before contamination so we don't waste embedding compute on dups.
     r1 = filter_by_length(queries_only)
-    r2 = filter_duplicates(r1.kept, embedder.embed_texts)
+    r2 = filter_by_type_shape(r1.kept)
+    r3 = filter_duplicates(r2.kept, embedder.embed_texts)
     eval_texts = _load_eval_query_texts()
-    r3 = filter_eval_contamination(r2.kept, eval_texts, embedder.embed_texts)
+    r4 = filter_eval_contamination(r3.kept, eval_texts, embedder.embed_texts)
 
     # Build the final pool, preserving alignment between GeneratedQuery
     # and PoolEntry. We map by id() since GeneratedQuery isn't hashable.
-    final_keep_ids = {id(q) for q in r3.kept}
+    final_keep_ids = {id(q) for q in r4.kept}
     final_pool = [pe for pe in pool_entries if id(pe.generated) in final_keep_ids]
     logger.info(
-        "Filtered: %d → %d (length=%d, dedupe=%d, eval=%d)",
+        "Filtered: %d → %d (length=%d, type_shape=%d, dedupe=%d, eval=%d)",
         initial_count,
         len(final_pool),
         r1.dropped_count,
         r2.dropped_count,
         r3.dropped_count,
+        r4.dropped_count,
     )
 
     # 12. Write artifacts
@@ -793,8 +802,9 @@ def main() -> int:  # noqa: PLR0915 — orchestration script, sequential by natu
         _format_filter_report_markdown(
             initial_count=initial_count,
             after_length=r1,
-            after_dedupe=r2,
-            after_contamination=r3,
+            after_type_shape=r2,
+            after_dedupe=r3,
+            after_contamination=r4,
         )
     )
     logger.info("Wrote %s", report_path)

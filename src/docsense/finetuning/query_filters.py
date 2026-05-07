@@ -1,18 +1,26 @@
 """Quality filters for the Block 3B.2 query pool.
 
-Three filters operating on ``list[GeneratedQuery]`` (pre-retrieval):
+Four filters operating on ``list[GeneratedQuery]`` (pre-retrieval):
 
 1. ``filter_by_length`` — drops queries below a word-count floor
    (default 5). Catches outlier short queries the LLM produces despite
    the prompt's "5-15 words" instruction.
 
-2. ``filter_duplicates`` — embedding-based dedupe within each question
+2. ``filter_by_type_shape`` — drops queries whose phrasing doesn't
+   match their assigned ``question_type`` shape. Reduces type drift
+   (e.g., a procedural-shaped question landing in the comparison
+   bucket because the chunk classifier flagged the chunk as
+   comparison-affine but the chunk content didn't lend itself to
+   actual comparison framing). Type accuracy matters for downstream
+   eval breakdowns ("did fine-tuning improve comparison answers?").
+
+3. ``filter_duplicates`` — embedding-based dedupe within each question
    type. A procedural query and a comparison query may legitimately
    embed similarly while answering different question shapes;
    deduping them would lose diversity. Stratification preserves the
    type distribution we engineered in 3B.2.
 
-3. ``filter_eval_contamination`` — drops any query similar to an
+4. ``filter_eval_contamination`` — drops any query similar to an
    existing eval query (curated_eval, no_answer, structural). Hard
    threshold (default 0.7) — even a few contaminated examples destroy
    the Phase 3 fine-tuning eval. NOT type-stratified: cross-type
@@ -25,11 +33,14 @@ next filter); no magic composition keeps the audit trail visible.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 import numpy as np
+
+from docsense.finetuning.chunk_classifier import QuestionType
 
 if TYPE_CHECKING:
     from docsense.finetuning.query_generation import GeneratedQuery
@@ -69,6 +80,74 @@ class FilterReport:
         for _, reason in self.dropped:
             counts[reason] = counts.get(reason, 0) + 1
         return counts
+
+
+# Per-type shape patterns. Calibrated against the first Stage 1 run's
+# query distribution; intent is to catch obvious type drift (procedural-
+# shaped queries in the comparison bucket, etc.) without false-rejecting
+# legitimate queries with overlapping vocabulary. Each pattern requires
+# AT LEAST ONE shape-distinctive token. REFUSAL is exempt — refusal
+# queries are valid in any shape as long as they're off-corpus.
+_PROCEDURAL_SHAPE_RE = re.compile(r"^\s*how\b", re.IGNORECASE)
+_COMPARISON_SHAPE_RE = re.compile(
+    # vocabulary: difference / differs / different / vs / versus / compared / instead of
+    r"\b(differ(s|ence|ent)?|vs\.?|versus|compared\s+(to|with)|instead\s+of)\b"
+    # decision framing: "should I use X or Y" / "when should I use X vs Y"
+    r"|^\s*should\s+i\s+use\b"
+    r"|^\s*when\s+(should|do)\s+i\s+use\b",
+    re.IGNORECASE,
+)
+_BEST_PRACTICE_SHAPE_RE = re.compile(
+    r"\b(recommend(ed)?|best\s+(way|practice|approach)|"
+    r"should\s+i|how\s+should\s+i|preferred?|advise[sd]?)\b",
+    re.IGNORECASE,
+)
+_POINTER_SHAPE_RE = re.compile(
+    r"\bwhere\b|\b(starting\s+point|good\s+place\s+to\s+start|"
+    r"find\s+(the|an?)|locate\s+the)\b",
+    re.IGNORECASE,
+)
+
+
+def _matches_type_shape(query: str, qt: QuestionType) -> bool:
+    """True iff ``query``'s phrasing matches the expected shape for ``qt``."""
+    if qt == QuestionType.PROCEDURAL:
+        return bool(_PROCEDURAL_SHAPE_RE.search(query))
+    if qt == QuestionType.COMPARISON:
+        return bool(_COMPARISON_SHAPE_RE.search(query))
+    if qt == QuestionType.BEST_PRACTICE:
+        return bool(_BEST_PRACTICE_SHAPE_RE.search(query))
+    if qt == QuestionType.POINTER:
+        return bool(_POINTER_SHAPE_RE.search(query))
+    # REFUSAL: any phrasing is acceptable; the chunk-mismatch property
+    # (off-corpus topic OR mismatched chunks) is what defines refusals.
+    return True
+
+
+def filter_by_type_shape(queries: Sequence[GeneratedQuery]) -> FilterReport:
+    """Drop queries whose phrasing doesn't match their assigned type.
+
+    The chunk classifier sometimes flags chunks as comparison-affine
+    or pointer-affine based on heuristic vocabulary in the chunk, but
+    the chunk's actual content may not support that question shape.
+    When the generator is asked to produce a comparison question for
+    such a chunk, it tends to produce a procedural-shaped question
+    instead (Haiku does its best with what's there).
+
+    These mis-typed queries are still good queries — they just shouldn't
+    sit in the wrong bucket. Type accuracy matters for downstream eval
+    breakdowns and for the proportional sampling we engineered.
+
+    REFUSAL queries are exempt — their defining property is chunk
+    mismatch (off-corpus topic OR mismatched chunks), not phrasing.
+    """
+    report = FilterReport()
+    for q in queries:
+        if _matches_type_shape(q.query, q.question_type):
+            report.kept.append(q)
+        else:
+            report.dropped.append((q, f"type_mismatch_{q.question_type.value}"))
+    return report
 
 
 def filter_by_length(

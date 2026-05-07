@@ -14,6 +14,7 @@ from docsense.finetuning.chunk_classifier import QuestionType
 from docsense.finetuning.query_filters import (
     FilterReport,
     filter_by_length,
+    filter_by_type_shape,
     filter_duplicates,
     filter_eval_contamination,
 )
@@ -83,6 +84,123 @@ class TestFilterByLength:
         report = filter_by_length([])
         assert report.kept_count == 0
         assert report.dropped_count == 0
+
+
+# --------------------------------------------------------------------
+# filter_by_type_shape
+# --------------------------------------------------------------------
+
+
+class TestFilterByTypeShape:
+    """Drops queries whose phrasing doesn't match their assigned type.
+
+    Each test uses real query phrasings observed in the first Stage 1 run
+    (or close paraphrases) so the patterns are calibrated to actual
+    Haiku output, not synthetic examples.
+    """
+
+    def test_procedural_starting_with_how_is_kept(self):
+        q = _make_query("how do I save a fine-tuned model", QuestionType.PROCEDURAL)
+        report = filter_by_type_shape([q])
+        assert report.kept_count == 1
+
+    def test_procedural_not_starting_with_how_is_dropped(self):
+        """A query like 'What is BERT?' in the procedural bucket
+        doesn't match the procedural shape — drop it."""
+        q = _make_query("what is BERT used for in transformers", QuestionType.PROCEDURAL)
+        report = filter_by_type_shape([q])
+        assert report.dropped_count == 1
+        assert "type_mismatch_procedural" in report.dropped[0][1]
+
+    def test_comparison_with_difference_vocabulary_kept(self):
+        for text in [
+            "what's the difference between AutoModel and AutoModelForCausalLM",
+            "how is image classification different from audio classification",
+            "AutoModel vs AutoModelForCausalLM for embeddings",
+            "should I use int4 or int8 quantization for accuracy",
+        ]:
+            q = _make_query(text, QuestionType.COMPARISON)
+            assert filter_by_type_shape([q]).kept_count == 1, text
+
+    def test_comparison_without_comparison_vocab_dropped(self):
+        """Real example from the first Stage 1 run that surfaced the
+        type-drift issue: 'How do I load WikiText-2 and prepare it
+        for perplexity evaluation' in the comparison bucket."""
+        q = _make_query(
+            "how do I load WikiText-2 and prepare it for perplexity evaluation",
+            QuestionType.COMPARISON,
+        )
+        report = filter_by_type_shape([q])
+        assert report.dropped_count == 1
+
+    def test_best_practice_with_advisory_vocab_kept(self):
+        for text in [
+            "what's the recommended way to handle padding for batched inference",
+            "what's the best way to load a vision model for image-to-text tasks",
+            "should I use a tokenizer with CANINE for batched inference",
+            "how should I convert MusicGen checkpoints to transformers format",
+        ]:
+            q = _make_query(text, QuestionType.BEST_PRACTICE)
+            assert filter_by_type_shape([q]).kept_count == 1, text
+
+    def test_best_practice_without_advisory_vocab_dropped(self):
+        """Real example: 'How do I explicitly enable SDPA attention
+        when loading a model' was tagged best_practice but is procedural."""
+        q = _make_query(
+            "how do I explicitly enable SDPA attention when loading a model",
+            QuestionType.BEST_PRACTICE,
+        )
+        report = filter_by_type_shape([q])
+        assert report.dropped_count == 1
+
+    def test_pointer_with_where_kept(self):
+        for text in [
+            "where can I find AutoRound and what's its relationship to Intel Neural Compressor",
+            "where do I configure ZeRO optimization stages in transformers",
+            "where is the BERT conversion script located",
+        ]:
+            q = _make_query(text, QuestionType.POINTER)
+            assert filter_by_type_shape([q]).kept_count == 1, text
+
+    def test_pointer_without_where_dropped(self):
+        """Real examples: 'How do I quantize a model to int4 using
+        bitsandbytes' and 'How do I load a T5 model' were tagged
+        pointer but are procedural in shape."""
+        for text in [
+            "how do I quantize a model to int4 using bitsandbytes",
+            "how do I load a T5 model for sequence-to-sequence training tasks",
+        ]:
+            q = _make_query(text, QuestionType.POINTER)
+            report = filter_by_type_shape([q])
+            assert report.dropped_count == 1, text
+
+    def test_refusal_is_exempt(self):
+        """Refusals are defined by chunk-mismatch (off-corpus topic OR
+        mismatched chunks), not phrasing. Any shape is accepted."""
+        for text in [
+            "how do I tune AWS Lambda cold starts",  # how-shape
+            "what's the recommended postgres VACUUM cadence",  # advisory
+            "where can I find the Linux kernel scheduler source",  # where
+            "should I use Raft or Paxos for consensus",  # comparison-shape
+        ]:
+            q = _make_query(text, QuestionType.REFUSAL)
+            assert filter_by_type_shape([q]).kept_count == 1, text
+
+    def test_empty_input(self):
+        assert filter_by_type_shape([]).kept_count == 0
+
+    def test_mixed_types_filtered_independently(self):
+        """A batch of mixed-type queries: each is checked against ITS
+        own type's shape, not against a single global pattern."""
+        queries = [
+            _make_query("how do I X", QuestionType.PROCEDURAL),  # kept
+            _make_query("what is X", QuestionType.PROCEDURAL),  # dropped
+            _make_query("difference between X and Y", QuestionType.COMPARISON),  # kept
+            _make_query("how do I X", QuestionType.COMPARISON),  # dropped (no comparison vocab)
+        ]
+        report = filter_by_type_shape(queries)
+        assert report.kept_count == 2
+        assert report.dropped_count == 2
 
 
 # --------------------------------------------------------------------
