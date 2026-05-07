@@ -18,6 +18,10 @@ Modules:
   wrapping Haiku 4.5 — given a chunk + question type, generates a
   realistic query grounded in the chunk. Also handles off-corpus
   refusal queries from topic seeds.
+- ``query_filters``: (Block 3B.2.c) quality filters for the query
+  pool — length floor, type-stratified embedding dedupe, eval-set
+  contamination filter. Each returns a ``FilterReport`` with
+  explicit ``kept``/``dropped`` lists for the seeder's audit trail.
 
 See ``docs/phase-3-scope.md`` and ``docs/phase-3-block-3b2-plan.md``
 for the full Phase 3 plan.
