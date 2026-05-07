@@ -291,7 +291,27 @@ def parse_distill_response(raw_text: str) -> str | None:
     Returns ``None`` on parse failure — caller decides whether to
     retry or fall back. Same conservative pattern as the eval-pipeline
     parsers: typed result on every input, never raise.
+
+    **Plain-text refusal escape hatch:** Sonnet 4.5 sometimes drops
+    the JSON wrapper specifically when refusing — returning just
+    ``"I don't have enough context to answer that."`` (sometimes
+    quoted, sometimes bare) instead of ``{"answer": "..."}``.
+    Observed at ~14% of procedural queries in the Block 3B.2 spot-check.
+    Treating this as a parse failure would silently lose valid
+    refusal training data, so we detect the canonical phrase first
+    and return it as a refusal answer before falling through to the
+    JSON path.
     """
+    # Plain-text refusal: strip surrounding whitespace + optional
+    # JSON-string quotes ("..."), then exact-match against the
+    # canonical refusal. Catches both bare and string-quoted forms
+    # the model produces.
+    stripped = raw_text.strip()
+    if stripped.startswith('"') and stripped.endswith('"'):
+        stripped = stripped[1:-1]
+    if stripped == CANONICAL_REFUSAL:
+        return CANONICAL_REFUSAL
+
     block = _extract_json_block(raw_text)
     try:
         parsed = json.loads(block)

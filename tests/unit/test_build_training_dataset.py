@@ -99,6 +99,43 @@ class TestParseDistillResponse:
         text = '```json\n{"answer": "with citation [1]"}\n```'
         assert distill.parse_distill_response(text) == "with citation [1]"
 
+    def test_plain_text_canonical_refusal_accepted(self):
+        """Sonnet sometimes drops the JSON wrapper when refusing,
+        returning just the canonical refusal phrase as plain text.
+        Treating this as a parse failure would silently lose valid
+        refusal training data — observed at ~14% of procedural queries
+        in the Block 3B.2 spot-check. Accept and return as a refusal."""
+        assert (
+            distill.parse_distill_response("I don't have enough context to answer that.")
+            == distill.CANONICAL_REFUSAL
+        )
+
+    def test_quoted_canonical_refusal_accepted(self):
+        """Sonnet may also wrap the refusal in JSON-style string quotes
+        (without the object wrapper). Strip those and accept."""
+        assert (
+            distill.parse_distill_response('"I don\'t have enough context to answer that."')
+            == distill.CANONICAL_REFUSAL
+        )
+
+    def test_plain_text_canonical_refusal_with_whitespace(self):
+        """Trailing/leading whitespace shouldn't defeat the match."""
+        assert (
+            distill.parse_distill_response("  I don't have enough context to answer that.  \n")
+            == distill.CANONICAL_REFUSAL
+        )
+
+    def test_plain_text_non_refusal_still_fails(self):
+        """Regression guard: only the EXACT canonical refusal phrase is
+        accepted as plain text. Any other plain-text response is still
+        a parse failure (we don't want to silently accept arbitrary
+        non-JSON answers)."""
+        assert distill.parse_distill_response("Use save_pretrained() [1].") is None
+        assert distill.parse_distill_response("I don't know.") is None
+        assert (
+            distill.parse_distill_response("I don't have enough context to answer this.") is None
+        )  # "this" instead of "that" — strict match
+
 
 # --------------------------------------------------------------------
 # User-message formatting
