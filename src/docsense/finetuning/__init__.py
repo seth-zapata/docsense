@@ -22,6 +22,10 @@ Modules:
   pool — length floor, type-stratified embedding dedupe, eval-set
   contamination filter. Each returns a ``FilterReport`` with
   explicit ``kept``/``dropped`` lists for the seeder's audit trail.
+- ``refusal_seeds``: (Block 3B.2.d) loader + typed contracts for the
+  canonical off-corpus topic seeds file. The seeder feeds each seed's
+  ``topic`` field into ``TypeAwareQueryGenerator.generate_for_topic``
+  to produce off-corpus refusal queries.
 
 See ``docs/phase-3-scope.md`` and ``docs/phase-3-block-3b2-plan.md``
 for the full Phase 3 plan.
