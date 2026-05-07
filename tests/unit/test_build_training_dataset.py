@@ -340,3 +340,146 @@ class TestLoadInputs:
         assert len(inputs[0].retrieved_chunks) == 2
         assert inputs[1].expected_refusal is True
         assert inputs[1].note == "should refuse"
+        # Pilot inputs don't carry pool fields → both default None.
+        assert inputs[0].question_type is None
+        assert inputs[0].query_gen_metadata is None
+
+    def test_load_pool_jsonl_format(self, tmp_path):
+        """Block 3B.2.e's query_pool.jsonl format — newline-separated
+        entries with extra question_type and metadata fields. Should
+        load cleanly and propagate the pool-only fields onto _PilotInput."""
+        import json
+
+        path = tmp_path / "query_pool.jsonl"
+        entries = [
+            {
+                "query": "How do I save a model?",
+                "question_type": "procedural",
+                "expected_refusal": False,
+                "retrieved_chunks": [
+                    {"doc_id": "a.md", "chunk_id": "1", "score": 0.9, "text": "alpha"},
+                ],
+                "seed_chunks": [],
+                "seed_topic": None,
+                "metadata": {
+                    "gen_model": "claude-haiku-4-5",
+                    "prompt_version": "v1",
+                    "input_tokens": 271,
+                    "output_tokens": 27,
+                    "cost_usd": 0.000324,
+                },
+            },
+            {
+                "query": "How do I tune AWS Lambda cold starts?",
+                "question_type": "refusal",
+                "expected_refusal": True,
+                "retrieved_chunks": [],
+                "seed_chunks": [],
+                "seed_topic": "AWS Lambda cold start optimization",
+                "metadata": {"gen_model": "claude-haiku-4-5", "prompt_version": "v1"},
+            },
+        ]
+        path.write_text("\n".join(json.dumps(e) for e in entries) + "\n")
+
+        inputs = distill._load_inputs(path)
+        assert len(inputs) == 2
+        assert inputs[0].query == "How do I save a model?"
+        assert inputs[0].question_type == "procedural"
+        assert inputs[0].query_gen_metadata is not None
+        assert inputs[0].query_gen_metadata["gen_model"] == "claude-haiku-4-5"
+        assert inputs[0].query_gen_metadata["cost_usd"] == 0.000324
+        assert inputs[1].expected_refusal is True
+        assert inputs[1].question_type == "refusal"
+
+    def test_load_pool_jsonl_skips_blank_lines(self, tmp_path):
+        """JSONL files sometimes acquire blank lines (manual edits,
+        crashed appends). Loader should skip them rather than crash."""
+        import json
+
+        path = tmp_path / "with_blanks.jsonl"
+        entry = {
+            "query": "How do I X?",
+            "expected_refusal": False,
+            "retrieved_chunks": [
+                {"doc_id": "a.md", "chunk_id": "1", "score": 0.9, "text": "alpha"},
+            ],
+        }
+        path.write_text(f"{json.dumps(entry)}\n\n{json.dumps(entry)}\n")
+        inputs = distill._load_inputs(path)
+        assert len(inputs) == 2
+
+    def test_format_dispatch_by_extension(self, tmp_path):
+        """``.json`` → array dispatch; ``.jsonl`` → newline dispatch.
+        Pin so a future refactor doesn't accidentally swap them."""
+        import json
+
+        # Same payload, two extensions, two format conventions.
+        entry = {
+            "query": "test",
+            "expected_refusal": False,
+            "retrieved_chunks": [{"doc_id": "a.md", "chunk_id": "1", "score": 0.9, "text": "x"}],
+        }
+        json_path = tmp_path / "input.json"
+        json_path.write_text(json.dumps([entry]))
+        jsonl_path = tmp_path / "input.jsonl"
+        jsonl_path.write_text(json.dumps(entry) + "\n")
+
+        a = distill._load_inputs(json_path)
+        b = distill._load_inputs(jsonl_path)
+        assert len(a) == len(b) == 1
+        assert a[0].query == b[0].query
+
+
+# --------------------------------------------------------------------
+# Pool metadata propagation through distill_one_example
+# --------------------------------------------------------------------
+
+
+class TestPoolMetadataPropagation:
+    def test_question_type_lands_in_metadata(self):
+        client = _StubClient('{"answer": "How do I save? Use save_pretrained [1]."}')
+        result = distill.distill_one_example(
+            client,  # type: ignore[arg-type]
+            query="how do I save?",
+            chunks=[_chunk(1)],
+            model="claude-sonnet-4-5",
+            question_type="procedural",
+        )
+        assert result.metadata["question_type"] == "procedural"
+
+    def test_query_gen_metadata_nested_under_query_gen_key(self):
+        """Pool's gen-time metadata gets nested under ``query_gen`` so
+        distill-time fields stay at the top level (existing test
+        contracts unchanged) while gen provenance is preserved."""
+        client = _StubClient('{"answer": "ok [1]"}')
+        result = distill.distill_one_example(
+            client,  # type: ignore[arg-type]
+            query="q",
+            chunks=[_chunk(1)],
+            model="claude-sonnet-4-5",
+            query_gen_metadata={
+                "gen_model": "claude-haiku-4-5",
+                "prompt_version": "v1",
+                "input_tokens": 250,
+                "output_tokens": 30,
+            },
+        )
+        assert "query_gen" in result.metadata
+        assert result.metadata["query_gen"]["gen_model"] == "claude-haiku-4-5"
+        # Distill-time fields still at the top level.
+        assert result.metadata["distill_model"] == "claude-sonnet-4-5"
+        assert result.metadata["input_tokens"] != 250  # would collide if not nested
+
+    def test_pool_fields_default_none_for_pilot_input(self):
+        """When called without pool fields (legacy pilot path),
+        question_type and query_gen aren't added to metadata — only
+        the original distill-time fields are present."""
+        client = _StubClient('{"answer": "ok [1]"}')
+        result = distill.distill_one_example(
+            client,  # type: ignore[arg-type]
+            query="q",
+            chunks=[_chunk(1)],
+            model="claude-sonnet-4-5",
+        )
+        assert "question_type" not in result.metadata
+        assert "query_gen" not in result.metadata
