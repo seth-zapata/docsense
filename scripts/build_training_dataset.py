@@ -266,6 +266,114 @@ def _read_api_key() -> str:
     return key_path.read_text().strip()
 
 
+# --- Resumability ---------------------------------------------------
+#
+# A 30-min, ~$4 distillation run loses everything on a single uncaught
+# exception (network blip, citation-grounding ValueError, OOM). The
+# fix is per-example incremental persistence: each successful
+# TrainingExample is appended to a sibling JSONL file immediately
+# after generation. On restart, we read that file, build a set of
+# already-done queries (keyed by query text + chunk_ids so changes
+# to either invalidate the cache), and skip them in the main loop.
+#
+# Mirrors the same pattern used by build_query_pool.py for Stage 1.
+
+
+def _raw_jsonl_path(output_path: Path) -> Path:
+    """Sibling JSONL file for incremental persistence + resume.
+
+    For ``output=/tmp/dataset.json``, returns
+    ``/tmp/dataset.raw.jsonl``. The final TrainingDataset JSON is
+    assembled from this raw file at the end of the run.
+    """
+    return output_path.parent / (output_path.stem + ".raw.jsonl")
+
+
+def _cache_key(query: str, chunks: list[ChunkRef]) -> str:
+    """Resume key: (query, sorted chunk_ids).
+
+    Both fields matter — a query alone could repeat with different
+    retrieved_chunks, and the answer depends on both. If either
+    changes between runs (user re-runs Stage 1, the seeder picks
+    different chunks), the cached answer is correctly invalidated.
+    """
+    chunks_key = ",".join(c.chunk_id for c in chunks)
+    return f"{query}::{chunks_key}"
+
+
+def _read_done_examples(raw_path: Path) -> dict[str, TrainingExample]:
+    """Read existing checkpoint. Returns ``{cache_key: TrainingExample}``.
+
+    Tolerates blank lines and individually corrupt lines so a partial-
+    write or manual edit doesn't lose ALL prior progress.
+    """
+    if not raw_path.exists():
+        return {}
+    done: dict[str, TrainingExample] = {}
+    for line in raw_path.read_text().splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            ex = TrainingExample.model_validate_json(line)
+        except (ValueError, json.JSONDecodeError):
+            # Corrupt line; skip. One bad line shouldn't lose the rest.
+            continue
+        done[_cache_key(ex.query, ex.retrieved_chunks)] = ex
+    return done
+
+
+def _append_example(raw_path: Path, example: TrainingExample) -> None:
+    """Append one TrainingExample to the JSONL checkpoint."""
+    raw_path.parent.mkdir(parents=True, exist_ok=True)
+    with raw_path.open("a") as f:
+        f.write(example.model_dump_json() + "\n")
+
+
+def _process_one_input(
+    client: Anthropic,
+    inp: _PilotInput,
+    *,
+    model: str,
+    enable_thinking: bool,
+) -> TrainingExample | None:
+    """Distill one input. Returns ``None`` on any recoverable error.
+
+    Two recoverable failure modes are caught here so the caller can
+    skip-and-continue rather than crashing the entire run:
+
+    - ``RuntimeError``: parser couldn't extract an answer from the
+      model's response (bad JSON, missing field, etc.).
+    - ``ValueError``: ``TrainingExample``'s citation-grounding
+      validator rejected the answer (Sonnet hallucinated a chunk
+      index outside ``[1, len(chunks)]``).
+
+    Both are "bad output, skip this one" cases. Without catching
+    ``ValueError``, a single hallucinated citation in the middle of
+    a 600-query run would crash the script and lose all prior
+    progress. Reproduced once in pre-flight stress tests; would
+    have lost ~$4 of compute mid-run.
+    """
+    try:
+        return distill_one_example(
+            client,
+            query=inp.query,
+            chunks=inp.retrieved_chunks,
+            model=model,
+            enable_thinking=enable_thinking,
+            question_type=inp.question_type,
+            query_gen_metadata=inp.query_gen_metadata,
+        )
+    except (RuntimeError, ValueError) as exc:
+        logger.warning(
+            "Skipped (%s): %s — query: %r",
+            type(exc).__name__,
+            exc,
+            inp.query[:80],
+        )
+        return None
+
+
 # --- JSON response parsing ------------------------------------------
 
 # Same JSON-extraction pattern we use for the Llama judge in
@@ -490,6 +598,16 @@ def main() -> int:
         default=None,
         help="Cap input examples to first N (smoke runs).",
     )
+    parser.add_argument(
+        "--no-resume",
+        action="store_true",
+        help=(
+            "Delete the existing per-example JSONL checkpoint and start "
+            "fresh. Default behavior reads <output>.raw.jsonl and skips "
+            "queries already done — safe to re-run after a crash without "
+            "re-paying for completed calls."
+        ),
+    )
     args = parser.parse_args()
 
     if not args.input.exists():
@@ -522,11 +640,30 @@ def main() -> int:
         "on" if args.enable_thinking else "off",
     )
 
+    # --- Resume bookkeeping ---------------------------------------
+    raw_path = _raw_jsonl_path(args.output)
+    if args.no_resume and raw_path.exists():
+        logger.info("--no-resume: deleting existing %s", raw_path)
+        raw_path.unlink()
+    done_examples = _read_done_examples(raw_path)
+    if done_examples:
+        logger.info("Resuming: %d examples already done in %s", len(done_examples), raw_path)
+
     # --- Run -------------------------------------------------------
     examples: list[TrainingExample] = []
     total_input_tokens = 0
     total_output_tokens = 0
+    n_skipped_done = 0
+    n_skipped_failure = 0
     for i, inp in enumerate(inputs, start=1):
+        # Resume: if we've already distilled this exact (query, chunks)
+        # pair, reuse the cached TrainingExample and skip the API call.
+        cached = done_examples.get(_cache_key(inp.query, inp.retrieved_chunks))
+        if cached is not None:
+            examples.append(cached)
+            n_skipped_done += 1
+            continue
+
         logger.info(
             "[%d/%d] %s%s — %s",
             i,
@@ -535,24 +672,32 @@ def main() -> int:
             " +thinking" if args.enable_thinking else "",
             inp.query[:80],
         )
-        try:
-            ex = distill_one_example(
-                client,
-                query=inp.query,
-                chunks=inp.retrieved_chunks,
-                model=args.model,
-                enable_thinking=args.enable_thinking,
-                question_type=inp.question_type,
-                query_gen_metadata=inp.query_gen_metadata,
-            )
-        except RuntimeError as exc:
-            logger.warning("Parse failure on example %d: %s", i, exc)
+        ex = _process_one_input(
+            client,
+            inp,
+            model=args.model,
+            enable_thinking=args.enable_thinking,
+        )
+        if ex is None:
+            n_skipped_failure += 1
             continue
         examples.append(ex)
-        total_input_tokens += int(ex.metadata.get("input_tokens", 0))
-        total_output_tokens += int(ex.metadata.get("output_tokens", 0))
+        # Append IMMEDIATELY so a later crash doesn't lose this example.
+        _append_example(raw_path, ex)
         if i < len(inputs):
             time.sleep(_INTER_CALL_DELAY_SEC)
+
+    # Token totals are computed across ALL examples (fresh + cached) so
+    # a resumed run reports the true cumulative token spend, not just
+    # this run's incremental cost.
+    for ex in examples:
+        total_input_tokens += int(ex.metadata.get("input_tokens", 0))
+        total_output_tokens += int(ex.metadata.get("output_tokens", 0))
+
+    if n_skipped_done:
+        logger.info("Reused %d cached examples from prior run(s)", n_skipped_done)
+    if n_skipped_failure:
+        logger.info("Skipped %d examples due to parse/citation failures", n_skipped_failure)
 
     # --- Persist --------------------------------------------------
     n_in_corpus = sum(1 for ex in examples if not ex.is_refusal)
@@ -577,7 +722,8 @@ def main() -> int:
             "n_examples": len(examples),
             "n_in_corpus": n_in_corpus,
             "n_refusal": n_refusal,
-            "n_parse_failures": len(inputs) - len(examples),
+            "n_resumed_from_cache": n_skipped_done,
+            "n_parse_failures": n_skipped_failure,
             "total_input_tokens": total_input_tokens,
             "total_output_tokens": total_output_tokens,
             "captured_at": datetime.now(tz=UTC).isoformat(timespec="seconds"),
