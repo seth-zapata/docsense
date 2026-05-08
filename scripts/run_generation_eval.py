@@ -768,12 +768,18 @@ def run_one_eval_set(
     strategy: str,
     limit: int | None,
     run_id: str,
+    output_dir: Path | None = None,
 ) -> Path:
     """Run Phases A-D for one eval set; return the path to the report.
 
     Each eval set is a self-contained run (its own retrieval load, its
     own generator load, its own judge load). When --eval-set all is
     used the outer loop just calls this three times.
+
+    ``output_dir`` overrides where the report JSON lands. Defaults to
+    the local ``REPORTS_DIR`` so the existing CLI behavior is unchanged.
+    The Modal eval driver passes a volume-backed path so reports
+    persist back to local via ``modal volume get``.
     """
     queries = load_eval_set(eval_set)
     if limit is not None:
@@ -800,8 +806,9 @@ def run_one_eval_set(
         chunks_total=chunks_total,
         limit_applied=limit,
     )
-    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
-    out_path = REPORTS_DIR / f"generation-{run_id}-{eval_set}.json"
+    target_dir = output_dir if output_dir is not None else REPORTS_DIR
+    target_dir.mkdir(parents=True, exist_ok=True)
+    out_path = target_dir / f"generation-{run_id}-{eval_set}.json"
     out_path.write_text(json.dumps(report, indent=2, sort_keys=False) + "\n")
     logger.info("Report written to %s", out_path)
     _print_summary(report)
