@@ -1,0 +1,251 @@
+{
+  "schema_version": 4,
+  "phase": "phase-3-block-3c-v1",
+  "description": "Phase 3 Block 3C v1 adapter snapshot. Qwen 2.5 7B Instruct (NF4 4-bit) with LoRA adapter (rank=16, alpha=32, q/k/v/o-proj) trained on 591 distilled examples (349 in-corpus + 242 refusal). 3 epochs on Modal A10G. Same retrieval pipeline as the pre-Phase-3 baseline; only generation stage differs. Run on Modal A10G for hardware parity with the matching Modal baseline (Run ID 20260508T114905Z, captured the same day). This is the reference v1 numbers Block 3D iterations should be compared against.",
+  "captured_at": "2026-05-08",
+  "captured_from": {
+    "adapter_run_id": "20260508T111606Z",
+    "baseline_modal_run_id": "20260508T114905Z",
+    "adapter_volume_path": "/v1 on docsense-adapters",
+    "reports": [
+      "evaluations/reports/phase3-v1-adapter/20260508T111606Z/generation-20260508T111606Z-curated.json",
+      "evaluations/reports/phase3-v1-adapter/20260508T111606Z/generation-20260508T111606Z-structural.json",
+      "evaluations/reports/phase3-v1-adapter/20260508T111606Z/generation-20260508T111606Z-no-answer.json"
+    ],
+    "training_dataset": "evaluations/datasets/training/training_dataset.json",
+    "analysis": "evaluations/analyses/2026-05-08-phase3-v1-finetune-eval.md",
+    "notes": "First QLoRA fine-tune. Citation rate gain on curated 0.70 -> 0.95 (+0.25), on structural 0.50 -> 0.67 (+0.17). Single failure mode: over-refusal on structural \u2014 7 of 8 extra refusals are unjustified (baseline scored >=0.83 on the same query/chunks). Drives the structural-faithfulness FAIL (0.640) and structural-citation-rate FAIL (0.667). Block 3D scope: rebalance training data \u2014 reduce refusal class share (3D.1) and/or add borderline-positive class with mixed-relevance retrieval (3D.2)."
+  },
+  "config": {
+    "generator_model": "Qwen/Qwen2.5-7B-Instruct",
+    "adapter": {
+      "name": "qwen-docsense-v1",
+      "rank": 16,
+      "alpha": 32,
+      "target_modules": [
+        "q_proj",
+        "k_proj",
+        "v_proj",
+        "o_proj"
+      ],
+      "training_epochs": 3,
+      "training_examples": 591,
+      "training_in_corpus": 349,
+      "training_refusal": 242,
+      "training_dataset_id": "evaluations/datasets/training/training_dataset.json"
+    },
+    "use_4bit_quantization_generator": true,
+    "use_4bit_quantization_judge": true,
+    "judge_model": "meta-llama/Meta-Llama-3.1-8B-Instruct",
+    "temperature_generator": 0.1,
+    "temperature_judge": 0.0,
+    "chunking_strategy": "recursive",
+    "top_k": 5,
+    "rerank_candidates": 20,
+    "max_context_tokens": 3500,
+    "max_new_tokens_generator": 512,
+    "faithfulness_method": "claim-level RAGAS-style with per-chunk attribution",
+    "relevance_method": "5-anchor absolute scale (0.0/0.25/0.5/0.75/1.0)",
+    "hardware": "Modal A10G (24 GB VRAM)"
+  },
+  "metrics_in_corpus": {
+    "curated": {
+      "n_queries": 20,
+      "faithfulness": {
+        "score_mean": 0.892,
+        "score_median": 1.0,
+        "score_min": 0.0,
+        "score_max": 1.0,
+        "score_stdev": 0.254,
+        "claims_total_extracted": 93,
+        "claims_total_supported": 87,
+        "claims_support_rate": 0.935,
+        "claims_mean_per_answer": 4.65,
+        "claims_max_per_answer": 7,
+        "n_claim_parse_failures": 0,
+        "n_score_parse_failures": 0,
+        "n_no_claims_extracted": 1,
+        "n_claim_out_of_range": 2,
+        "score_distribution": {
+          "0.0": 1,
+          "0.0-0.25": 0,
+          "0.25-0.5": 0,
+          "0.5-0.75": 3,
+          "0.75-1.0": 0,
+          "1.0": 16
+        },
+        "chunk_usage_distribution": {
+          "1": 21,
+          "2": 19,
+          "3": 24,
+          "none": 6,
+          "5": 13,
+          "4": 10
+        }
+      },
+      "relevance": {
+        "n": 20,
+        "mean": 0.725,
+        "median": 0.75,
+        "anchor_distribution": {
+          "0.00": 1,
+          "0.25": 0,
+          "0.50": 0,
+          "0.75": 18,
+          "1.00": 1
+        },
+        "n_parse_failures": 0
+      },
+      "citation_frac_with_any_marker": 0.95,
+      "citation_frac_all_in_range": 0.95,
+      "citation_mean_n_markers": 4.7
+    },
+    "structural": {
+      "n_queries": 30,
+      "faithfulness": {
+        "score_mean": 0.64,
+        "score_median": 1.0,
+        "score_min": 0.0,
+        "score_max": 1.0,
+        "score_stdev": 0.483,
+        "claims_total_extracted": 86,
+        "claims_total_supported": 78,
+        "claims_support_rate": 0.907,
+        "claims_mean_per_answer": 2.87,
+        "claims_max_per_answer": 10,
+        "n_claim_parse_failures": 0,
+        "n_score_parse_failures": 0,
+        "n_no_claims_extracted": 10,
+        "n_claim_out_of_range": 0,
+        "score_distribution": {
+          "0.0": 10,
+          "0.0-0.25": 1,
+          "0.25-0.5": 0,
+          "0.5-0.75": 0,
+          "0.75-1.0": 0,
+          "1.0": 19
+        },
+        "chunk_usage_distribution": {
+          "1": 43,
+          "5": 5,
+          "3": 14,
+          "2": 8,
+          "none": 8,
+          "4": 8
+        }
+      },
+      "relevance": {
+        "n": 30,
+        "mean": 0.525,
+        "median": 0.75,
+        "anchor_distribution": {
+          "0.00": 10,
+          "0.25": 0,
+          "0.50": 0,
+          "0.75": 17,
+          "1.00": 3
+        },
+        "n_parse_failures": 0
+      },
+      "citation_frac_with_any_marker": 0.667,
+      "citation_frac_all_in_range": 0.667,
+      "citation_mean_n_markers": 1.967
+    }
+  },
+  "metrics_off_corpus": {
+    "no_answer": {
+      "frac_correct_judge": 1.0,
+      "frac_correct_rule": 1.0,
+      "frac_refused_judge": 1.0,
+      "frac_refused_rule": 1.0,
+      "agreement_rate": 1.0,
+      "n_disagreements": 0,
+      "n_judge_parse_failures": 0,
+      "rule_matched_patterns": {
+        "dont_have_context": 25
+      },
+      "n_queries": 25
+    }
+  },
+  "timing_ms_per_query": {
+    "_schema_note": "AWS-standard p50/p95/p99 + mean + n.",
+    "curated": {
+      "retrieve_ms": {
+        "p50": 1437.49,
+        "p95": 3433.75,
+        "p99": 29214.6,
+        "mean": 3137.27,
+        "n": 20
+      },
+      "assemble_ms": {
+        "p50": 0.03,
+        "p95": 0.06,
+        "p99": 0.08,
+        "mean": 0.04,
+        "n": 20
+      },
+      "generate_ms": {
+        "p50": 10533.33,
+        "p95": 16287.13,
+        "p99": 16646.97,
+        "mean": 10506.65,
+        "n": 20
+      }
+    },
+    "structural": {
+      "retrieve_ms": {
+        "p50": 1502.89,
+        "p95": 2172.83,
+        "p99": 4247.65,
+        "mean": 1614.04,
+        "n": 30
+      },
+      "assemble_ms": {
+        "p50": 0.04,
+        "p95": 0.05,
+        "p99": 0.05,
+        "mean": 0.04,
+        "n": 30
+      },
+      "generate_ms": {
+        "p50": 5335.2,
+        "p95": 12824.98,
+        "p99": 15306.78,
+        "mean": 5784.81,
+        "n": 30
+      }
+    },
+    "no-answer": {
+      "retrieve_ms": {
+        "p50": 2225.52,
+        "p95": 3505.16,
+        "p99": 4787.57,
+        "mean": 2306.42,
+        "n": 25
+      },
+      "assemble_ms": {
+        "p50": 0.03,
+        "p95": 0.04,
+        "p99": 0.04,
+        "mean": 0.03,
+        "n": 25
+      },
+      "generate_ms": {
+        "p50": 1267.45,
+        "p95": 1384.66,
+        "p99": 1397.56,
+        "mean": 1284.36,
+        "n": 25
+      }
+    }
+  },
+  "phase3_acceptance_check": {
+    "citation_rate_curated_ge_0.80": true,
+    "citation_rate_structural_ge_0.80": false,
+    "refusal_correctness_eq_1.00": true,
+    "faithfulness_curated_ge_0.85": true,
+    "faithfulness_structural_ge_0.85": false,
+    "targets_passed": "3 / 5",
+    "failure_root_cause": "over-refusal on structural (7 of 8 extra refusals unjustified)"
+  }
+}

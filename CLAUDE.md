@@ -166,9 +166,34 @@ gh pr merge --auto --rebase --delete-branch  # merges when CI passes
   `evaluations/datasets/training/training_dataset.json`. Spend: ~$5 of
   the $10 distillation budget. Full arc:
   [`docs/journal/2026-05-08-block-3b-distillation-close.md`](docs/journal/2026-05-08-block-3b-distillation-close.md).
-- **Phase 3 Block 3C — next.** First QLoRA training run on Modal A10G,
-  adapter-loading wired into Generator, eval against the pre-Phase-3
-  baseline. Plan: [`docs/phase-3-block-3c-plan.md`](docs/phase-3-block-3c-plan.md).
+- **Phase 3 Block 3C — closed (2026-05-08).** First QLoRA training run on
+  Modal A10G (`qwen-docsense-v1`, rank=16, α=32, q/k/v/o-proj, 3 epochs),
+  adapter-loading wired into Generator (`PeftModel.from_pretrained` on top
+  of the NF4-quantized base), and apples-to-apples Modal A10G eval against
+  a same-day Modal baseline. Headline gain: citation rate **0.70 → 0.95
+  on curated** (target ≥0.80 ✅), **0.50 → 0.67 on structural**, citation
+  density 2.20 → 4.70 markers/answer, citation validity 11→2 out-of-range
+  on curated. Curated faithfulness 0.892 (≥0.85 ✅). Refusal correctness
+  preserved at 1.00. **3 of 5 acceptance targets pass.** Single failure
+  mode: over-refusal on structural — 7 of 8 extra refusals are unjustified
+  (baseline scored ≥0.83 on the same query/chunks). Drives both the
+  structural-faithfulness and structural-citation FAILs. Adapter v1
+  reference snapshot at `evaluations/baselines/phase3_v1_finetune.json`.
+  Full analysis: [`evaluations/analyses/2026-05-08-phase3-v1-finetune-eval.md`](evaluations/analyses/2026-05-08-phase3-v1-finetune-eval.md).
+- **Phase 3 Block 3D — next.** Address structural over-refusal via
+  training-data composition:
+  3D.1: down-sample refusal class from 242 → ~100 (so refusal share is
+  ~22% not 41%), retrain v2, re-eval.
+  3D.2 (if 3D.1 insufficient): add **borderline-positive class** — ~100
+  examples where retrieval is intentionally noisy (only 2-3 of top-5
+  chunks support the answer; correct answer cites the supportive ones,
+  ignores the off-topic ones). This is the missing class — the v1
+  training set has only pure positives and pure refusals.
+  3D.3 (stretch): regression on claims-per-answer (6.35 → 4.65 on
+  curated) — verify if 3D.1/3D.2 also closes it; otherwise inspect the
+  distillation prompt v2 for an implicit brevity bias.
+  Out of scope: hyperparameter sweeps. The failure isn't a tuning
+  problem.
 - **Phase 3 deferred.** Pre-Phase-3 Block 1B's deferred items still in
   scope: 5c LLM-generated eval set for cross-validation, AnthropicJudge
   calibration if absolute faithfulness becomes load-bearing.

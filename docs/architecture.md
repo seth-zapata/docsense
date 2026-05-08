@@ -289,26 +289,78 @@ Two-stage pipeline (corpus chunks → query pool → distilled answers):
 Total Block 3B spend: ~$5 of $10 distillation budget. Full arc:
 [`docs/journal/2026-05-08-block-3b-distillation-close.md`](journal/2026-05-08-block-3b-distillation-close.md).
 
-**Block 3C — next.** First training run on Modal A10G, adapter loaded
-into the inference path, eval against the pre-Phase-3 baseline. Plan:
-[`phase-3-block-3c-plan.md`](phase-3-block-3c-plan.md).
+**Block 3C — closed (2026-05-08).** First QLoRA training run executed
+on Modal A10G (`qwen-docsense-v1`: rank=16, α=32, q/k/v/o-proj, 3
+epochs, paged AdamW 8-bit, NF4 4-bit base). Adapter loaded into the
+inference path via `PeftModel.from_pretrained` on top of the
+quantized base; `Generator` exposes `adapter_path` config field for
+A/B comparison. Eval ran on Modal A10G for both legs (adapter +
+fresh baseline) so the comparison is apples-to-apples — same
+hardware, same retrieval state, same prompts, same judge.
+
+Headline (vs Modal baseline, same day):
+
+| Metric | Baseline | Adapter v1 | Δ | Phase 3 target |
+|---|---:|---:|---:|---|
+| Citation rate (curated) | 0.700 | 0.950 | +0.250 | ≥0.80 ✅ |
+| Citation rate (structural) | 0.500 | 0.667 | +0.167 | ≥0.80 ❌ |
+| Faithfulness (curated) | 0.938 | 0.892 | −0.046 | ≥0.85 ✅ |
+| Faithfulness (structural) | 0.893 | 0.640 | −0.253 | ≥0.85 ❌ |
+| Refusal correctness (no-answer) | 1.000 | 1.000 | 0.000 | =1.00 ✅ |
+| Citation density (curated, markers/answer) | 2.20 | 4.70 | +2.50 | — |
+| Citation validity (curated, n out-of-range) | 11/128 | 2/93 | −9 | — |
+
+**Three of five acceptance targets pass.** Both failures trace to
+one root cause: the adapter over-refuses on structural — 10/30 items
+become `"I don't have enough context..."` (was 2/30 baseline). Per-
+query alignment shows 7 of those 8 extra refusals are unjustified
+(baseline scored ≥0.83 on the same query/chunks). When the model
+refuses, it doesn't cite, which is why both structural metrics fail.
+
+Adapter v1 reference snapshot at
+[`evaluations/baselines/phase3_v1_finetune.json`](../evaluations/baselines/phase3_v1_finetune.json).
+Full analysis: [`evaluations/analyses/2026-05-08-phase3-v1-finetune-eval.md`](../evaluations/analyses/2026-05-08-phase3-v1-finetune-eval.md).
+
+**Block 3D — next.** Address the over-refusal failure mode via
+training-data composition (not hyperparameters):
+
+- **3D.1.** Down-sample refusal class from 242 → ~100 (refusal share
+  41% → 22%). Cheapest possible iteration; if the over-refusal is
+  driven by class-share alone, this closes both structural FAILs.
+- **3D.2.** If 3D.1 is insufficient, add the missing **borderline-
+  positive class** — ~100 examples where retrieval is intentionally
+  noisy (only 2-3 of top-5 chunks support the answer). The v1
+  training set has only pure positives (clean retrieval) and pure
+  refusals (off-corpus); it never demonstrates "answer using the
+  supportive chunks, ignore the off-topic ones." Reuse the existing
+  `TypeAwareQueryGenerator` infrastructure with a noisier retrieval
+  path (raw BM25 only, no rerank) to seed mixed-relevance queries,
+  then distill via Sonnet 4.5 + prompt v2 (the Block 3B 4-way pilot
+  winner).
+- **3D.3 (stretch).** Investigate the claims-per-answer regression
+  (curated 6.35 → 4.65). Could be faithful concision or corner-
+  cutting; verify if 3D.1/3D.2 also closes it.
 
 Constraints (calibrated from actual hardware):
 - **Local hardware: RTX 4070 with 12 GB VRAM** (not 5080/16 GB as
   the original scope assumed). Sufficient for inference (NF4 4-bit
   Qwen 7B + LoRA fits, ~6-7 GB) but tight for training (too many
   ~5-8 hr wall-time runs would lock the dev box).
-- **Cloud training: Modal A10G with 24 GB VRAM** at $1.10/hr. Cuts
-  per-run wall time to ~30-45 min. $30 free credit pool covers 3-5
-  Block 3D iteration cycles comfortably.
-- Dataset construction was its own subproject (Block 3B above).
+- **Cloud training + eval: Modal A10G with 24 GB VRAM** at $1.10/hr.
+  Block 3C training was ~25 min, full eval was ~30-45 min. $30 free
+  credit pool covers many 3D iteration cycles.
+- Dataset construction was its own subproject (Block 3B above);
+  3D.2 reuses the same infrastructure with a different retrieval
+  configuration.
 
 Interview narrative target: "I built the fine-tuning pipeline,
 constructed a 591-example training dataset via two-stage LLM
-distillation with rigorous quality filtering, ran a real training
-job within hardware + cost constraints, and showed measurable
-improvement (or lack thereof — also informative) on domain-specific
-questions versus the off-the-shelf base."
+distillation with rigorous quality filtering, ran a real QLoRA
+training job, and the v1 adapter shipped a +0.25 citation-rate gain
+on curated. The eval surfaced a single failure mode — over-refusal
+on structural — that was diagnosable as missing training-data
+coverage rather than a hyperparameter problem. v2 targets the
+training-data gap."
 
 ## Phase 4 — serving + observability
 
@@ -412,12 +464,13 @@ runs (PR / nightly / manual), and where artifacts live — is in
 
 | | |
 |---|---|
-| **Current phase** | Phase 3 Blocks 3A + 3B closed; Block 3C (first training run + eval on Modal) up next |
+| **Current phase** | Phase 3 Blocks 3A + 3B + 3C closed (2026-05-08); Block 3D (training-data rebalance) up next |
 | **Phase 1 finding** | Recursive chunking wins under dense-only retrieval (MRR 0.692). Established the eval set + corrected metrics. |
 | **Phase 2 finding** | The "fixed wins under hybrid+rerank" result on the curated set didn't replicate on the structural set — exposed eval-set bias as a real issue. Production default: hybrid+rerank with `chunking.strategy=recursive`. |
 | **Pre-Phase-3 finding** | Qwen 2.5 7B Instruct cites correctly on ~54% of in-corpus answers (cross-set agreement) and refuses 100% of off-corpus queries. Llama 3.1 8B as judge anchors faithfulness at 0.75 — calibration prerequisite for absolute-faithfulness claims. **Citation rate is the highest-leverage Phase 3 fine-tune target.** Full analysis: [`evaluations/analyses/2026-05-06-baseline-generation-eval.md`](../evaluations/analyses/2026-05-06-baseline-generation-eval.md). |
 | **Block 3B finding** | 591-example training dataset constructed via two-stage Haiku→Sonnet distillation with rigorous filtering. Natural 41% refusal rate (Sonnet correctly refuses on coverage gaps even at low retrieval scores) gives strong refusal-discipline training signal. Pre-flight resumability + ValueError audit (PR A) caught 8 of 599 distillation failures cleanly that would otherwise have crashed the run. Full arc: [`docs/journal/2026-05-08-block-3b-distillation-close.md`](journal/2026-05-08-block-3b-distillation-close.md). |
-| **Next experiment** | Phase 3 Block 3C: train QLoRA adapter on Modal A10G, load into Generator, eval against the pre-Phase-3 baseline. Plan: [`phase-3-block-3c-plan.md`](phase-3-block-3c-plan.md). |
+| **Block 3C finding** | First QLoRA fine-tune (`qwen-docsense-v1`) shipped citation-rate +0.25 on curated (0.70 → 0.95, target ≥0.80 ✅) and +0.17 on structural; faithfulness held above target on curated (0.892 ≥ 0.85); refusal correctness preserved at 1.00. Single failure mode: over-refusal on structural — 7/8 extra refusals are unjustified (baseline scored ≥0.83 on the same items). 3 of 5 acceptance targets pass; both FAILs trace to the same root cause. Full analysis: [`evaluations/analyses/2026-05-08-phase3-v1-finetune-eval.md`](../evaluations/analyses/2026-05-08-phase3-v1-finetune-eval.md). |
+| **Next experiment** | Phase 3 Block 3D: rebalance training data to address structural over-refusal — 3D.1 down-sample refusal class (242 → ~100), 3D.2 add borderline-positive class (mixed-relevance retrieval). Adapter v1 reference at [`evaluations/baselines/phase3_v1_finetune.json`](../evaluations/baselines/phase3_v1_finetune.json). |
 | **Test coverage** | 606 tests, 90% CI gate enforced |
 | **Workflow** | PR-based, branch-protected `main`, auto-merge with rebase on passing CI; pre-push pytest hook locally. |
 | **Recent commit** | See `git log` for the canonical state |
