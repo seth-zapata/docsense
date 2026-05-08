@@ -96,10 +96,15 @@ adapters_vol = modal.Volume.from_name("docsense-adapters", create_if_missing=Tru
         "/root/.cache/huggingface": hf_cache_vol,
         "/adapters": adapters_vol,
     },
-    # HF_TOKEN avoids rate limits on first weight download. Optional —
-    # if the secret doesn't exist, training still works (just may hit
-    # rate limits if multiple Modal runs collide on a cold cache).
-    secrets=[modal.Secret.from_name("hf-token", required_keys=[])],
+    # No HF_TOKEN secret needed: Qwen 2.5 7B Instruct is Apache 2.0
+    # and non-gated, the persistent docsense-hf-cache volume means we
+    # download weights once and reuse forever (no rate-limit risk on
+    # subsequent runs), and Modal's `Secret.from_name` actually
+    # requires the secret to EXIST — `required_keys=[]` only relaxes
+    # which keys must be present within an existing secret. To opt
+    # back in for a future gated model, create the secret via:
+    #   modal secret create hf-token HF_TOKEN=hf_xxx
+    # then add: secrets=[modal.Secret.from_name("hf-token")] here.
     timeout=3600,
 )
 def train(
