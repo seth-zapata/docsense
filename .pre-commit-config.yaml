@@ -21,7 +21,12 @@ repos:
       - id: check-yaml
       - id: check-merge-conflict
       - id: check-added-large-files
-        args: [--maxkb=500]
+        # 500 KB was the default; bumped to 3 MB to accommodate the
+        # committed Phase 3 datasets (~2.2 MB final + ~2.1 MB query pool)
+        # per the plan's reproducibility goal — full ideal_answer text
+        # in-repo, not a manifest. Still tight enough to catch
+        # accidentally-staged model weights or pickle dumps.
+        args: [--maxkb=3000]
 
   # Lint, format, and type-check on commit; full PR-CI-parity test on push.
   # The test suite is too slow for every commit but cheap enough for every

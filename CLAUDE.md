@@ -145,11 +145,33 @@ gh pr merge --auto --rebase --delete-branch  # merges when CI passes
   target), 100% refusal on off-corpus, faithfulness mean 0.75 with
   judge anchor saturation flagged. Full analysis:
   `evaluations/analyses/2026-05-06-baseline-generation-eval.md`.
-- **Phase 3.** QLoRA fine-tuning track — supervised dataset construction,
-  training script, eval against the pre-Phase-3 baseline. Pre-Phase-3
-  Block 1B's deferred items still in scope: 5c LLM-generated eval set
-  for cross-validation, AnthropicJudge calibration if absolute
-  faithfulness becomes load-bearing.
+- **Phase 3 Block 3A — closed (2026-05-06).** Training infrastructure
+  scaffolding: `TrainingExample`/`TrainingDataset` typed contracts with
+  stratified split (3A.1), `LoRAFineTuner` wrapping PEFT + TRL SFTTrainer
+  with assistant-only-loss masking + NF4 4-bit quantization defaults
+  (3A.2), `scripts/train_lora.py` CLI for local execution. Modal-aware
+  driver lives in 3C.
+- **Phase 3 Block 3B — closed (2026-05-08).** Training-dataset construction.
+  3B.1: 4-way distillation pilot (Haiku/Sonnet/Sonnet+thinking/Opus on
+  6 queries) picked Sonnet 4.5 + prompt v2. 3B.2 (a-f): heuristic
+  chunk-affinity classifier, `TypeAwareQueryGenerator` (Haiku 4.5 — also
+  validated via mini-pilot vs Sonnet, quality wash at 3.5× cheaper),
+  type-stratified embedding dedupe + eval-contamination filter, 30
+  hand-curated off-corpus topic seeds, Stage 1 driver `build_query_pool.py`,
+  distillation-script JSONL adapter. Plus three quality-fix follow-ups
+  (refusal temperature for diversity, type-shape filter against drift,
+  plain-text-refusal parser fix) and a pre-flight resumability + ValueError
+  audit (PR A) that saved the full Stage 2 run from a citation-hallucination
+  crash. Final dataset: 591 examples (349 in-corpus + 242 refusal) at
+  `evaluations/datasets/training/training_dataset.json`. Spend: ~$5 of
+  the $10 distillation budget. Full arc:
+  [`docs/journal/2026-05-08-block-3b-distillation-close.md`](docs/journal/2026-05-08-block-3b-distillation-close.md).
+- **Phase 3 Block 3C — next.** First QLoRA training run on Modal A10G,
+  adapter-loading wired into Generator, eval against the pre-Phase-3
+  baseline. Plan: [`docs/phase-3-block-3c-plan.md`](docs/phase-3-block-3c-plan.md).
+- **Phase 3 deferred.** Pre-Phase-3 Block 1B's deferred items still in
+  scope: 5c LLM-generated eval set for cross-validation, AnthropicJudge
+  calibration if absolute faithfulness becomes load-bearing.
 - **Phase 4.** FastAPI serving + `tracing/` (structured query logs), end-to-end
   generation eval (faithfulness, answer relevance), Docker packaging.
 

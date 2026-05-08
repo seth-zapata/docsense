@@ -256,23 +256,57 @@ full breakdown of what runs where.
 - **194 tests, 90% CI coverage gate.** Two of the new tests
   (D.2, D.3) caught real bugs in production-relevant code paths.
 
-## Phase 3 — QLoRA fine-tuning
+## Phase 3 — QLoRA fine-tuning (in progress)
 
 Take the base model from Phase 2, train a QLoRA adapter on a
-synthetic dataset built from the corpus (probably "given this
-section, write a question someone might ask, and the answer"), and
-compare fine-tuned vs base on the same end-to-end eval.
+distilled dataset built from the corpus, and compare fine-tuned vs
+base on the same end-to-end eval.
 
-Constraints:
-- Target hardware: RTX 5080 with 16 GB VRAM. QLoRA's 4-bit
-  quantization plus low-rank adapter weights make this fit; full
-  fine-tuning wouldn't.
-- Dataset construction is its own subproject — synthetic Q&A pairs
-  via an LLM, validated against the source docs to avoid
-  hallucinated training data.
+**Block 3A — closed (2026-05-06).** Training infrastructure scaffolded:
+`TrainingExample` / `TrainingDataset` typed contracts with stratified
+train/val split, `LoRAFineTuner` wrapping PEFT + TRL SFTTrainer with
+`assistant_only_loss=True` and NF4 4-bit quantization defaults,
+`scripts/train_lora.py` local CLI. Hyperparameter defaults
+(rank=16, alpha=32, lr=2e-4, 3 epochs, grad_accum=8) pinned in
+`FineTuningConfig`.
 
-Interview narrative target: "I built the fine-tuning pipeline, ran a
-real training job within hardware constraints, and showed measurable
+**Block 3B — closed (2026-05-08).** Training-dataset construction.
+Two-stage pipeline (corpus chunks → query pool → distilled answers):
+
+- Stage 1 generates type-stratified queries via Haiku 4.5 (procedural,
+  comparison, best-practice, pointer) plus refusal queries (off-corpus
+  topic seeds + engineered retrieval-failure pairing). Filtered by
+  length, per-type shape, type-stratified embedding dedupe, and
+  eval-contamination check. Output: 599 query-pool entries committed
+  at `evaluations/datasets/training/query_pool/query_pool.jsonl`.
+- Stage 2 distills ideal cited answers via Sonnet 4.5 with a v2 prompt
+  calibrated against a 4-way pilot. Resumable per-example checkpoint
+  + ValueError catch for citation hallucination saved the run from
+  expected mid-batch crashes. Output: 591 training examples (349
+  in-corpus + 242 refusal) committed at
+  `evaluations/datasets/training/training_dataset.json`.
+
+Total Block 3B spend: ~$5 of $10 distillation budget. Full arc:
+[`docs/journal/2026-05-08-block-3b-distillation-close.md`](journal/2026-05-08-block-3b-distillation-close.md).
+
+**Block 3C — next.** First training run on Modal A10G, adapter loaded
+into the inference path, eval against the pre-Phase-3 baseline. Plan:
+[`phase-3-block-3c-plan.md`](phase-3-block-3c-plan.md).
+
+Constraints (calibrated from actual hardware):
+- **Local hardware: RTX 4070 with 12 GB VRAM** (not 5080/16 GB as
+  the original scope assumed). Sufficient for inference (NF4 4-bit
+  Qwen 7B + LoRA fits, ~6-7 GB) but tight for training (too many
+  ~5-8 hr wall-time runs would lock the dev box).
+- **Cloud training: Modal A10G with 24 GB VRAM** at $1.10/hr. Cuts
+  per-run wall time to ~30-45 min. $30 free credit pool covers 3-5
+  Block 3D iteration cycles comfortably.
+- Dataset construction was its own subproject (Block 3B above).
+
+Interview narrative target: "I built the fine-tuning pipeline,
+constructed a 591-example training dataset via two-stage LLM
+distillation with rigorous quality filtering, ran a real training
+job within hardware + cost constraints, and showed measurable
 improvement (or lack thereof — also informative) on domain-specific
 questions versus the off-the-shelf base."
 
@@ -378,12 +412,13 @@ runs (PR / nightly / manual), and where artifacts live — is in
 
 | | |
 |---|---|
-| **Current phase** | Pre-Phase-3 Block 1B closed; Phase 3 (QLoRA fine-tuning) up next |
+| **Current phase** | Phase 3 Blocks 3A + 3B closed; Block 3C (first training run + eval on Modal) up next |
 | **Phase 1 finding** | Recursive chunking wins under dense-only retrieval (MRR 0.692). Established the eval set + corrected metrics. |
 | **Phase 2 finding** | The "fixed wins under hybrid+rerank" result on the curated set didn't replicate on the structural set — exposed eval-set bias as a real issue. Production default: hybrid+rerank with `chunking.strategy=recursive`. |
 | **Pre-Phase-3 finding** | Qwen 2.5 7B Instruct cites correctly on ~54% of in-corpus answers (cross-set agreement) and refuses 100% of off-corpus queries. Llama 3.1 8B as judge anchors faithfulness at 0.75 — calibration prerequisite for absolute-faithfulness claims. **Citation rate is the highest-leverage Phase 3 fine-tune target.** Full analysis: [`evaluations/analyses/2026-05-06-baseline-generation-eval.md`](../evaluations/analyses/2026-05-06-baseline-generation-eval.md). |
-| **Next experiment** | Phase 3 QLoRA fine-tune targeting the citation-rate gap; AnthropicJudge calibration if absolute faithfulness becomes load-bearing. |
-| **Test coverage** | 266 tests, 90% CI gate enforced |
+| **Block 3B finding** | 591-example training dataset constructed via two-stage Haiku→Sonnet distillation with rigorous filtering. Natural 41% refusal rate (Sonnet correctly refuses on coverage gaps even at low retrieval scores) gives strong refusal-discipline training signal. Pre-flight resumability + ValueError audit (PR A) caught 8 of 599 distillation failures cleanly that would otherwise have crashed the run. Full arc: [`docs/journal/2026-05-08-block-3b-distillation-close.md`](journal/2026-05-08-block-3b-distillation-close.md). |
+| **Next experiment** | Phase 3 Block 3C: train QLoRA adapter on Modal A10G, load into Generator, eval against the pre-Phase-3 baseline. Plan: [`phase-3-block-3c-plan.md`](phase-3-block-3c-plan.md). |
+| **Test coverage** | 606 tests, 90% CI gate enforced |
 | **Workflow** | PR-based, branch-protected `main`, auto-merge with rebase on passing CI; pre-push pytest hook locally. |
 | **Recent commit** | See `git log` for the canonical state |
 | **Metric-level view** | See [`evaluations/performance.md`](../evaluations/performance.md) for the per-subsystem report card with measurement provenance and explicit gaps |

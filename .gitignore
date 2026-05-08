@@ -26,6 +26,12 @@ data/eval-runs/
 *.faiss
 *.pkl
 
+# Resumability checkpoints — redundant with the final committed
+# artifacts (query_pool.jsonl, training_dataset.json). Useful only
+# for resuming an interrupted run; not a repo artifact.
+evaluations/datasets/training/query_pool/raw_queries.jsonl
+evaluations/datasets/training/training_dataset.raw.jsonl
+
 # Models
 models/
 *.bin
