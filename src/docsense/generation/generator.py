@@ -31,7 +31,7 @@ from typing import TYPE_CHECKING, Any, cast
 from docsense.generation.types import Answer, ChunkRef, Citation, GenerationMetadata
 
 if TYPE_CHECKING:
-    from transformers import PreTrainedModel, PreTrainedTokenizerBase
+    from transformers import PreTrainedTokenizerBase
 
     from docsense.config import GenerationConfig
 
@@ -76,11 +76,16 @@ class Generator:
 
     def __init__(self, config: GenerationConfig) -> None:
         self.config = config
-        self._model: PreTrainedModel | None = None
+        # ``Any`` because the loaded model can be either a HF
+        # ``PreTrainedModel`` (base-only path) or a peft ``PeftModel``
+        # (when adapter_path is set). PeftModel doesn't subclass
+        # PreTrainedModel but is duck-type compatible for the methods
+        # the Generator uses (``.generate``, ``.device``).
+        self._model: Any | None = None
         self._tokenizer: PreTrainedTokenizerBase | None = None
 
     @property
-    def model(self) -> PreTrainedModel:
+    def model(self) -> Any:
         if self._model is None:
             from transformers import AutoModelForCausalLM
 
@@ -88,10 +93,29 @@ class Generator:
             if self.config.use_4bit_quantization:
                 kwargs["quantization_config"] = self._build_4bit_config()
 
-            self._model = AutoModelForCausalLM.from_pretrained(
+            base_model = AutoModelForCausalLM.from_pretrained(
                 self.config.model_name,
                 **kwargs,
             )
+            # If a PEFT adapter is configured, load it on top of the
+            # quantized base. Standard PEFT inference order: NF4-quantize
+            # the base first (above), then apply the full-precision LoRA
+            # matrices via PeftModel.from_pretrained. PEFT respects the
+            # base's device_map, so the adapter weights land alongside
+            # the base weights without an extra .to(device) step.
+            #
+            # Lazy import: peft is in the [gpu] extras alongside
+            # bitsandbytes; importing at module scope would force the
+            # dep on CPU-only / mocked test paths.
+            if self.config.adapter_path is not None:
+                from peft import PeftModel
+
+                self._model = PeftModel.from_pretrained(
+                    base_model,
+                    str(self.config.adapter_path),
+                )
+            else:
+                self._model = base_model
         return self._model
 
     @staticmethod
@@ -205,6 +229,9 @@ class Generator:
             latency_ms=float(raw["latency_ms"]),
             prompt_tokens=raw.get("prompt_tokens"),
             completion_tokens=raw.get("completion_tokens"),
+            adapter_path=(
+                str(self.config.adapter_path) if self.config.adapter_path is not None else None
+            ),
         )
         return Answer(
             text=text.strip(),

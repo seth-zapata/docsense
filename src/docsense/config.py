@@ -54,6 +54,15 @@ class GenerationConfig(BaseSettings):
     # then loads at default precision (float16/bfloat16 depending on dtype).
     # Bitsandbytes ships in the `gpu` extras (`pip install -e ".[gpu]"`).
     use_4bit_quantization: bool = True
+    # Path to a trained PEFT/LoRA adapter directory. When set, Generator
+    # loads the adapter on top of the base model after quantization
+    # (the standard PEFT inference pattern: NF4-quantize the base, then
+    # apply full-precision LoRA matrices via PeftModel.from_pretrained).
+    # Default None preserves base-model-only inference for the
+    # pre-Phase-3 baseline path; set to a directory containing
+    # ``adapter_config.json`` + ``adapter_model.safetensors`` (output of
+    # ``LoRAFineTuner.save_adapter()``) for Phase 3+ fine-tuned inference.
+    adapter_path: Path | None = None
 
 
 class ChunkingConfig(BaseSettings):
