@@ -709,6 +709,15 @@ def build_report(
             "chunking_strategy": settings.chunking.strategy,
             "chunks_total": chunks_total,
             "generator_model": settings.generation.model_name,
+            # Adapter path lets downstream comparisons (base vs adapter
+            # v1, etc.) distinguish runs without needing the filename
+            # to encode it. None means base-model-only (pre-Phase-3
+            # baseline path).
+            "adapter_path": (
+                str(settings.generation.adapter_path)
+                if settings.generation.adapter_path is not None
+                else None
+            ),
             # Judge is now used for no-answer queries too (refusal
             # detection moved from regex-only to LLM-judge primary
             # with regex as guardrail). So the judge model is recorded
@@ -738,6 +747,18 @@ def _apply_device_override(settings: Settings, device: str | None) -> None:
         return
     settings.generation = GenerationConfig(**{**settings.generation.model_dump(), "device": device})
     settings.judge = JudgeConfig(**{**settings.judge.model_dump(), "device": device})
+
+
+def _apply_adapter_path_override(settings: Settings, adapter_path: Path | None) -> None:
+    """Set Generator's adapter_path. None keeps the default base-model path
+    (i.e., the pre-Phase-3 baseline run); a real path triggers PEFT
+    adapter loading on top of the quantized base. The judge is unaffected
+    — it always runs base Llama 3.1 8B for stable judging anchor."""
+    if adapter_path is None:
+        return
+    settings.generation = GenerationConfig(
+        **{**settings.generation.model_dump(), "adapter_path": adapter_path},
+    )
 
 
 def run_one_eval_set(
@@ -877,10 +898,25 @@ def main() -> int:
             "CPU and thrashing). 'cpu' for CPU-only runs."
         ),
     )
+    parser.add_argument(
+        "--adapter-path",
+        type=Path,
+        default=None,
+        help=(
+            "Path to a PEFT/LoRA adapter directory to load on top of the "
+            "base model (Block 3C+). Default None runs the base model "
+            "alone — that's the pre-Phase-3 baseline. Set this to "
+            "models/fine-tunes/qwen-docsense-vN/ for fine-tuned eval "
+            "(Block 3C.5 onwards). The adapter path is recorded in the "
+            "report so base vs adapter runs are distinguishable in "
+            "the eval JSON without needing the filename to encode it."
+        ),
+    )
     args = parser.parse_args()
 
     settings = Settings()
     _apply_device_override(settings, args.device)
+    _apply_adapter_path_override(settings, args.adapter_path)
 
     run_id = datetime.now(tz=UTC).strftime("%Y%m%dT%H%M%SZ")
     logger.info("Run ID: %s", run_id)
@@ -889,6 +925,7 @@ def main() -> int:
     logger.info("Chunking:        %s", args.strategy)
     logger.info("Limit:           %s", args.limit or "(none)")
     logger.info("Device override: %s", args.device or "(default)")
+    logger.info("Adapter:         %s", args.adapter_path or "(none — base model)")
 
     eval_sets_to_run: tuple[str, ...] = (
         ALL_EVAL_SETS if args.eval_set == "all" else (args.eval_set,)
