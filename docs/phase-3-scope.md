@@ -65,43 +65,134 @@ Stack:
 
 ## Block structure (5 blocks, ~3-5 PRs)
 
-### Block 3A — Training infrastructure scaffolding (no real training yet)
+### Block 3A — Training infrastructure scaffolding (closed 2026-05-06)
 
-Adds the moving parts; tests with synthetic dataset + mocked model loads.
+Built the moving parts, tested with synthetic dataset + mocked model loads.
 
-**3A.1 — Dataset shape + config** (this session)
+**3A.1 — Dataset shape + config** ✅
 - `src/docsense/finetuning/dataset.py`: `TrainingExample` typed
-  dataclass, `TrainingDataset` with stratified train/val split,
-  loader from JSON manifest.
+  contract, `TrainingDataset` with stratified train/val split,
+  citation-grounding model_validator, JSON round-trip via
+  `from_json`/`to_json`.
 - `src/docsense/finetuning/config.py`: `FineTuningConfig` with
   pinned defaults (rank=16, alpha=32, lr=2e-4, num_epochs=3,
-  gradient_accumulation=8 to compensate for batch=1).
-- Tests: shape contracts, defaults, stratified split correctness.
+  grad_accumulation=8 to compensate for batch=1).
 
-**3A.2 — Trainer wrapper + CLI** (next session)
+**3A.2 — Trainer wrapper + CLI** ✅
 - `src/docsense/finetuning/trainer.py`: `LoRAFineTuner` wrapping
-  PEFT model prep + LoRA config + SFTTrainer construction. Mockable
-  `_run_training_step` for testing.
-- `scripts/train_lora.py`: CLI entry point (local execution path).
-- Modal-aware execution path lands in 3C.
+  PEFT model prep + LoRA config + TRL SFTTrainer with
+  `assistant_only_loss=True` and NF4 4-bit quantization defaults.
+- `scripts/train_lora.py`: local CLI entry point. Modal-aware
+  driver lives in 3C.
 
-### Block 3B — Training dataset construction (pilot-first)
+### Block 3B — Training dataset construction (closed 2026-05-08)
 
-**3B.1 — Distillation script + pilot** (small)
-- `scripts/build_training_dataset.py` with `--limit N` flag.
-- Pilot: generate 5-10 examples (~$0.10 Anthropic cost), manually
-  review outputs, iterate on the system prompt 1-2 rounds.
-- Commit script + pilot examples + journal note on prompt iteration.
+The original two-bullet decomposition was correct in spirit; the
+realized work decomposed further once the pipeline complexity became
+clear. Final shape:
 
-**3B.2 — Full dataset generation** (one-shot batch)
-- Run validated script at scale: ~500-800 in-corpus + ~50-100
-  refusal examples = ~600-900 total.
-- Manual eyeball-review of ~20 random samples.
-- Commit full dataset to `evaluations/datasets/training/v1.json` —
-  full answers, not just manifest, for portfolio reproducibility.
-  ~5-10 MB JSON, well within repo size.
+**3B.1 — Distillation pilot** ✅ (4-way model comparison)
+- `scripts/build_training_dataset.py` with `--limit N` and
+  `--enable-thinking` flags.
+- Pilot: 6 queries × 4 model variants (Haiku 4.5 / Sonnet 4.5 /
+  Sonnet 4.5 + thinking / Opus 4.7) at $0.45 total. Picked
+  **Sonnet 4.5 with prompt v2** based on citation density (26
+  markers, highest), correctness on prerequisite-rich procedurals,
+  and absence of URL hallucination.
+- Comparison artifact: `evaluations/datasets/training/pilot/comparison.md`.
+
+**3B.2 plan doc** ✅ → [`phase-3-block-3b2-plan.md`](phase-3-block-3b2-plan.md)
+- Two-stage architecture (corpus → query pool → distilled answers)
+- 5 validated decisions including a mini-pilot for Haiku-vs-Sonnet
+  on query generation (Haiku won, quality wash at 3.5× cheaper)
+
+**3B.2.a — Heuristic chunk-affinity classifier** ✅
+- `src/docsense/finetuning/chunk_classifier.py`: classifies chunks
+  as procedural / comparison / best-practice / pointer (multi-label).
+- 53 unit tests covering positive/negative examples per detector,
+  multi-label combinations, real-chunk parity tests.
+
+**3B.2.b — Type-aware query generator** ✅
+- `src/docsense/finetuning/query_generation.py`:
+  `TypeAwareQueryGenerator` wrapping Haiku 4.5 with one prompt
+  template per type, `GeneratedQuery` pydantic model.
+- 29 unit tests with stubbed Anthropic client.
+
+**3B.2.c — Query pool quality filters** ✅
+- `src/docsense/finetuning/query_filters.py`:
+  `filter_by_length`, `filter_duplicates` (type-stratified embedding
+  dedupe), `filter_eval_contamination` (cross-type, vs eval queries).
+- 21 unit tests with deterministic mock embedder.
+
+**3B.2.d — Refusal topic seeds** ✅
+- `evaluations/datasets/training/refusal_topic_seeds.json`: 30
+  hand-curated topics (10 adjacent_ml, 12 general_cs, 8 unrelated).
+- `src/docsense/finetuning/refusal_seeds.py`: typed loader with
+  `Literal` category validation. 16 tests.
+
+**3B.2.e — Stage 1 query-pool seeder** ✅
+- `scripts/build_query_pool.py`: end-to-end Stage 1 driver tying
+  3B.2.a-d together. Resumable via per-task JSONL append.
+  Synthesizes retrieval-failure refusals by pairing in-corpus
+  queries with chunks from a different doc family.
+- 27 unit tests.
+
+**3B.2.f — Distillation script JSONL adapter** ✅
+- `scripts/build_training_dataset.py` extended to consume both pilot
+  JSON arrays (3B.1 hand-curated) and pool JSONL entries (3B.2.e
+  output). Pool-only fields (`question_type`, gen metadata) propagate
+  to `TrainingExample.metadata` for end-to-end provenance.
+- 6 new tests, 24 existing preserved.
+
+**Quality fixes** (post-first-run findings) ✅
+- Refusal generation at `temperature=0.7` for diversity (in-corpus
+  stays at 0 for resumability). Eliminated 67% within-seed dedupe
+  observed at temperature=0.
+- `filter_by_type_shape` step: dropped 16.8% of generated queries
+  whose phrasing didn't match their assigned type. Pointer was the
+  worst offender (53 dropped) — confirms chunk-classifier
+  pointer-affinity heuristic is over-eager.
+- Distill parser plain-text refusal escape hatch: Sonnet sometimes
+  drops the JSON wrapper when refusing. Recovered ~14% of procedural
+  queries that were silently being lost as "parse failures".
+
+**Pre-flight audit (PR A)** ✅
+- `_process_one_input` wrapper catches both `RuntimeError` (parse
+  failure) and `ValueError` (citation hallucination from
+  `TrainingExample` validator). Without this, a single
+  hallucinated citation would crash the run and lose all prior
+  progress.
+- Per-example resumability: each successful TrainingExample appends
+  to `<output>.raw.jsonl` immediately. On restart, cache key is
+  `(query, chunk_ids)` so changed inputs correctly invalidate.
+- Caught 8 of 599 distillation failures cleanly during the actual
+  run (5 citation hallucinations, 3 plain-text non-refusal answers).
+
+**Stage 1 actual run** ✅ — `evaluations/datasets/training/query_pool/`
+- 599 query-pool entries (508 in-corpus + 92 refusal pool entries:
+  53 off-corpus + 39 retrieval-failure)
+- $0.31 actual cost (v1 + v2 regen for refusal temperature fix)
+- Filter pass-through: length 0 dropped, type-shape 136 dropped,
+  dedupe 66 dropped, eval-contamination 9 dropped (810 → 599)
+
+**Stage 2 actual run** ✅ — `evaluations/datasets/training/training_dataset.json`
+- 591 distilled training examples (349 in-corpus + 242 refusal)
+- 41% natural refusal rate after distillation (Sonnet correctly
+  refuses when retrieved chunks don't fully cover the question;
+  this is the production failure mode we want Qwen to learn)
+- $3.87 actual cost vs $4.16 projection
+- 30 min wall time on Modal-free local Anthropic API path
+- 8 losses (1.3%) all caught cleanly by PR A's safety net
+
+**Total Block 3B spend:** ~$5.00 of the $10 distillation budget.
+Full arc and lessons learned:
+[`docs/journal/2026-05-08-block-3b-distillation-close.md`](journal/2026-05-08-block-3b-distillation-close.md).
 
 ### Block 3C — First training run + eval (Modal cloud)
+
+> Detailed sub-block plan: [`phase-3-block-3c-plan.md`](phase-3-block-3c-plan.md)
+> (5 sub-blocks 3C.1 through 3C.5, including the dataset-size pain
+> point captured in "Open questions / followups").
 
 - Add Modal-aware training entry point (`scripts/train_lora_modal.py`)
 - Modal config: A10G GPU, persistent volume for HF model cache
