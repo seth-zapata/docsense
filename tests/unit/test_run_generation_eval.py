@@ -491,3 +491,22 @@ class TestReportRecordsAdapterPath:
             limit_applied=None,
         )
         assert report["config"]["adapter_path"] == str(adapter)
+
+
+class TestRunOneEvalSetSignature:
+    """Pin the ``output_dir`` parameter added for the Modal eval driver.
+    The Modal function passes a volume-backed path; the local CLI
+    leaves it None to use REPORTS_DIR. Both must remain valid."""
+
+    def test_output_dir_parameter_exists(self):
+        import inspect
+
+        sig = inspect.signature(driver.run_one_eval_set)
+        assert "output_dir" in sig.parameters
+        param = sig.parameters["output_dir"]
+        # Default None preserves the local CLI behavior.
+        assert param.default is None
+        # Keyword-only because the function uses *, between positional
+        # and named args (caller can't accidentally pass output_dir
+        # positionally and shift other args).
+        assert param.kind == inspect.Parameter.KEYWORD_ONLY
