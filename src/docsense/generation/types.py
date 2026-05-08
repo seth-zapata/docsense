@@ -46,12 +46,18 @@ class GenerationMetadata(BaseModel):
     Latency is wall-clock around the model's generate() call only; it does
     not include retrieval, reranking, or context assembly. Token counts are
     optional because some callers (e.g., mocked tests) won't have them.
+
+    ``adapter_path`` is set when a PEFT/LoRA adapter is loaded on top of
+    the base model. Useful for the Phase 3 eval comparisons where we
+    want every Answer to record exactly which trained checkpoint
+    produced it (base vs adapter v1 vs adapter v1.1, etc.).
     """
 
     model_name: str
     latency_ms: float
     prompt_tokens: int | None = None
     completion_tokens: int | None = None
+    adapter_path: str | None = None
 
 
 class Answer(BaseModel):

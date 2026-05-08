@@ -20,6 +20,7 @@ evals — not here. These are contract tests for the wrapper.
 
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -249,6 +250,117 @@ class TestGeneratorQuantization:
         assert "quantization_config" in kwargs
         # Sanity check: the config carries the NF4 marker
         assert kwargs["quantization_config"].bnb_4bit_quant_type == "nf4"
+
+
+class TestGeneratorAdapterLoading:
+    """Block 3C.4: PEFT/LoRA adapter is loaded on top of the base when
+    ``GenerationConfig.adapter_path`` is set. Tests use mocks because
+    real PEFT loading requires a trained adapter on disk + GPU."""
+
+    def test_no_adapter_when_path_unset(self):
+        """Default ``adapter_path=None`` → PEFT is never imported and
+        the base model is returned unwrapped. Pre-Phase-3 baseline path."""
+        config = GenerationConfig(model_name="dummy", use_4bit_quantization=False)
+        gen = Generator(config)
+
+        with patch("transformers.AutoModelForCausalLM") as mock_cls:
+            mock_base = MagicMock(name="base_model")
+            mock_cls.from_pretrained.return_value = mock_base
+            # If PeftModel.from_pretrained gets called, the patch will fail
+            # because we don't import peft at all in this branch.
+            result = gen.model
+
+        assert result is mock_base
+
+    def test_adapter_loaded_when_path_set(self, tmp_path):
+        """When ``adapter_path`` is set, PEFT is invoked to wrap the base."""
+        # Pre-import peft so the patch context doesn't trigger a fresh
+        # peft import (which transitively touches transformers internals
+        # and was observed to undo `patch("transformers.AutoModelForCausalLM")`
+        # when both patches are entered together).
+        import peft  # noqa: F401
+
+        config = GenerationConfig(
+            model_name="dummy",
+            use_4bit_quantization=False,
+            adapter_path=tmp_path / "fake-adapter",
+        )
+        gen = Generator(config)
+
+        mock_base = MagicMock(name="base_model")
+        mock_wrapped = MagicMock(name="peft_model")
+
+        # Nested rather than `with A, B:` — combining the patches via
+        # parenthesized syntax was observed to leave the transformers
+        # patch un-applied (likely a Python/mock interaction with how
+        # the peft import resolves). Nesting is robust; the SIM117
+        # combine-with hint is intentionally suppressed.
+        with patch("transformers.AutoModelForCausalLM") as mock_cls:  # noqa: SIM117
+            with patch("peft.PeftModel") as mock_peft:
+                mock_cls.from_pretrained.return_value = mock_base
+                mock_peft.from_pretrained.return_value = mock_wrapped
+                result = gen.model
+
+        # PEFT was called with the base + adapter path (as string).
+        mock_peft.from_pretrained.assert_called_once()
+        call_args = mock_peft.from_pretrained.call_args
+        assert call_args.args[0] is mock_base
+        assert call_args.args[1] == str(tmp_path / "fake-adapter")
+        # The wrapped PEFT model is what Generator returns.
+        assert result is mock_wrapped
+
+    def test_adapter_path_default_is_none(self):
+        """Pin: pre-Phase-3 baseline runs (no adapter) keep working
+        out of the box. A future change to default-on would silently
+        affect the baseline measurements."""
+        config = GenerationConfig()
+        assert config.adapter_path is None
+
+    def test_adapter_path_propagates_to_generation_metadata(self):
+        """Phase 3 eval needs to know which adapter (if any) produced
+        each Answer. Pin: the path is stamped on metadata."""
+        from docsense.generation.prompt import PromptBuilder
+
+        config = GenerationConfig(
+            model_name="dummy",
+            device="cpu",
+            adapter_path=Path("/some/adapter/path"),
+        )
+
+        class _StubGenerator(Generator):
+            def _run_inference(self, messages):
+                return (
+                    "answer text",
+                    {"latency_ms": 12.3, "prompt_tokens": 5, "completion_tokens": 2},
+                )
+
+        gen = _StubGenerator(config)
+        chunks = [ChunkRef(doc_id="d.md", chunk_id="d.md::1", score=1.0, text="x")]
+        messages = PromptBuilder().build(query="q", context="ctx")
+        answer = gen.generate(messages, chunks)
+
+        assert answer.metadata.adapter_path == "/some/adapter/path"
+
+    def test_no_adapter_means_no_adapter_path_in_metadata(self):
+        """Mirror of above: baseline path (no adapter) → metadata
+        ``adapter_path`` is None, not e.g. an empty string."""
+        from docsense.generation.prompt import PromptBuilder
+
+        config = GenerationConfig(model_name="dummy", device="cpu")  # adapter_path defaults None
+
+        class _StubGenerator(Generator):
+            def _run_inference(self, messages):
+                return (
+                    "answer text",
+                    {"latency_ms": 12.3, "prompt_tokens": 5, "completion_tokens": 2},
+                )
+
+        gen = _StubGenerator(config)
+        chunks = [ChunkRef(doc_id="d.md", chunk_id="d.md::1", score=1.0, text="x")]
+        messages = PromptBuilder().build(query="q", context="ctx")
+        answer = gen.generate(messages, chunks)
+
+        assert answer.metadata.adapter_path is None
 
 
 class TestGeneratorContractViaPatch:
