@@ -96,10 +96,19 @@ class TestDefaults:
         config = FineTuningConfig()
         assert config.val_fraction == 0.1
 
-    def test_save_and_eval_strategies_per_epoch(self):
+    def test_save_strategy_per_epoch(self):
         config = FineTuningConfig()
         assert config.save_strategy == "epoch"
-        assert config.eval_strategy == "epoch"
+
+    def test_eval_strategy_disabled_by_default(self):
+        """Per-epoch eval was the cause of an OOM in the first Block
+        3C.3 training run on Modal A10G. The "real" eval lives in
+        scripts/run_generation_eval.py which runs AFTER training; the
+        per-epoch eval was just a monitoring nicety. Pin "no" so a
+        future flip to "epoch" is a deliberate change with eval
+        memory accommodations (eval_accumulation_steps, val seq cap)."""
+        config = FineTuningConfig()
+        assert config.eval_strategy == "no"
 
     def test_output_dir_v1(self):
         config = FineTuningConfig()

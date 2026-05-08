@@ -79,7 +79,18 @@ class FineTuningConfig(BaseSettings):
     # --- Output / logging -------------------------------------------
     output_dir: Path = Path("models/fine-tunes/qwen-docsense-v1")
     save_strategy: str = "epoch"
-    eval_strategy: str = "epoch"
+    # Per-epoch eval is OFF by default. The first Block 3C.3 run hit
+    # CUDA OOM during the epoch-1 eval pass on Modal A10G (24 GB) —
+    # eval doesn't use gradient_checkpointing, and a long val example
+    # spiked allocation by 7.76 GiB on top of the 19 GiB already in
+    # use. The "real" eval (citation rate, refusal correctness,
+    # faithfulness, etc.) happens via scripts/run_generation_eval.py
+    # AFTER training completes; per-epoch val cross-entropy was just a
+    # monitoring nicety, and per-step training loss (logged every 10
+    # steps) gives us enough convergence signal. Set to "epoch" to
+    # re-enable if eval_accumulation_steps + a max_seq_length cap on
+    # val examples is added later.
+    eval_strategy: str = "no"
     logging_steps: int = Field(default=10, ge=1)
     seed: int = 42
 
