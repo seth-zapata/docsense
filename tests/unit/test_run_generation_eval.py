@@ -428,3 +428,66 @@ class TestBuildReport:
         assert "p95" in report["timing_ms_per_query"]["generate_ms"]
         assert "p90" not in report["timing_ms_per_query"]["generate_ms"]
         assert "max" not in report["timing_ms_per_query"]["generate_ms"]
+
+
+class TestApplyAdapterPathOverride:
+    """``--adapter-path`` CLI flag plumbs through to settings.generation.
+    None preserves the base-model baseline path; a real path triggers
+    PEFT loading at Generator construction."""
+
+    def test_none_keeps_baseline_path(self):
+        settings = Settings()
+        baseline_adapter = settings.generation.adapter_path
+        driver._apply_adapter_path_override(settings, None)
+        assert settings.generation.adapter_path == baseline_adapter
+
+    def test_path_propagates_to_generation_config(self, tmp_path):
+        settings = Settings()
+        adapter = tmp_path / "fake-adapter"
+        driver._apply_adapter_path_override(settings, adapter)
+        assert settings.generation.adapter_path == adapter
+
+    def test_does_not_touch_judge_config(self, tmp_path):
+        """Adapter is generator-side only — the judge stays on base
+        Llama for stable judging anchor."""
+        settings = Settings()
+        original_judge = settings.judge.model_dump()
+        driver._apply_adapter_path_override(settings, tmp_path / "x")
+        assert settings.judge.model_dump() == original_judge
+
+
+class TestReportRecordsAdapterPath:
+    """The eval report's config block records adapter_path so base vs
+    adapter runs are distinguishable in the JSON without filename
+    encoding."""
+
+    def test_baseline_run_records_none(self):
+        records = [_record("q1", is_no_answer=False)]
+        records[0].faithfulness = JudgeScore(metric="faithfulness", score=1.0, rationale="ok")
+        report = driver.build_report(
+            records,
+            eval_set="curated",
+            settings=Settings(),  # default GenerationConfig has adapter_path=None
+            chunks_total=100,
+            limit_applied=None,
+        )
+        assert report["config"]["adapter_path"] is None
+
+    def test_adapter_run_records_path(self, tmp_path):
+        from docsense.config import GenerationConfig
+
+        settings = Settings()
+        adapter = tmp_path / "qwen-docsense-v1"
+        settings.generation = GenerationConfig(
+            **{**settings.generation.model_dump(), "adapter_path": adapter},
+        )
+        records = [_record("q1", is_no_answer=False)]
+        records[0].faithfulness = JudgeScore(metric="faithfulness", score=1.0, rationale="ok")
+        report = driver.build_report(
+            records,
+            eval_set="curated",
+            settings=settings,
+            chunks_total=100,
+            limit_applied=None,
+        )
+        assert report["config"]["adapter_path"] == str(adapter)
