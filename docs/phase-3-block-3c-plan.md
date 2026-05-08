@@ -40,21 +40,39 @@ a valid adapter end-to-end before paying for Modal compute.
 The 12 GB VRAM local box is tighter than Modal's 24 GB A10G; if it
 runs locally on a slice, Modal at scale is comfortable.
 
-### 3C.2 — Modal infrastructure
+### 3C.2 — Modal infrastructure + smoke
 
-Add `scripts/train_lora_modal.py` plus a Modal app definition.
+Add `scripts/train_lora_modal.py` plus a Modal app definition AND
+verify the infrastructure end-to-end with a smoke run before paying
+for the full training in 3C.3.
 
-- A10G GPU (24 GB), `gpu="a10g"`
-- Persistent volume for HF model cache to avoid re-downloading the
-  ~15 GB Qwen weights on every cold-start invocation
-- HF_TOKEN via Modal Secrets (paralleling the Anthropic-key flow)
-- Wrap `LoRAFineTuner.train()` as a Modal function, stream logs back
-  to local for visibility
-- Save adapter to a Modal volume; download to local
-  `models/fine-tunes/qwen-docsense-v1/` after run completes
+**Infrastructure:**
+- A10G GPU (24 GB)
+- Persistent volume `docsense-hf-cache` for the HF model cache
+  (avoids re-downloading the ~15 GB Qwen weights every cold-start)
+- Persistent volume `docsense-adapters` for adapter artifacts
+- Optional `hf-token` Modal Secret (avoids HF rate limits on first run)
+- `add_local_dir` mounts the committed dataset; `add_local_python_source`
+  mounts the docsense package so iteration changes don't require image
+  rebuilds
+- Three local entrypoints: `smoke`, `full`, `sweep` (3D)
 
-First-time Modal setup is the friction point — auth, image build,
-secret management. Allocate ~30-60 min for it; bake into 3C.2 timing.
+**Smoke run (the 3C.2 deliverable):**
+- `modal run scripts/train_lora_modal.py::smoke`
+- 10 examples, 1 epoch — same shape as 3C.1's local smoke
+- ~30 sec of A10G compute (~$0.01) on top of the cold-start image build
+- Validates: image builds, volume mounts, model downloads to volume,
+  HF_TOKEN secret retrieval, training-step COMPLETION (the gap left
+  by the local 3C.1 which didn't finish a grad step due to VRAM
+  paging), adapter save to volume, `volume.commit()` makes the
+  artifact visible to `modal volume get` from local
+- 3C.2 ships when the smoke completes successfully and the adapter
+  is confirmed downloadable to local
+
+First-time Modal setup is the friction point — `modal token new`,
+secret creation, first image build (~3-5 min), first weight download
+(~2-5 min). Allocate ~30-60 min for the cold-path setup; subsequent
+invocations skip both image build and weight download.
 
 ### 3C.3 — Training run #1 (default hyperparameters)
 
