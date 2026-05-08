@@ -27,8 +27,10 @@ from __future__ import annotations
 from docsense.finetuning.config import FineTuningConfig
 from docsense.finetuning.dataset import TrainingExample
 from docsense.finetuning.trainer import (
+    _QWEN_TRAINING_CHAT_TEMPLATE,
     LoRAFineTuner,
     _format_chunks_block,
+    _is_qwen_model,
     format_messages_for_training,
 )
 from docsense.generation.prompt import DEFAULT_SYSTEM_PROMPT
@@ -315,6 +317,83 @@ class TestSaveAdapter:
         finetuner = LoRAFineTuner(config)
         with pytest.raises(RuntimeError, match="before train"):
             finetuner.save_adapter()
+
+
+class TestIsQwenModel:
+    """Family detector that decides whether to override the chat
+    template at training time. Qwen-specific because the
+    ``{% generation %}`` injection is template-specific."""
+
+    def test_official_hub_id_is_qwen(self):
+        assert _is_qwen_model("Qwen/Qwen2.5-7B-Instruct")
+
+    def test_other_qwen_variants(self):
+        assert _is_qwen_model("Qwen/Qwen2.5-14B-Instruct")
+        assert _is_qwen_model("Qwen/Qwen3-7B-Instruct")
+
+    def test_lowercase_qwen_variant(self):
+        """Local paths or community forks may not preserve the official
+        capitalization. Detect those too so the template override
+        still fires."""
+        assert _is_qwen_model("qwen-local-fork")
+
+    def test_non_qwen_models(self):
+        assert not _is_qwen_model("meta-llama/Meta-Llama-3.1-8B-Instruct")
+        assert not _is_qwen_model("mistralai/Mistral-7B-Instruct-v0.3")
+        assert not _is_qwen_model("microsoft/phi-3-mini-4k-instruct")
+
+
+class TestQwenTrainingChatTemplate:
+    """The custom Qwen training-time chat template injected to satisfy
+    TRL's ``assistant_only_loss=True`` requirement.
+
+    Caught in Block 3C.1 smoke: Qwen 2.5's stock template lacks
+    the ``{% generation %}`` Jinja markers TRL needs for assistant-mask
+    generation; without them, SFTTrainer crashes mid-tokenization.
+    """
+
+    def test_contains_generation_markers(self):
+        """The whole point — must wrap something with the markers."""
+        assert "{% generation %}" in _QWEN_TRAINING_CHAT_TEMPLATE
+        assert "{% endgeneration %}" in _QWEN_TRAINING_CHAT_TEMPLATE
+
+    def test_generation_block_wraps_assistant_content_only(self):
+        """``{% generation %}`` should bracket the assistant content,
+        NOT the role markers or system/user content. The assistant-mask
+        TRL produces from this should cover the answer text exactly."""
+        # Find the generation block and verify its bracketing context.
+        assert "{% generation %}{{- message.content + '<|im_end|>' -}}{% endgeneration %}" in (
+            _QWEN_TRAINING_CHAT_TEMPLATE
+        )
+        # The role prefix should be OUTSIDE the generation block, so
+        # the mask doesn't include the '<|im_start|>assistant\n' tokens.
+        before_gen = _QWEN_TRAINING_CHAT_TEMPLATE.split("{% generation %}")[0]
+        assert "<|im_start|>assistant" in before_gen
+
+    def test_handles_system_user_assistant_roles(self):
+        """The template must render all three role types our training
+        triples use (system + user + assistant). Pin so a future
+        simplification doesn't drop a branch."""
+        for role in ("system", "user", "assistant"):
+            assert f"'{role}'" in _QWEN_TRAINING_CHAT_TEMPLATE or (
+                f'"{role}"' in _QWEN_TRAINING_CHAT_TEMPLATE
+            )
+
+    def test_emits_qwen_special_tokens(self):
+        """The rendered output must use Qwen 2.5's special tokens
+        (im_start / im_end). Pin so the byte-identity invariant
+        between training and inference holds — the Generator path
+        uses the stock template at inference; the special tokens
+        emitted must match."""
+        assert "<|im_start|>" in _QWEN_TRAINING_CHAT_TEMPLATE
+        assert "<|im_end|>" in _QWEN_TRAINING_CHAT_TEMPLATE
+
+    def test_supports_add_generation_prompt(self):
+        """When ``add_generation_prompt=True`` (the SFTTrainer default
+        for the model.generate path), the template must emit the
+        opening assistant marker — otherwise the model has no signal
+        that it's the assistant's turn."""
+        assert "add_generation_prompt" in _QWEN_TRAINING_CHAT_TEMPLATE
 
 
 class TestTrainerImportsAreLazy:
