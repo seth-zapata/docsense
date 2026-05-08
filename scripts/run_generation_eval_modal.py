@@ -69,13 +69,25 @@ image = (
         "tqdm>=4.66.0",
         "huggingface-hub>=0.20.0",
     )
-    # Mount the indexed corpus — required for the retrieval phase.
-    # data/index is gitignored (~30 MB); mounted at build time so the
-    # function has access. ~2 sec to upload on incremental builds.
+    # Mount paths must satisfy two PROJECT_ROOT computations that
+    # land on different roots in the Modal container:
+    #
+    # 1. docsense/config.py is mounted via add_local_python_source
+    #    into the standard Python path, so its
+    #    ``Path(__file__).parent.parent.parent`` lands on ``/``.
+    #    DATA_DIR therefore = ``/data`` and INDEX_DIR = ``/data/index``.
+    #
+    # 2. scripts/run_generation_eval.py is mounted at /workspace/scripts/
+    #    so its ``Path(__file__).parent.parent`` lands on ``/workspace``.
+    #    EVAL_SETS_DIR = ``/workspace/evaluations/eval_sets``.
+    #
+    # We mount each artifact at the path the corresponding script
+    # expects, rather than fighting the divergent roots with
+    # symlinks (which we tried — fragile because PROJECT_ROOT is
+    # set at module-import time, before any in-function setup).
     .add_local_dir("data/index", "/data/index")
-    # Mount scripts/ so we can importlib-load run_generation_eval.
-    # Single source of truth for the eval orchestration logic.
-    .add_local_dir("scripts", "/scripts")
+    .add_local_dir("scripts", "/workspace/scripts")
+    .add_local_dir("evaluations/eval_sets", "/workspace/evaluations/eval_sets")
     # Mount docsense package for all the library imports the eval
     # driver does (Settings, Generator, judge, retrieval, etc.).
     .add_local_python_source("docsense")
@@ -146,18 +158,32 @@ def evaluate(
     # 30+ GB of model weights every cold start.
     os.environ["HF_HOME"] = "/root/.cache/huggingface"
 
-    # The eval driver expects ``data/index/<strategy>/`` relative to
-    # PROJECT_ROOT (computed from the script's __file__). Modal mounts
-    # the index at /data/index, so we set up a project-root-shaped
-    # directory: /workspace with /workspace/data → /data and
-    # /workspace/scripts → /scripts. cwd into /workspace so the
-    # script's PROJECT_ROOT computation lands on the right path.
+    # The eval driver expects several things at PROJECT_ROOT-relative
+    # paths (computed from the script's __file__):
+    #   data/index/<strategy>/        — corpus index
+    #   evaluations/eval_sets/        — structural.json etc.
+    #   evaluations/runs/<run_id>/    — per-query intermediate state
+    #   evaluations/reports/          — final report JSON (overridden
+    #                                   via output_dir to /reports/)
+    #
+    # Image mounts read-only artifacts at /workspace/data/index,
+    # /workspace/scripts, /workspace/evaluations/eval_sets — so when
+    # the eval driver does ``PROJECT_ROOT = Path(__file__).parent.parent``
+    # from /workspace/scripts/run_generation_eval.py, it lands on
+    # /workspace/ and all relative paths resolve correctly without
+    # script-side changes.
+    #
+    # evaluations/runs/ is writable in-container (ephemeral, for
+    # per-query intermediate state during a run) — must be created
+    # before the eval driver tries to write to it. The /workspace/
+    # tree is mounted read-only so we make a writable runs/ at the
+    # parent location.
     workspace = Path("/workspace")
-    workspace.mkdir(exist_ok=True)
-    if not (workspace / "data").exists():
-        (workspace / "data").symlink_to("/data")
-    if not (workspace / "scripts").exists():
-        (workspace / "scripts").symlink_to("/scripts")
+    eval_runs = workspace / "evaluations" / "runs"
+    # The /workspace/evaluations/eval_sets/ is read-only (mounted),
+    # but we need a writable runs/ inside it. Modal allows mkdir on
+    # a non-mounted subdir; runs/ is one such subdir.
+    eval_runs.mkdir(parents=True, exist_ok=True)
     os.chdir(workspace)
     logger.info("Working directory: %s", os.getcwd())
 
@@ -165,7 +191,7 @@ def evaluate(
     # uses. Module-level code runs (sets up REPORTS_DIR, etc.); we
     # then call run_one_eval_set directly with our parameters.
     spec = importlib.util.spec_from_file_location(
-        "run_generation_eval", "/scripts/run_generation_eval.py"
+        "run_generation_eval", "/workspace/scripts/run_generation_eval.py"
     )
     assert spec is not None and spec.loader is not None
     eval_driver = importlib.util.module_from_spec(spec)
