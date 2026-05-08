@@ -54,6 +54,42 @@ if TYPE_CHECKING:
 # specific to the base model family (Qwen: ``<|im_start|>assistant\n``,
 # Llama: ``<|start_header_id|>assistant<|end_header_id|>\n\n``,
 # Mistral: ``[/INST]``).
+#
+# Caught in Block 3C.1 smoke: Qwen 2.5's stock chat template lacks the
+# ``{% generation %}...{% endgeneration %}`` Jinja markers that TRL
+# 0.29's assistant-mask machinery needs. Without them, SFTTrainer
+# crashes mid-tokenization with "at least one example has no assistant
+# tokens." We patch the tokenizer's template at training-time only
+# (Generator's inference path keeps the stock template — the special
+# tokens emitted are byte-identical, so train/serve consistency holds).
+#
+# Strategy: replace Qwen 2.5's complex multi-branch assistant block
+# (which mixes user/system/assistant/tool-call rendering) with a
+# minimal Qwen-compatible template that explicitly wraps assistant
+# content in {% generation %} markers. Our training data has no tool
+# calls and exactly one system message, so the simplification is safe
+# for our use case.
+
+_QWEN_TRAINING_CHAT_TEMPLATE = """{%- if messages[0].role == 'system' -%}
+{{- '<|im_start|>system\\n' + messages[0].content + '<|im_end|>\\n' -}}
+{%- endif -%}
+{%- for message in messages -%}
+{%- if message.role == 'user' -%}
+{{- '<|im_start|>user\\n' + message.content + '<|im_end|>\\n' -}}
+{%- elif message.role == 'assistant' -%}
+{{- '<|im_start|>assistant\\n' -}}
+{% generation %}{{- message.content + '<|im_end|>' -}}{% endgeneration %}
+{{- '\\n' -}}
+{%- endif -%}
+{%- endfor -%}
+{%- if add_generation_prompt -%}
+{{- '<|im_start|>assistant\\n' -}}
+{%- endif -%}"""
+
+
+def _is_qwen_model(model_name: str) -> bool:
+    """Whether ``model_name`` is a Qwen-family model needing our chat template."""
+    return model_name.startswith("Qwen/") or model_name.lower().startswith("qwen")
 
 
 def _format_chunks_block(chunks: list[ChunkRef]) -> str:
@@ -127,6 +163,13 @@ class LoRAFineTuner:
         a pad token to right-pad batched inputs. Doing this once at
         load time avoids a hard-to-spot SFTTrainer crash on first
         batch.
+
+        For Qwen-family bases, also overrides ``chat_template`` with
+        a custom training-time template that includes the
+        ``{% generation %}`` markers TRL's ``assistant_only_loss=True``
+        needs. The override is training-side only — Generator's
+        inference tokenizer keeps the stock template, and the rendered
+        special tokens are byte-identical between the two.
         """
         if self._tokenizer is None:
             from transformers import AutoTokenizer
@@ -134,6 +177,8 @@ class LoRAFineTuner:
             tok = AutoTokenizer.from_pretrained(self.config.base_model_name)
             if tok.pad_token is None:
                 tok.pad_token = tok.eos_token
+            if _is_qwen_model(self.config.base_model_name):
+                tok.chat_template = _QWEN_TRAINING_CHAT_TEMPLATE
             self._tokenizer = tok
         return self._tokenizer
 
