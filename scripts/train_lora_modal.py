@@ -9,7 +9,7 @@ Usage::
 
     # One-time setup (done locally, once per Modal account)
     modal token new                                       # authenticate CLI
-    modal secret create hf_token HF_TOKEN=hf_xxxxxxx      # required; use a read-scoped HF token
+    modal secret create hf-token HF_TOKEN=hf_xxxxxxx      # required; use a read-scoped HF token
 
     # Smoke: 1 grad step on 10 examples, ~30 sec compute (~6-10 min wall
     # including image build + weight download on first invocation)
@@ -31,7 +31,7 @@ key ones for this script:
   invocation.
 - ``docsense-adapters`` volume — adapter weights are written here,
   downloaded to local after run via ``modal volume get``.
-- ``hf_token`` Modal Secret — wired into the function decorator. Not
+- ``hf-token`` Modal Secret — wired into the function decorator. Not
   strictly needed for Qwen 2.5 (non-gated) but included so future
   experiments with gated models work without an emergency script
   change. Use a read-scoped token (HF settings) for least privilege.
@@ -117,7 +117,7 @@ adapters_vol = modal.Volume.from_name("docsense-adapters", create_if_missing=Tru
     # an HF account / token at all, comment out the `secrets=` line
     # below; the script then works for non-gated models like Qwen
     # without any auth (which is what PR #33 confirmed empirically).
-    secrets=[modal.Secret.from_name("hf_token")],
+    secrets=[modal.Secret.from_name("hf-token")],
     timeout=3600,
 )
 def train(
