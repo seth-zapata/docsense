@@ -1,0 +1,762 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-05-08T11:45:28+00:00",
+  "eval_set": "no-answer",
+  "eval_set_size": 25,
+  "limit_applied": null,
+  "config": {
+    "chunking_strategy": "recursive",
+    "chunks_total": 12601,
+    "generator_model": "Qwen/Qwen2.5-7B-Instruct",
+    "adapter_path": "/adapters/v1",
+    "judge_model": "meta-llama/Meta-Llama-3.1-8B-Instruct",
+    "use_4bit_generator": true,
+    "use_4bit_judge": true,
+    "rerank_candidates": 20,
+    "top_k": 5,
+    "max_context_tokens": 3500,
+    "max_new_tokens_generator": 512,
+    "max_new_tokens_judge": 256
+  },
+  "aggregates": {
+    "no_answer": {
+      "n": 25,
+      "frac_refused_judge": 1.0,
+      "frac_refused_rule": 1.0,
+      "frac_correct_judge": 1.0,
+      "frac_correct_rule": 1.0,
+      "agreement_rate": 1.0,
+      "n_disagreements": 0,
+      "disagreement_query_ids": [],
+      "n_judge_parse_failures": 0,
+      "rule_matched_patterns": {
+        "dont_have_context": 25
+      }
+    }
+  },
+  "timing_ms_per_query": {
+    "retrieve_ms": {
+      "p50": 2225.52,
+      "p95": 3505.16,
+      "p99": 4787.57,
+      "mean": 2306.42,
+      "n": 25
+    },
+    "assemble_ms": {
+      "p50": 0.03,
+      "p95": 0.04,
+      "p99": 0.04,
+      "mean": 0.03,
+      "n": 25
+    },
+    "generate_ms": {
+      "p50": 1267.45,
+      "p95": 1384.66,
+      "p99": 1397.56,
+      "mean": 1284.36,
+      "n": 25
+    }
+  },
+  "per_query": [
+    {
+      "query_id": "no_answer_001",
+      "query": "What's the AWS Lambda free-tier limit per month?",
+      "answer_text": "I don't have enough context to answer that.",
+      "is_no_answer_query": true,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 5179.606405999948,
+        "assemble_ms": 0.026502000082473387,
+        "generate_ms": 1269.5517629999813
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "no_answer_check_rule": {
+        "refused": true,
+        "expected_refusal": true,
+        "correct": true,
+        "matched_pattern": "dont_have_context"
+      },
+      "refusal_judge": {
+        "refused": true,
+        "rationale": "The model lacks specific information about AWS Lambda free-tier limits."
+      }
+    },
+    {
+      "query_id": "no_answer_002",
+      "query": "How do I file federal income taxes in California?",
+      "answer_text": "I don't have enough context to answer that.",
+      "is_no_answer_query": true,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1530.5687930001568,
+        "assemble_ms": 0.029780999966533273,
+        "generate_ms": 1221.8957739999041
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "no_answer_check_rule": {
+        "refused": true,
+        "expected_refusal": true,
+        "correct": true,
+        "matched_pattern": "dont_have_context"
+      },
+      "refusal_judge": {
+        "refused": true,
+        "rationale": "The model recognized the context didn't have information about federal income taxes in California."
+      }
+    },
+    {
+      "query_id": "no_answer_003",
+      "query": "What are the GDPR data-retention requirements for EU users?",
+      "answer_text": "I don't have enough context to answer that.",
+      "is_no_answer_query": true,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1201.619466000011,
+        "assemble_ms": 0.028100999998059706,
+        "generate_ms": 1239.441928999895
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "no_answer_check_rule": {
+        "refused": true,
+        "expected_refusal": true,
+        "correct": true,
+        "matched_pattern": "dont_have_context"
+      },
+      "refusal_judge": {
+        "refused": true,
+        "rationale": "The model lacks specific information about GDPR data-retention requirements for EU users."
+      }
+    },
+    {
+      "query_id": "no_answer_004",
+      "query": "What's the latest iPhone model and its release date?",
+      "answer_text": "I don't have enough context to answer that.",
+      "is_no_answer_query": true,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 2111.8135830001847,
+        "assemble_ms": 0.03150100019411184,
+        "generate_ms": 1238.865100999874
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "no_answer_check_rule": {
+        "refused": true,
+        "expected_refusal": true,
+        "correct": true,
+        "matched_pattern": "dont_have_context"
+      },
+      "refusal_judge": {
+        "refused": true,
+        "rationale": "The model lacks information about the latest iPhone model and its release date."
+      }
+    },
+    {
+      "query_id": "no_answer_005",
+      "query": "Should I buy a MacBook Pro M4 or M3?",
+      "answer_text": "I don't have enough context to answer that.",
+      "is_no_answer_query": true,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 2325.1002179999887,
+        "assemble_ms": 0.033550999887665967,
+        "generate_ms": 1209.7913780000908
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "no_answer_check_rule": {
+        "refused": true,
+        "expected_refusal": true,
+        "correct": true,
+        "matched_pattern": "dont_have_context"
+      },
+      "refusal_judge": {
+        "refused": true,
+        "rationale": "The model lacks information about the MacBook Pro M4 and M3 models to provide a recommendation."
+      }
+    },
+    {
+      "query_id": "no_answer_006",
+      "query": "How do I make sourdough bread starter from scratch?",
+      "answer_text": "I don't have enough context to answer that.",
+      "is_no_answer_query": true,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1474.239936999993,
+        "assemble_ms": 0.04217199989398068,
+        "generate_ms": 1259.0413059999719
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "no_answer_check_rule": {
+        "refused": true,
+        "expected_refusal": true,
+        "correct": true,
+        "matched_pattern": "dont_have_context"
+      },
+      "refusal_judge": {
+        "refused": true,
+        "rationale": "The model recognized the context didn't have the necessary information to provide a recipe for sourdough bread starter."
+      }
+    },
+    {
+      "query_id": "no_answer_007",
+      "query": "How do I clean a mechanical keyboard?",
+      "answer_text": "I don't have enough context to answer that.",
+      "is_no_answer_query": true,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1718.8495210000383,
+        "assemble_ms": 0.030710999908478698,
+        "generate_ms": 1227.2406759998375
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "no_answer_check_rule": {
+        "refused": true,
+        "expected_refusal": true,
+        "correct": true,
+        "matched_pattern": "dont_have_context"
+      },
+      "refusal_judge": {
+        "refused": true,
+        "rationale": "The model recognized the context didn't have information about mechanical keyboard maintenance."
+      }
+    },
+    {
+      "query_id": "no_answer_008",
+      "query": "What's a good recipe for chocolate chip cookies?",
+      "answer_text": "I don't have enough context to answer that.",
+      "is_no_answer_query": true,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 2789.3737100000635,
+        "assemble_ms": 0.033551999877090566,
+        "generate_ms": 1401.292194000007
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "no_answer_check_rule": {
+        "refused": true,
+        "expected_refusal": true,
+        "correct": true,
+        "matched_pattern": "dont_have_context"
+      },
+      "refusal_judge": {
+        "refused": true,
+        "rationale": "The model lacks context about the user's dietary needs, preferences, or specific requirements for the cookies."
+      }
+    },
+    {
+      "query_id": "no_answer_009",
+      "query": "What's the best time of year to visit Tokyo?",
+      "answer_text": "I don't have enough context to answer that.",
+      "is_no_answer_query": true,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1571.3893090000965,
+        "assemble_ms": 0.02818099983414868,
+        "generate_ms": 1233.6966620000567
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "no_answer_check_rule": {
+        "refused": true,
+        "expected_refusal": true,
+        "correct": true,
+        "matched_pattern": "dont_have_context"
+      },
+      "refusal_judge": {
+        "refused": true,
+        "rationale": "The model lacks information about Tokyo's climate or tourist seasons."
+      }
+    },
+    {
+      "query_id": "no_answer_010",
+      "query": "What's the best route to drive from San Francisco to Los Angeles?",
+      "answer_text": "I don't have enough context to answer that.",
+      "is_no_answer_query": true,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 2225.5222470000717,
+        "assemble_ms": 0.03097199987678323,
+        "generate_ms": 1335.7799399998385
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "no_answer_check_rule": {
+        "refused": true,
+        "expected_refusal": true,
+        "correct": true,
+        "matched_pattern": "dont_have_context"
+      },
+      "refusal_judge": {
+        "refused": true,
+        "rationale": "The model lacks information about the specific route or transportation options from San Francisco to Los Angeles."
+      }
+    },
+    {
+      "query_id": "no_answer_011",
+      "query": "What's the current score of the Lakers game?",
+      "answer_text": "I don't have enough context to answer that.",
+      "is_no_answer_query": true,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 3341.372437000018,
+        "assemble_ms": 0.03454200009400665,
+        "generate_ms": 1304.4351240000651
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "no_answer_check_rule": {
+        "refused": true,
+        "expected_refusal": true,
+        "correct": true,
+        "matched_pattern": "dont_have_context"
+      },
+      "refusal_judge": {
+        "refused": true,
+        "rationale": "The model lacks information about the current Lakers game, specifically its score."
+      }
+    },
+    {
+      "query_id": "no_answer_012",
+      "query": "Who won the 2026 World Series?",
+      "answer_text": "I don't have enough context to answer that.",
+      "is_no_answer_query": true,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 2173.6313299998073,
+        "assemble_ms": 0.030951999860917567,
+        "generate_ms": 1313.2217590000437
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "no_answer_check_rule": {
+        "refused": true,
+        "expected_refusal": true,
+        "correct": true,
+        "matched_pattern": "dont_have_context"
+      },
+      "refusal_judge": {
+        "refused": true,
+        "rationale": "The model lacks information about future events, specifically the 2026 World Series."
+      }
+    },
+    {
+      "query_id": "no_answer_013",
+      "query": "What's the current price of Bitcoin?",
+      "answer_text": "I don't have enough context to answer that.",
+      "is_no_answer_query": true,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1748.1553540001187,
+        "assemble_ms": 0.0334219998876506,
+        "generate_ms": 1329.215191000003
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "no_answer_check_rule": {
+        "refused": true,
+        "expected_refusal": true,
+        "correct": true,
+        "matched_pattern": "dont_have_context"
+      },
+      "refusal_judge": {
+        "refused": true,
+        "rationale": "The model lacks information about the current price of Bitcoin."
+      }
+    },
+    {
+      "query_id": "no_answer_014",
+      "query": "What's the latest US unemployment rate?",
+      "answer_text": "I don't have enough context to answer that.",
+      "is_no_answer_query": true,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 2703.2860150000033,
+        "assemble_ms": 0.033491000067442656,
+        "generate_ms": 1341.4962130000276
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "no_answer_check_rule": {
+        "refused": true,
+        "expected_refusal": true,
+        "correct": true,
+        "matched_pattern": "dont_have_context"
+      },
+      "refusal_judge": {
+        "refused": true,
+        "rationale": "The model lacks information about the current US unemployment rate."
+      }
+    },
+    {
+      "query_id": "no_answer_015",
+      "query": "Will the stock market go up next year?",
+      "answer_text": "I don't have enough context to answer that.",
+      "is_no_answer_query": true,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 2828.0234870001095,
+        "assemble_ms": 0.033961999861276126,
+        "generate_ms": 1385.746600999937
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "no_answer_check_rule": {
+        "refused": true,
+        "expected_refusal": true,
+        "correct": true,
+        "matched_pattern": "dont_have_context"
+      },
+      "refusal_judge": {
+        "refused": true,
+        "rationale": "The model lacks specific information about future stock market trends."
+      }
+    },
+    {
+      "query_id": "no_answer_016",
+      "query": "How do I configure Postgres streaming replication?",
+      "answer_text": "I don't have enough context to answer that.",
+      "is_no_answer_query": true,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1563.1563639999513,
+        "assemble_ms": 0.028730999929393874,
+        "generate_ms": 1242.8617950001808
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "no_answer_check_rule": {
+        "refused": true,
+        "expected_refusal": true,
+        "correct": true,
+        "matched_pattern": "dont_have_context"
+      },
+      "refusal_judge": {
+        "refused": true,
+        "rationale": "The model recognized the context didn't have the necessary information to provide a configuration for Postgres streaming replication."
+      }
+    },
+    {
+      "query_id": "no_answer_017",
+      "query": "How do I configure nginx as a reverse proxy?",
+      "answer_text": "I don't have enough context to answer that.",
+      "is_no_answer_query": true,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 2835.599259000219,
+        "assemble_ms": 0.026150999929086538,
+        "generate_ms": 1265.8481010000742
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "no_answer_check_rule": {
+        "refused": true,
+        "expected_refusal": true,
+        "correct": true,
+        "matched_pattern": "dont_have_context"
+      },
+      "refusal_judge": {
+        "refused": true,
+        "rationale": "The model lacks sufficient context to provide a specific configuration for nginx as a reverse proxy."
+      }
+    },
+    {
+      "query_id": "no_answer_018",
+      "query": "What's the syntax for a SELECT JOIN in MySQL?",
+      "answer_text": "I don't have enough context to answer that.",
+      "is_no_answer_query": true,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 2371.7924300001414,
+        "assemble_ms": 0.030072000072323135,
+        "generate_ms": 1305.6451859999925
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "no_answer_check_rule": {
+        "refused": true,
+        "expected_refusal": true,
+        "correct": true,
+        "matched_pattern": "dont_have_context"
+      },
+      "refusal_judge": {
+        "refused": true,
+        "rationale": "The model recognized the context didn't have enough information about MySQL syntax."
+      }
+    },
+    {
+      "query_id": "no_answer_019",
+      "query": "How do I deploy a React app to Vercel?",
+      "answer_text": "I don't have enough context to answer that.",
+      "is_no_answer_query": true,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 2292.1780399999534,
+        "assemble_ms": 0.033211999834747985,
+        "generate_ms": 1258.8656679999985
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "no_answer_check_rule": {
+        "refused": true,
+        "expected_refusal": true,
+        "correct": true,
+        "matched_pattern": "dont_have_context"
+      },
+      "refusal_judge": {
+        "refused": true,
+        "rationale": "The model recognized the context didn't have the necessary information to provide a deployment guide for Vercel."
+      }
+    },
+    {
+      "query_id": "no_answer_020",
+      "query": "What's the difference between let and var in JavaScript?",
+      "answer_text": "I don't have enough context to answer that.",
+      "is_no_answer_query": true,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1351.88400800007,
+        "assemble_ms": 0.03229100002499763,
+        "generate_ms": 1267.4505519999002
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "no_answer_check_rule": {
+        "refused": true,
+        "expected_refusal": true,
+        "correct": true,
+        "matched_pattern": "dont_have_context"
+      },
+      "refusal_judge": {
+        "refused": true,
+        "rationale": "The model recognized the context didn't have enough information about JavaScript to provide an answer."
+      }
+    },
+    {
+      "query_id": "no_answer_021",
+      "query": "What's the chemical formula of caffeine?",
+      "answer_text": "I don't have enough context to answer that.",
+      "is_no_answer_query": true,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 3273.0341420001423,
+        "assemble_ms": 0.03027100001418148,
+        "generate_ms": 1307.5688409999202
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "no_answer_check_rule": {
+        "refused": true,
+        "expected_refusal": true,
+        "correct": true,
+        "matched_pattern": "dont_have_context"
+      },
+      "refusal_judge": {
+        "refused": true,
+        "rationale": "The model lacks specific information about the chemical formula of caffeine."
+      }
+    },
+    {
+      "query_id": "no_answer_022",
+      "query": "What's the formula for compound interest?",
+      "answer_text": "I don't have enough context to answer that.",
+      "is_no_answer_query": true,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 3546.1081959999774,
+        "assemble_ms": 0.03150199995616276,
+        "generate_ms": 1380.33267600008
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "no_answer_check_rule": {
+        "refused": true,
+        "expected_refusal": true,
+        "correct": true,
+        "matched_pattern": "dont_have_context"
+      },
+      "refusal_judge": {
+        "refused": true,
+        "rationale": "The model explicitly states it lacks sufficient context to provide an answer."
+      }
+    },
+    {
+      "query_id": "no_answer_023",
+      "query": "What's the population of Reykjavik?",
+      "answer_text": "I don't have enough context to answer that.",
+      "is_no_answer_query": true,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 2400.6176759999107,
+        "assemble_ms": 0.02876199982893013,
+        "generate_ms": 1322.8373490001104
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "no_answer_check_rule": {
+        "refused": true,
+        "expected_refusal": true,
+        "correct": true,
+        "matched_pattern": "dont_have_context"
+      },
+      "refusal_judge": {
+        "refused": true,
+        "rationale": "The model explicitly states it lacks sufficient context to provide an answer."
+      }
+    },
+    {
+      "query_id": "no_answer_024",
+      "query": "Who directed the movie Inception?",
+      "answer_text": "I don't have enough context to answer that.",
+      "is_no_answer_query": true,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1502.5900100001763,
+        "assemble_ms": 0.04574199988383043,
+        "generate_ms": 1220.566066999936
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "no_answer_check_rule": {
+        "refused": true,
+        "expected_refusal": true,
+        "correct": true,
+        "matched_pattern": "dont_have_context"
+      },
+      "refusal_judge": {
+        "refused": true,
+        "rationale": "The model lacks sufficient context to identify the director of the movie Inception."
+      }
+    },
+    {
+      "query_id": "no_answer_025",
+      "query": "What was the highest-grossing movie of 2025?",
+      "answer_text": "I don't have enough context to answer that.",
+      "is_no_answer_query": true,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1600.9866629999578,
+        "assemble_ms": 0.03486200012048357,
+        "generate_ms": 1226.222848999896
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "no_answer_check_rule": {
+        "refused": true,
+        "expected_refusal": true,
+        "correct": true,
+        "matched_pattern": "dont_have_context"
+      },
+      "refusal_judge": {
+        "refused": true,
+        "rationale": "The model lacks information about future events, specifically the 2025 movie box office."
+      }
+    }
+  ]
+}

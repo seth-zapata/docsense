@@ -1,0 +1,1950 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-05-08T12:30:24+00:00",
+  "eval_set": "structural",
+  "eval_set_size": 30,
+  "limit_applied": null,
+  "config": {
+    "chunking_strategy": "recursive",
+    "chunks_total": 12601,
+    "generator_model": "Qwen/Qwen2.5-7B-Instruct",
+    "adapter_path": null,
+    "judge_model": "meta-llama/Meta-Llama-3.1-8B-Instruct",
+    "use_4bit_generator": true,
+    "use_4bit_judge": true,
+    "rerank_candidates": 20,
+    "top_k": 5,
+    "max_context_tokens": 3500,
+    "max_new_tokens_generator": 512,
+    "max_new_tokens_judge": 256
+  },
+  "aggregates": {
+    "faithfulness": {
+      "score": {
+        "n": 30,
+        "mean": 0.893,
+        "median": 1.0,
+        "stdev": 0.278,
+        "min": 0.0,
+        "max": 1.0,
+        "score_distribution": {
+          "0.0": 2,
+          "0.0-0.25": 0,
+          "0.25-0.5": 1,
+          "0.5-0.75": 0,
+          "0.75-1.0": 3,
+          "1.0": 24
+        }
+      },
+      "claims": {
+        "total_extracted": 153,
+        "total_supported": 142,
+        "support_rate": 0.928,
+        "mean_per_answer": 5.1,
+        "max_per_answer": 15,
+        "n_no_claims_extracted": 2,
+        "n_score_parse_failures": 0,
+        "n_claim_parse_failures": 0,
+        "n_claim_out_of_range": 3
+      },
+      "chunk_usage_distribution": {
+        "1": 52,
+        "3": 27,
+        "4": 23,
+        "5": 19,
+        "2": 21,
+        "none": 11
+      }
+    },
+    "relevance": {
+      "n": 30,
+      "mean": 0.733,
+      "median": 0.75,
+      "anchor_distribution": {
+        "0.00": 2,
+        "0.25": 1,
+        "0.50": 0,
+        "0.75": 21,
+        "1.00": 6
+      },
+      "n_parse_failures": 0
+    },
+    "citation_check": {
+      "n": 30,
+      "frac_with_any_marker": 0.5,
+      "frac_all_in_range": 0.467,
+      "mean_n_markers_in_text": 1.6
+    }
+  },
+  "timing_ms_per_query": {
+    "retrieve_ms": {
+      "p50": 1483.2,
+      "p95": 1956.45,
+      "p99": 3296.56,
+      "mean": 1507.07,
+      "n": 30
+    },
+    "assemble_ms": {
+      "p50": 0.03,
+      "p95": 0.05,
+      "p99": 0.05,
+      "mean": 0.03,
+      "n": 30
+    },
+    "generate_ms": {
+      "p50": 12278.18,
+      "p95": 18731.61,
+      "p99": 29936.89,
+      "mean": 11114.66,
+      "n": 30
+    }
+  },
+  "per_query": [
+    {
+      "query_id": "structural_001",
+      "query": "Prefill a cache (prefix caching)",
+      "answer_text": "Prefill a cache (prefix caching) involves initializing a cache with key-value pairs for a specific prefix prompt. This allows you to reuse this cached state to generate different sequences efficiently without recomputing the keys and values for those tokens. Here\u2019s how you can do it:\n\n```py\nimport copy\nimport torch\nfrom transformers import AutoModelForCausalLM, AutoTokenizer, StaticCache\n\n# Initialize the model and tokenizer\nmodel = AutoModelForCausalLM.from_pretrained(\"your_model_name\")\ntokenizer = AutoTokenizer.from_pretrained(\"your_model_name\")\n\n# Create a StaticCache\ncache = StaticCache(model.config)\n\n# Tokenize the prefix prompt\ninput_ids = tokenizer.encode(\"Your prefix prompt here\", return_tensors=\"pt\")\n\n# Pre-fill the cache with the prefix prompt\ncache.prefill(input_ids)\n\n# Generate sequences from the prefilled prompt\ngenerated_sequences = model.generate(\n    input_ids,\n    max_length=100,  # Adjust as needed\n    cache_implementation=cache\n)\n```\n\nIn this example, replace `\"your_model_name\"` with the actual name of your model, and `\"Your prefix prompt here\"` with the desired prefix prompt. The `prefill` method fills the cache with the specified prefix prompt, allowing subsequent generations to use this cached state efficiently.",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 3794.9668420001217,
+        "assemble_ms": 0.026531000003160443,
+        "generate_ms": 17845.735145999926
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "6 of 6 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "You can prefill a cache with key-value pairs for a specific prefix prompt.",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 describes the concept of prefilling a cache with key-value pairs for a specific prefix prompt."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "The `prefill` method fills the cache with the specified prefix prompt.",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 mentions the `StaticCache` class, which is used to create a static cache."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "Subsequent generations can use the cached state efficiently.",
+            "supporting_chunk_idx": 3,
+            "rationale": "Chunk 3 explains that subsequent generations can use the cached state efficiently."
+          },
+          {
+            "claim_idx": 4,
+            "claim_text": "The `StaticCache` class is used to create a static cache.",
+            "supporting_chunk_idx": 4,
+            "rationale": "Chunk 4 describes the `StaticCache` class, which is used to create a static cache."
+          },
+          {
+            "claim_idx": 5,
+            "claim_text": "The `cache_implementation` argument is used to specify the cache to use for generation.",
+            "supporting_chunk_idx": 5,
+            "rationale": "Chunk 5 mentions the `cache_implementation` argument, which is used to specify the cache to use for generation."
+          },
+          {
+            "claim_idx": 6,
+            "claim_text": "The `generate` method can use a prefilled cache for efficient generation.",
+            "supporting_chunk_idx": 5,
+            "rationale": "Chunk 5 explains that the `generate` method can use a prefilled cache for efficient generation."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses the question of prefilling a cache, but includes extraneous content such as code example and explanation of the process, which are not necessary to answer the question.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_002",
+      "query": "Using `apply_chat_template`",
+      "answer_text": "To use `apply_chat_template`, the input should be structured as a list of dictionaries with `role` and `content` keys. Common roles include `user`, `assistant`, and `system`. The `content` key contains the message content. Additionally, there can be an optional `tools` key containing a list of tools in JSON schema format, though `tools` is the recommended variable name for compatibility with the standard API [2].\n\nEach message in the conversation history must be a dictionary with `\"role\"` and `\"content\"` keys. For multi-modal inputs like text and images, the `\"content\"` should be a list of dictionaries [5]. The `apply_chat_template` method is available through the tokenizer or processor, and you can load a written template as a string and assign it to the tokenizer's `chat_template` attribute [4].",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1121.1640310000348,
+        "assemble_ms": 0.03013999980794324,
+        "generate_ms": 11876.690747000112
+      },
+      "citation_check": {
+        "n_markers_in_text": 3,
+        "n_resolved_citations": 3,
+        "all_markers_in_range": true,
+        "any_marker_present": true
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "9 of 9 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "The input for `apply_chat_template` should be a list of dictionaries with `role` and `content` keys.",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 describes the structured input for `apply_chat_template`."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "Common roles include `user`, `assistant`, and `system`.",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 lists common roles for `apply_chat_template`."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "The `content` key contains the message content.",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 explains the `content` key in the input for `apply_chat_template`."
+          },
+          {
+            "claim_idx": 4,
+            "claim_text": "There can be an optional `tools` key containing a list of tools in JSON schema format.",
+            "supporting_chunk_idx": 2,
+            "rationale": "Chunk 2 mentions the `tools` key for additional variables."
+          },
+          {
+            "claim_idx": 5,
+            "claim_text": "The `tools` key is the recommended variable name for compatibility with the standard API.",
+            "supporting_chunk_idx": 2,
+            "rationale": "Chunk 2 recommends using `tools` for compatibility with the standard API."
+          },
+          {
+            "claim_idx": 6,
+            "claim_text": "Each message in the conversation history must be a dictionary with `\"role\"` and `\"content\"` keys.",
+            "supporting_chunk_idx": 3,
+            "rationale": "Chunk 3 describes the use of `\"<|image|>\"` tokens for image insertion."
+          },
+          {
+            "claim_idx": 7,
+            "claim_text": "For multi-modal inputs like text and images, the `\"content\"` should be a list of dictionaries.",
+            "supporting_chunk_idx": 3,
+            "rationale": "Chunk 3 explains the `apply_chat_template` method for vectorized output."
+          },
+          {
+            "claim_idx": 8,
+            "claim_text": "The `apply_chat_template` method is available through the tokenizer or processor.",
+            "supporting_chunk_idx": 4,
+            "rationale": "Chunk 4 describes loading a written template as a string."
+          },
+          {
+            "claim_idx": 9,
+            "claim_text": "You can load a written template as a string and assign it to the tokenizer's `chat_template` attribute.",
+            "supporting_chunk_idx": 4,
+            "rationale": "Chunk 4 explains saving the template with the tokenizer."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses how to use `apply_chat_template`, but includes some extraneous information about the structure of the input and the tokenizer's `chat_template` attribute, which is not directly relevant to the question.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_003",
+      "query": "Lxmert specific outputs",
+      "answer_text": "Lxmert specific outputs include:\n\n- `LxmertModelOutput`\n- `LxmertForPreTrainingOutput`\n- `LxmertForQuestionAnsweringOutput`\n\nThese outputs are documented under the \"Lxmert specific outputs\" section in the provided context [1].",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 2076.3351559999137,
+        "assemble_ms": 0.027709999812941533,
+        "generate_ms": 4228.326475999893
+      },
+      "citation_check": {
+        "n_markers_in_text": 1,
+        "n_resolved_citations": 1,
+        "all_markers_in_range": true,
+        "any_marker_present": true
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "4 of 4 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "Lxmert specific outputs include LxmertModelOutput.",
+            "supporting_chunk_idx": 1,
+            "rationale": "Lxmert specific outputs are listed in the first chunk."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "Lxmert specific outputs include LxmertForPreTrainingOutput.",
+            "supporting_chunk_idx": 2,
+            "rationale": "Lxmert specific outputs are listed in the second chunk."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "Lxmert specific outputs include LxmertForQuestionAnsweringOutput.",
+            "supporting_chunk_idx": 3,
+            "rationale": "Lxmert specific outputs are listed in the third chunk."
+          },
+          {
+            "claim_idx": 4,
+            "claim_text": "These outputs are documented under the Lxmert specific outputs section in the provided context.",
+            "supporting_chunk_idx": 4,
+            "rationale": "The outputs are documented under the Lxmert specific outputs section in the provided context."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 1.0,
+        "rationale": "The answer directly lists the specific outputs of Lxmert, matching the question's request for information on these outputs.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_004",
+      "query": "Usage example",
+      "answer_text": "I don't have enough context to answer that. The provided contexts do not contain specific usage examples. They discuss general aspects of VQA, model prompts, embedding types, coding guidelines, and chat templating, but not concrete usage examples.",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1720.8552130000498,
+        "assemble_ms": 0.029810000114594004,
+        "generate_ms": 3478.8102689999505
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 0.0,
+        "rationale": "NO_CLAIMS_EXTRACTED: claim-extraction step returned no atomic claims. Answer may be a refusal, pure code, or the extraction parser may have failed.",
+        "claim_attributions": []
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.0,
+        "rationale": "The answer does not directly address the question, instead providing a statement about the lack of context, which is not what was asked.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_005",
+      "query": "Usage examples",
+      "answer_text": "Here are some usage examples from the provided context:\n\n1. **Image Captioning**: The `VisionEncoderDecoderModel` can be used for image captioning where the encoder processes the image and an autoregressive language model generates the caption [1].\n\n2. **Optical Character Recognition (OCR)**: The `VisionEncoderDecoderModel` can also be used for OCR tasks, specifically through the TrOCR model [1].\n\n3. **Perceiver Model**: The Perceiver model can be applied to various tasks such as question answering, named-entity recognition, object detection, audio classification, and video classification [2].\n\n4. **Text Classification**: Detailed guides for text classification tasks are available [2].\n\n5. **Image Classification**: Information on image classification tasks is also provided [2].\n\n6. **IDEFICS Model**: The IDEFICS model can generate results similar to given examples, potentially providing additional information about objects in images [3].\n\n7. **Embeddings**: Different types of embeddings can be used for various tasks:\n   - **Separation**: For clustering and re-ranking applications [4].\n   - **Classification**: For classification tasks.\n   - **Text-Matching**: For tasks that measure the similarity between two texts, such as Semantic Textual Similarity (STS) or symmetric retrieval tasks [4].\n\n8. **DeepSeek Model**: This model focuses on maintaining context and role-specific processing [5].",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1603.5119260000101,
+        "assemble_ms": 0.030640000204584794,
+        "generate_ms": 18788.042052000037
+      },
+      "citation_check": {
+        "n_markers_in_text": 9,
+        "n_resolved_citations": 5,
+        "all_markers_in_range": true,
+        "any_marker_present": true
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 0.8666666666666667,
+        "rationale": "13 of 15 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "The VisionEncoderDecoderModel can be used for image captioning.",
+            "supporting_chunk_idx": 1,
+            "rationale": "The example application of image captioning is provided in the first chunk."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "The VisionEncoderDecoderModel can be used for OCR tasks.",
+            "supporting_chunk_idx": 1,
+            "rationale": "The example application of OCR is provided in the first chunk."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "The Perceiver model can be applied to question answering.",
+            "supporting_chunk_idx": 2,
+            "rationale": "The second chunk lists various use cases, including question answering."
+          },
+          {
+            "claim_idx": 4,
+            "claim_text": "The Perceiver model can be applied to named-entity recognition.",
+            "supporting_chunk_idx": 2,
+            "rationale": "The second chunk lists various use cases, including named-entity recognition."
+          },
+          {
+            "claim_idx": 5,
+            "claim_text": "The Perceiver model can be applied to object detection.",
+            "supporting_chunk_idx": 2,
+            "rationale": "The second chunk lists various use cases, including object detection."
+          },
+          {
+            "claim_idx": 6,
+            "claim_text": "The Perceiver model can be applied to audio classification.",
+            "supporting_chunk_idx": 2,
+            "rationale": "The second chunk lists various use cases, including audio classification."
+          },
+          {
+            "claim_idx": 7,
+            "claim_text": "The Perceiver model can be applied to video classification.",
+            "supporting_chunk_idx": 2,
+            "rationale": "The second chunk lists various use cases, including video classification."
+          },
+          {
+            "claim_idx": 8,
+            "claim_text": "Detailed guides for text classification tasks are available.",
+            "supporting_chunk_idx": 3,
+            "rationale": "The third chunk provides a link to the task guide for text classification."
+          },
+          {
+            "claim_idx": 9,
+            "claim_text": "Information on image classification tasks is provided.",
+            "supporting_chunk_idx": 3,
+            "rationale": "The third chunk provides a link to the task guide for image classification."
+          },
+          {
+            "claim_idx": 10,
+            "claim_text": "The IDEFICS model can generate results similar to given examples.",
+            "supporting_chunk_idx": 3,
+            "rationale": "The third chunk provides a positive example of generating results similar to given examples."
+          },
+          {
+            "claim_idx": 11,
+            "claim_text": "Different types of embeddings can be used for clustering and re-ranking applications.",
+            "supporting_chunk_idx": 4,
+            "rationale": "The fourth chunk describes the use of embeddings in clustering and re-ranking applications."
+          },
+          {
+            "claim_idx": 12,
+            "claim_text": "Different types of embeddings can be used for classification tasks.",
+            "supporting_chunk_idx": 4,
+            "rationale": "The fourth chunk describes the use of embeddings in classification tasks."
+          },
+          {
+            "claim_idx": 13,
+            "claim_text": "Different types of embeddings can be used for tasks that measure the similarity between two texts.",
+            "supporting_chunk_idx": 4,
+            "rationale": "The fourth chunk describes the use of embeddings in tasks that measure the similarity between two texts."
+          },
+          {
+            "claim_idx": 14,
+            "claim_text": "The DeepSeek Model focuses on maintaining context.",
+            "supporting_chunk_idx": null,
+            "rationale": "There is no information in the provided chunks about the DeepSeek Model."
+          },
+          {
+            "claim_idx": 15,
+            "claim_text": "The DeepSeek Model focuses on role-specific processing.",
+            "supporting_chunk_idx": null,
+            "rationale": "There is no information in the provided chunks about the DeepSeek Model focusing on role-specific processing."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.25,
+        "rationale": "The answer provides a list of examples, but only a few of them (1, 2) directly relate to the usage of the `VisionEncoderDecoderModel`, while the others (3-8) mention other models or tasks, making the answer mostly off-topic.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_006",
+      "query": "Albert specific outputs",
+      "answer_text": "The Albert specific outputs are documented under the `AlbertForPreTrainingOutput` class [N4].",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1525.6119619998572,
+        "assemble_ms": 0.04973099999006081,
+        "generate_ms": 1640.4366519998348
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "1 of 1 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "The Albert specific outputs are documented under the `AlbertForPreTrainingOutput` class.",
+            "supporting_chunk_idx": 1,
+            "rationale": "The documentation of Albert specific outputs is provided in the AlbertConfig section."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 1.0,
+        "rationale": "The answer directly addresses the question by providing the specific class where Albert's outputs are documented.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_007",
+      "query": "Per-Layer-Type RoPE Configuration",
+      "answer_text": "Per-layer-type RoPE configuration allows specifying distinct RoPE parameters for different layer types within a model. For instance, in models like Gemma-3, which use different attention mechanisms in various blocks (e.g., \"full attention\" and \"sliding-window attention\"), you can configure RoPE parameters separately for each layer type.\n\nHere's how you can set it up for the Gemma-3 model:\n\n```python\nfrom transformers import Gemma3Config\n\nconfig = Gemma3Config()\nconfig.rope_parameters = {\n    \"full_attention\": {\n        \"rope_type\": \"dynamic\",\n        \"rope_theta\": 1000000.0,\n        \"factor\": 8.0,\n        \"original_max_position_embeddings\": 8096,\n    },\n    \"sliding_attention\": {\n        \"rope_type\": \"default\",\n        \"rope_theta\": 10000.0,\n    }\n}\n```\n\nDuring model initialization, each decoder layer automatically looks up the matching RoPE configuration based on its declared layer type. This setup ensures that the appropriate RoPE parameters are applied to each layer according to its specific type.",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1490.878332000193,
+        "assemble_ms": 0.03483099999357364,
+        "generate_ms": 16298.037083999816
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "3 of 3 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "Per-layer-type RoPE configuration allows specifying distinct RoPE parameters for different layer types within a model.",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 describes per-layer-type RoPE configuration."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "In models like Gemma-3, different attention mechanisms are used in various blocks.",
+            "supporting_chunk_idx": 2,
+            "rationale": "Chunk 2 mentions different attention mechanisms in Gemma-3."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "Each decoder layer automatically looks up the matching RoPE configuration based on its declared layer type.",
+            "supporting_chunk_idx": 3,
+            "rationale": "Chunk 3 explains how each decoder layer looks up the matching RoPE configuration."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses the question by explaining how to configure per-layer-type RoPE parameters, but includes extraneous content by providing a specific example and code snippet.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_008",
+      "query": "Load IMDb dataset",
+      "answer_text": "To load the IMDb dataset, you can use the following code:\n\n```py\nfrom datasets import load_dataset\n\nimdb = load_dataset(\"imdb\")\n```\n\nThis code snippet uses the `load_dataset` function from the `datasets` library to load the IMDb dataset.",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1624.9157759998525,
+        "assemble_ms": 0.034291000019948115,
+        "generate_ms": 3969.994669000016
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "1 of 1 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "The IMDb dataset can be loaded using the `load_dataset` function from the `datasets` library.",
+            "supporting_chunk_idx": 1,
+            "rationale": "The IMDb dataset can be loaded using the `load_dataset` function from the `datasets` library, as shown in chunk 1."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 1.0,
+        "rationale": "The answer directly addresses the question by providing a code snippet that loads the IMDb dataset using the `load_dataset` function from the `datasets` library.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_009",
+      "query": "Audio Transformations",
+      "answer_text": "Audio transformations include functions such as converting hertz to mel, mel to hertz, creating a mel filter bank, determining the optimal FFT length, applying window functions, generating spectrograms, converting power to decibels, and converting amplitude to decibels. These transformations are documented in the `audio_utils` module [1].",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1281.6190680000545,
+        "assemble_ms": 0.03330099980303203,
+        "generate_ms": 4451.213697000185
+      },
+      "citation_check": {
+        "n_markers_in_text": 1,
+        "n_resolved_citations": 1,
+        "all_markers_in_range": true,
+        "any_marker_present": true
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "8 of 8 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "Converting hertz to mel is an audio transformation.",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 lists audio transformations, including converting hertz to mel."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "Converting mel to hertz is an audio transformation.",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 lists audio transformations, including converting mel to hertz."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "Creating a mel filter bank is an audio transformation.",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 lists audio transformations, including creating a mel filter bank."
+          },
+          {
+            "claim_idx": 4,
+            "claim_text": "Determining the optimal FFT length is an audio transformation.",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 lists audio transformations, including determining the optimal FFT length."
+          },
+          {
+            "claim_idx": 5,
+            "claim_text": "Applying window functions is an audio transformation.",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 lists audio transformations, including applying window functions."
+          },
+          {
+            "claim_idx": 6,
+            "claim_text": "Generating spectrograms is an audio transformation.",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 lists audio transformations, including generating spectrograms."
+          },
+          {
+            "claim_idx": 7,
+            "claim_text": "Converting power to decibels is an audio transformation.",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 lists audio transformations, including converting power to decibels."
+          },
+          {
+            "claim_idx": 8,
+            "claim_text": "Converting amplitude to decibels is an audio transformation.",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 lists audio transformations, including converting amplitude to decibels."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses the question by listing various audio transformations, but includes extraneous information about the `audio_utils` module.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_010",
+      "query": "Key Features",
+      "answer_text": "Based on the provided context, key features of keypoint detection include:\n\n- Identifying and locating specific points of interest within an image, known as keypoints or landmarks [1].\n- Returning keypoints and their confidence scores [4].\n- Providing descriptors for each keypoint, which capture the texture, gradient, orientation, and other properties of the image region surrounding the keypoint [4].\n\nThese features are useful for various applications such as image similarity and image retrieval [3].",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1200.2202440000929,
+        "assemble_ms": 0.038291000009849085,
+        "generate_ms": 6512.838104000139
+      },
+      "citation_check": {
+        "n_markers_in_text": 4,
+        "n_resolved_citations": 3,
+        "all_markers_in_range": true,
+        "any_marker_present": true
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "4 of 4 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "Identifying and locating specific points of interest within an image, known as keypoints or landmarks.",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 describes the purpose of keypoint detection."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "Returning keypoints and their confidence scores.",
+            "supporting_chunk_idx": 4,
+            "rationale": "Chunk 4 lists the outputs of keypoint detection models, including keypoints and scores."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "Providing descriptors for each keypoint, which capture the texture, gradient, orientation, and other properties of the image region surrounding the keypoint.",
+            "supporting_chunk_idx": 4,
+            "rationale": "Chunk 4 lists the outputs of keypoint detection models, including descriptors."
+          },
+          {
+            "claim_idx": 4,
+            "claim_text": "These features are useful for various applications such as image similarity and image retrieval.",
+            "supporting_chunk_idx": 3,
+            "rationale": "Chunk 3 mentions that these features are useful for various applications, including image similarity and image retrieval."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses the question by listing key features of keypoint detection, but includes extraneous content about the applications of these features.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_011",
+      "query": "Transformers integration",
+      "answer_text": "Transformers integration can be done in a few ways depending on the model's popularity and the model author's involvement:\n\n1. **Direct Integration**: If a model becomes very popular, it is likely that the Hugging Face team will integrate it directly into the Transformers library to provide better support, including documentation, maintenance, and optimization [5].\n\n2. **Private Fork**: For models that are particularly novel or have significant demand, the model author can reach out to transformers@huggingface.co a few days to a week in advance. This allows for collaboration on a private fork of Transformers until the model is ready for release [2].\n\n3. **Community Integrations**: There are also community-driven integrations like those with SGLang and vLLM, which provide additional resources and usage examples [3][4]. These integrations might involve maintaining the model structure compatible with Transformers while providing specific backend support.\n\nFor new models, it's recommended to provide early reviews and ensure everything works as expected before reaching out to the Hugging Face team [2].",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1069.061419000036,
+        "assemble_ms": 0.02552099999775237,
+        "generate_ms": 14369.613052999966
+      },
+      "citation_check": {
+        "n_markers_in_text": 5,
+        "n_resolved_citations": 4,
+        "all_markers_in_range": true,
+        "any_marker_present": true
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "4 of 4 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "If a model becomes very popular, the Hugging Face team will integrate it directly into the Transformers library.",
+            "supporting_chunk_idx": 5,
+            "rationale": "Direct integration is considered for very popular models."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "The model author can reach out to transformers@huggingface.co a few days to a week in advance for a private fork.",
+            "supporting_chunk_idx": 2,
+            "rationale": "Reaching out a few days to a week in advance is recommended for private fork."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "Community-driven integrations provide additional resources and usage examples.",
+            "supporting_chunk_idx": 3,
+            "rationale": "Community-driven integrations provide additional resources and usage examples."
+          },
+          {
+            "claim_idx": 4,
+            "claim_text": "New models should provide early reviews before reaching out to the Hugging Face team.",
+            "supporting_chunk_idx": 4,
+            "rationale": "New models should provide early reviews before reaching out to the Hugging Face team."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses the question of how transformers integration can be done, but includes extraneous content about the process and recommendations, which are not directly asked.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_012",
+      "query": "Transformers integration",
+      "answer_text": "Transformers integration can be done in a few ways depending on the model's popularity and the model author's involvement:\n\n1. **Direct Integration**: If a model becomes very popular, it is likely that the Hugging Face team will integrate it into the Transformers library themselves to provide better support, including documentation, maintenance, and optimization [5].\n\n2. **Private Fork**: For models that are particularly novel or have significant demand, the model author can reach out to transformers@huggingface.co a few days to a week in advance. This allows the Hugging Face team to work together on a private fork of Transformers until the model is ready for release [2].\n\n3. **Community Integrations**: Some models might be integrated through community efforts, such as with SGLang or vLLM, which provide their own integrations and documentation for using Transformers as a backend [3][4].\n\nThe process often involves providing early reviews and ensuring the model works as expected before full integration [2].",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 943.212524000046,
+        "assemble_ms": 0.02681000000848144,
+        "generate_ms": 13385.837733000017
+      },
+      "citation_check": {
+        "n_markers_in_text": 5,
+        "n_resolved_citations": 4,
+        "all_markers_in_range": true,
+        "any_marker_present": true
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "4 of 4 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "The Hugging Face team may integrate a popular model into the Transformers library for better support.",
+            "supporting_chunk_idx": 5,
+            "rationale": "The Hugging Face team may integrate a popular model into the Transformers library for better support."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "The model author can request a private fork of Transformers from the Hugging Face team.",
+            "supporting_chunk_idx": 2,
+            "rationale": "The model author can request a private fork of Transformers from the Hugging Face team."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "Community efforts can integrate models with Transformers as a backend.",
+            "supporting_chunk_idx": 3,
+            "rationale": "Community efforts can integrate models with Transformers as a backend."
+          },
+          {
+            "claim_idx": 4,
+            "claim_text": "The process of integration often involves providing early reviews and ensuring the model works as expected.",
+            "supporting_chunk_idx": 4,
+            "rationale": "The process of integration often involves providing early reviews and ensuring the model works as expected."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses the question of how transformers integration can be done, but includes extraneous content about the process and specific examples, which are not essential to the main point.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_013",
+      "query": "Image Transformations",
+      "answer_text": "The context provides information about various image transformations available in the library, such as center cropping, center-to-corners format conversion, corners-to-center format conversion, ID to RGB conversion, normalization, padding, RGB to ID conversion, rescaling, resizing, and converting to PIL images. These transformations are useful for preparing images for machine learning tasks like object detection and image classification [1].",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1475.5241789998763,
+        "assemble_ms": 0.030161000040607178,
+        "generate_ms": 5570.483992999925
+      },
+      "citation_check": {
+        "n_markers_in_text": 1,
+        "n_resolved_citations": 1,
+        "all_markers_in_range": true,
+        "any_marker_present": true
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "10 of 10 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "center cropping is an image transformation available in the library",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 lists various image transformations, including center cropping."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "center-to-corners format conversion is an image transformation available in the library",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 lists various image transformations, including center-to-corners format conversion."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "corners-to-center format conversion is an image transformation available in the library",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 lists various image transformations, including corners-to-center format conversion."
+          },
+          {
+            "claim_idx": 4,
+            "claim_text": "ID to RGB conversion is an image transformation available in the library",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 lists various image transformations, including ID to RGB conversion."
+          },
+          {
+            "claim_idx": 5,
+            "claim_text": "normalization is an image transformation available in the library",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 lists various image transformations, including normalization."
+          },
+          {
+            "claim_idx": 6,
+            "claim_text": "padding is an image transformation available in the library",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 lists various image transformations, including padding."
+          },
+          {
+            "claim_idx": 7,
+            "claim_text": "RGB to ID conversion is an image transformation available in the library",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 lists various image transformations, including RGB to ID conversion."
+          },
+          {
+            "claim_idx": 8,
+            "claim_text": "rescaling is an image transformation available in the library",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 lists various image transformations, including rescaling."
+          },
+          {
+            "claim_idx": 9,
+            "claim_text": "resizing is an image transformation available in the library",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 lists various image transformations, including resizing."
+          },
+          {
+            "claim_idx": 10,
+            "claim_text": "converting to PIL images is an image transformation available in the library",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 lists various image transformations, including converting to PIL images."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses the topic of image transformations, but includes extraneous content about the context and a tangential mention of machine learning tasks.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_014",
+      "query": "Support Model",
+      "answer_text": "The supported models include:\n\n- GLM-4.1V-9B-Base\n- GLM-4.1V-9B-Thinking\n- GLM-4.6V-Flash\n- AutoGLM-Phone-9B\n\nThese models are available at the following links:\n\n- [GLM-4.1V-9B-Base](https://huggingface.co/zai-org/GLM-4.1V-9B-Base)\n- [GLM-4.1V-9B-Thinking](https://huggingface.co/zai-org/GLM-4.1V-9B-Thinking)\n- [GLM-4.6V-Flash](https://huggingface.co/zai-org/GLM-4.6V-Flash)\n- [AutoGLM-Phone-9B](https://huggingface.co/zai-org/AutoGLM-Phone-9B)\n\nFor more information about these models and how to use them, you can refer to the provided links or explore the Hugging Face Hub.",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1717.2609900001135,
+        "assemble_ms": 0.04925100006403227,
+        "generate_ms": 15270.868059999884
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "8 of 8 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "GLM-4.1V-9B-Base is a supported model.",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 lists GLM-4.1V-9B-Base as a supported model."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "GLM-4.1V-9B-Thinking is a supported model.",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 lists GLM-4.1V-9B-Thinking as a supported model."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "GLM-4.6V-Flash is a supported model.",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 lists GLM-4.6V-Flash as a supported model."
+          },
+          {
+            "claim_idx": 4,
+            "claim_text": "AutoGLM-Phone-9B is a supported model.",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 lists AutoGLM-Phone-9B as a supported model."
+          },
+          {
+            "claim_idx": 5,
+            "claim_text": "The supported models are available at https://huggingface.co/zai-org/GLM-4.1V-9B-Base.",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 lists the supported models."
+          },
+          {
+            "claim_idx": 6,
+            "claim_text": "The supported models are available at https://huggingface.co/zai-org/GLM-4.1V-9B-Thinking.",
+            "supporting_chunk_idx": 5,
+            "rationale": "Chunk 5 describes the model cards which include GLM-4.1V-9B-Base."
+          },
+          {
+            "claim_idx": 7,
+            "claim_text": "The supported models are available at https://huggingface.co/zai-org/GLM-4.6V-Flash.",
+            "supporting_chunk_idx": 5,
+            "rationale": "Chunk 5 describes the model cards which include GLM-4.1V-9B-Thinking."
+          },
+          {
+            "claim_idx": 8,
+            "claim_text": "The supported models are available at https://huggingface.co/zai-org/AutoGLM-Phone-9B.",
+            "supporting_chunk_idx": 5,
+            "rationale": "Chunk 5 describes the model cards which include GLM-4.6V-Flash."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses the question by listing supported models, but includes extraneous content by providing links and a suggestion to explore the Hugging Face Hub, which is not directly related to the question.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_015",
+      "query": "Combining Starcoder and Flash Attention 2",
+      "answer_text": "To combine Starcoder and Flash Attention 2, follow these steps:\n\n1. Install the latest version of Flash Attention 2:\n```bash\npip install -U flash-attn --no-build-isolation\n```\n\n2. Ensure your hardware is compatible with Flash Attention 2. For details, refer to the official documentation of the `flash-attn` repository.\n\n3. Load the Starcoder model in half-precision (e.g., `torch.bfloat16`). Here is an example of how to do this:\n\n```python\nimport torch\nfrom transformers import AutoModelForCausalLM, AutoTokenizer\nfrom accelerate import Accelerator\n\ndevice = Accelerator().device  # the device to load the model onto\n\nmodel = AutoModelForCausalLM.from_pretrained(\"bigcode/starcoder\", dtype=torch.float16, attn_implementation=\"flash_attention_2\")\ntokenizer = AutoTokenizer.from_pretrained(\"bigcode/starcoder\")\n```\n\nThis setup will allow you to use Flash Attention 2 for the Starcoder model, potentially improving inference speed.",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1331.0634929998741,
+        "assemble_ms": 0.03762100004678359,
+        "generate_ms": 14875.966738999978
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "5 of 5 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "Install the latest version of Flash Attention 2 using pip.",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 provides the command to install the latest version of Flash Attention 2."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "Ensure hardware compatibility with Flash Attention 2 by referring to the official documentation of the `flash-attn` repository.",
+            "supporting_chunk_idx": 2,
+            "rationale": "Chunk 2 mentions the official documentation of the `flash-attn` repository for hardware compatibility."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "The `torch.bfloat16` data type is used for half-precision in PyTorch.",
+            "supporting_chunk_idx": 3,
+            "rationale": "Chunk 3 explains the use of half-precision in PyTorch with `torch.bfloat16`."
+          },
+          {
+            "claim_idx": 4,
+            "claim_text": "The `attn_implementation` parameter in `AutoModelForCausalLM.from_pretrained` can be set to `flash_attention_2`.",
+            "supporting_chunk_idx": 4,
+            "rationale": "Chunk 4 shows how to set the `attn_implementation` parameter to `flash_attention_2` in `AutoModelForCausalLM.from_pretrained`."
+          },
+          {
+            "claim_idx": 5,
+            "claim_text": "The `dtype` parameter in `AutoModelForCausalLM.from_pretrained` can be set to `torch.float16`.",
+            "supporting_chunk_idx": 4,
+            "rationale": "Chunk 4 also shows how to set the `dtype` parameter to `torch.float16` in `AutoModelForCausalLM.from_pretrained`."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer provides a step-by-step guide on how to combine Starcoder and Flash Attention 2, but includes extraneous content (installation and hardware compatibility steps) that are not directly related to the question.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_016",
+      "query": "Custom dataset",
+      "answer_text": "To use a custom dataset, you need to specify the `train_file` and `validation_file` paths, along with the `text_column` and `summary_column` parameters. Here is an example command:\n\n```bash\n--train_file ~/path/to/train.csv \\\n--validation_file ~/path/to/validation.csv \\\n--text_column input_text \\\n--summary_column target_summary \\\n--output_dir ~/tmp/tst-summarization \\\n```\n\nMake sure your dataset is in CSV or JSONL format. For more details, refer to the summarization scripts documentation [1].",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1731.3556550000158,
+        "assemble_ms": 0.04639100006897934,
+        "generate_ms": 7899.092509000184
+      },
+      "citation_check": {
+        "n_markers_in_text": 1,
+        "n_resolved_citations": 1,
+        "all_markers_in_range": true,
+        "any_marker_present": true
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "4 of 4 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "You need to specify the `train_file` and `validation_file` paths.",
+            "supporting_chunk_idx": 1,
+            "rationale": "The documentation mentions specifying additional parameters for custom datasets."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "You need to specify the `text_column` and `summary_column` parameters.",
+            "supporting_chunk_idx": 2,
+            "rationale": "The documentation provides an alternative to downloading the dataset from the official VQA dataset page."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "Your dataset should be in CSV or JSONL format.",
+            "supporting_chunk_idx": 4,
+            "rationale": "The documentation suggests not duplicating existing resources and provides a notebook on fine-tuning Idefics2."
+          },
+          {
+            "claim_idx": 4,
+            "claim_text": "The summarization scripts documentation can be found at [1].",
+            "supporting_chunk_idx": 5,
+            "rationale": "The documentation explains how to customize the training process using the TrainingArguments class."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses the question by providing the necessary parameters and an example command, but includes an unnecessary reference to the format of the dataset and a link to external documentation.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_017",
+      "query": "Template writing tips",
+      "answer_text": "Here are some template writing tips:\n\n- Refer to existing templates by using `print(tokenizer.chat_template)` on any chat model to see the template being used.\n- Start with simple models that do not involve tools or RAG (Retrieval-Augmented Generation) since tool-use models can have very complex templates.\n- Follow the standard API when writing templates for tools to ensure wide accessibility across different models.\n- Be mindful of model-specific formatting such as whitespace and special tokens; make sure they match the format the model was trained with.\n- You can edit the `chat_template.jinja` file directly to change the template, often making it simpler than manipulating a template string.\n- Start writing Jinja templates by looking at existing templates and referring to the [Jinja documentation](https://jinja.palletsprojects.com/en/stable/templates/#synopsis) for more details on formatting and syntax [N1, N4].",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1322.816198999817,
+        "assemble_ms": 0.04721100003735046,
+        "generate_ms": 12679.6727750002
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "6 of 6 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "Refer to existing templates by using `print(tokenizer.chat_template)` on any chat model to see the template being used.",
+            "supporting_chunk_idx": 5,
+            "rationale": "The Jinja documentation provides details on formatting and syntax."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "Start with simple models that do not involve tools or RAG (Retrieval-Augmented Generation) since tool-use models can have very complex templates.",
+            "supporting_chunk_idx": 4,
+            "rationale": "Simple models without tool use or RAG can have less complex templates."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "Follow the standard API when writing templates for tools to ensure wide accessibility across different models.",
+            "supporting_chunk_idx": 3,
+            "rationale": "Following the standard API ensures templates are widely accessible across models."
+          },
+          {
+            "claim_idx": 4,
+            "claim_text": "Be mindful of model-specific formatting such as whitespace and special tokens; make sure they match the format the model was trained with.",
+            "supporting_chunk_idx": 4,
+            "rationale": "Model-specific formatting such as whitespace and special tokens must match the model's training format."
+          },
+          {
+            "claim_idx": 5,
+            "claim_text": "You can edit the `chat_template.jinja` file directly to change the template, often making it simpler than manipulating a template string.",
+            "supporting_chunk_idx": 1,
+            "rationale": "Editing the chat_template.jinja file directly can be easier than manipulating a template string."
+          },
+          {
+            "claim_idx": 6,
+            "claim_text": "Start writing Jinja templates by looking at existing templates and referring to the [Jinja documentation](https://jinja.palletsprojects.com/en/stable/templates/#synopsis) for more details on formatting and syntax",
+            "supporting_chunk_idx": 4,
+            "rationale": "Existing templates and the Jinja documentation provide a good starting point for writing Jinja templates."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses the question by providing several tips for template writing, but includes some extraneous content such as a reference to the Jinja documentation, which is not directly related to the question.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_018",
+      "query": "Text-prompted zero-shot object detection by hand",
+      "answer_text": "To perform text-prompted zero-shot object detection by hand, you would typically follow these steps:\n\n1. **Train or Load a Model**: Use a pre-trained model like OWL-ViT or OWLv2 which supports zero-shot text-conditioned object detection. These models are fine-tuned to understand both text queries and image content.\n\n2. **Obtain Class Embeddings**: The model uses class-name embeddings obtained from a text model (often CLIP). These embeddings represent the textual descriptions of different object classes.\n\n3. **Process the Image**: Load your input image and any text queries you want to use for detection.\n\n4. **Match Text Queries to Image**: For each text query, the model computes a similarity score between the text embedding and the class embeddings learned during training. This helps in identifying potential object candidates in the image.\n\n5. **Detect Objects**: Using the computed scores, the model predicts bounding boxes around the objects in the image that match the given text queries. The predicted bounding boxes and associated labels are then visualized or returned as output.\n\nHere\u2019s a simplified example of how you might do this programmatically using the `transformers` library:\n\n```python\nfrom transformers import OwlViTForObjectDetection, OwlViTFeatureExtractor\nimport torch\n\n# Load the model and feature extractor\nmodel = OwlViTForObjectDetection.from_pretrained(\"huggingface/owlvit-689b0d0872a7634a6ea17ae7\")\nfeature_extractor = OwlViTFeatureExtractor.from_pretrained(\"huggingface/owlvit-689b0d0872a7634a6ea17ae7\")\n\n# Prepare the inputs\nimage = load_image(\"path_to_your_image.jpg\")  # Replace with actual image loading function\ntext_queries = [\"spaceship\", \"astronaut\"]  # Example text queries\n\n# Preprocess the image and text\ninputs = feature_extractor(images=image, text=text_queries, return_tensors=\"pt\")\n\n# Forward pass through the model\noutputs = model(**inputs)\n\n# Process the outputs to get bounding boxes and labels\npredicted_boxes = outputs[\"pred_boxes\"]\npredicted_labels = outputs[\"pred_logits\"].argmax(-1)\n\n# Visualize the results\nfor i, label in enumerate(predicted_labels[0]):\n    ymin, xmin, ymax, xmax = predicted_boxes[0][i].tolist()\n    print(f\"{text_queries[label]}: {round(outputs['scores'][0][i].",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1405.198923000171,
+        "assemble_ms": 0.027710000040315208,
+        "generate_ms": 34490.64806399997
+      },
+      "citation_check": {
+        "n_markers_in_text": 3,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": true
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 0.3,
+        "rationale": "3 of 10 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "You can use OWL-ViT or OWLv2 as a pre-trained model for zero-shot text-conditioned object detection.",
+            "supporting_chunk_idx": 4,
+            "rationale": "The guide mentions OWL-ViT and OWLv2 as options for image-guided object detection."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "CLIP is often used to obtain class-name embeddings.",
+            "supporting_chunk_idx": 3,
+            "rationale": "The guide mentions CLIP as a model that can be used to obtain class-name embeddings."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "The transformers library provides a feature extractor for image processing.",
+            "supporting_chunk_idx": null,
+            "rationale": "There is no mention of the transformers library providing a feature extractor for image processing."
+          },
+          {
+            "claim_idx": 4,
+            "claim_text": "The model computes a similarity score between the text embedding and the class embeddings learned during training.",
+            "supporting_chunk_idx": 5,
+            "rationale": "The guide mentions that the model computes a similarity score between the text embedding and the class embeddings learned during training."
+          },
+          {
+            "claim_idx": 5,
+            "claim_text": "The model predicts bounding boxes around the objects in the image that match the given text queries.",
+            "supporting_chunk_idx": null,
+            "rationale": "OUT_OF_RANGE: chunk 6 not in [1, 5]. The guide mentions that the model predicts bounding boxes around the objects in the image that match the given text queries."
+          },
+          {
+            "claim_idx": 6,
+            "claim_text": "The predicted bounding boxes and associated labels can be visualized or returned as output.",
+            "supporting_chunk_idx": null,
+            "rationale": "OUT_OF_RANGE: chunk 6 not in [1, 5]. The guide mentions that the predicted bounding boxes and associated labels can be visualized or returned as output."
+          },
+          {
+            "claim_idx": 7,
+            "claim_text": "The `OwlViTForObjectDetection` class is available in the transformers library.",
+            "supporting_chunk_idx": null,
+            "rationale": "There is no mention of the `OwlViTForObjectDetection` class being available in the transformers library."
+          },
+          {
+            "claim_idx": 8,
+            "claim_text": "The `OwlViTFeatureExtractor` class is available in the transformers library.",
+            "supporting_chunk_idx": null,
+            "rationale": "There is no mention of the `OwlViTFeatureExtractor` class being available in the transformers library."
+          },
+          {
+            "claim_idx": 9,
+            "claim_text": "The `argmax` function is used to get the predicted labels.",
+            "supporting_chunk_idx": null,
+            "rationale": "There is no mention of the `argmax` function being used to get the predicted labels."
+          },
+          {
+            "claim_idx": 10,
+            "claim_text": "The `tolist` function is used to convert the predicted bounding boxes to a list format.",
+            "supporting_chunk_idx": null,
+            "rationale": "There is no mention of the `tolist` function being used to convert the predicted bounding boxes to a list format."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses the question by providing a step-by-step guide on how to perform text-prompted zero-shot object detection by hand, but includes extraneous code and implementation details that are not directly relevant to the question.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_019",
+      "query": "Architecture Info",
+      "answer_text": "The context provides information about different model architectures:\n\n1. **Gemma3** has a similar architecture to previous Gemma versions but includes alternating 5 local sliding window self-attention layers for every global self-attention layer, support for a longer context length of 128K tokens, and a [SigLip](./siglip) encoder for handling high-resolution images [1].\n\n2. **Mask2Former** sets new state-of-the-art results on several datasets including panoptic segmentation, instance segmentation, and semantic segmentation [2].\n\n3. **PP-DocLayoutV2** consists of two networks: an RT-DETR-based detection model for layout element detection and classification, followed by a pointer network for ordering these elements [3].\n\n4. **DPT** achieves state-of-the-art performance on ADE20K with 49.02% mIoU and can be fine-tuned on smaller datasets like NYUv2, KITTI, and Pascal Context [4].\n\n5. **ExaOne MoE** features a 236B fine-grained MoE design with Multi-Token Prediction (MTP) for self-speculative decoding, boosting inference throughput [5].\n\nFor more detailed information on each architecture, refer to the respective sources [1-5].",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1238.5974049998367,
+        "assemble_ms": 0.03201999993507343,
+        "generate_ms": 18126.483464999867
+      },
+      "citation_check": {
+        "n_markers_in_text": 5,
+        "n_resolved_citations": 5,
+        "all_markers_in_range": true,
+        "any_marker_present": true
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "12 of 12 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "Gemma3 includes alternating 5 local sliding window self-attention layers for every global self-attention layer.",
+            "supporting_chunk_idx": 1,
+            "rationale": "The key differences in Gemma3 include alternating 5 local sliding window self-attention layers for every global self-attention layer."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "Gemma3 supports a longer context length of 128K tokens.",
+            "supporting_chunk_idx": 1,
+            "rationale": "The key differences in Gemma3 include support for a longer context length of 128K tokens."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "Gemma3 uses a SigLip encoder for handling high-resolution images.",
+            "supporting_chunk_idx": 1,
+            "rationale": "The key differences in Gemma3 include a [SigLip] encoder that can 'pan & scan' high-resolution images."
+          },
+          {
+            "claim_idx": 4,
+            "claim_text": "Mask2Former sets new state-of-the-art results on panoptic segmentation.",
+            "supporting_chunk_idx": 2,
+            "rationale": "Mask2Former sets a new state-of-the-art for panoptic segmentation (57.8 PQ on COCO) and semantic segmentation (57.7 mIoU on ADE20K)."
+          },
+          {
+            "claim_idx": 5,
+            "claim_text": "Mask2Former sets new state-of-the-art results on instance segmentation.",
+            "supporting_chunk_idx": 2,
+            "rationale": "Mask2Former sets a new state-of-the-art for instance segmentation (50.1 AP on COCO)."
+          },
+          {
+            "claim_idx": 6,
+            "claim_text": "Mask2Former sets new state-of-the-art results on semantic segmentation.",
+            "supporting_chunk_idx": 2,
+            "rationale": "Mask2Former sets a new state-of-the-art for semantic segmentation (57.7 mIoU on ADE20K)."
+          },
+          {
+            "claim_idx": 7,
+            "claim_text": "PP-DocLayoutV2 consists of two networks.",
+            "supporting_chunk_idx": 3,
+            "rationale": "PP-DocLayoutV2 is composed of two sequentially connected networks."
+          },
+          {
+            "claim_idx": 8,
+            "claim_text": "PP-DocLayoutV2 uses an RT-DETR-based detection model.",
+            "supporting_chunk_idx": 3,
+            "rationale": "The first network in PP-DocLayoutV2 is an RT-DETR-based detection model."
+          },
+          {
+            "claim_idx": 9,
+            "claim_text": "PP-DocLayoutV2 uses a pointer network.",
+            "supporting_chunk_idx": 3,
+            "rationale": "The second network in PP-DocLayoutV2 is a pointer network."
+          },
+          {
+            "claim_idx": 10,
+            "claim_text": "DPT achieves state-of-the-art performance on ADE20K with 49.02% mIoU.",
+            "supporting_chunk_idx": 4,
+            "rationale": "DPT sets a new state of the art on ADE20K with 49.02% mIoU."
+          },
+          {
+            "claim_idx": 11,
+            "claim_text": "ExaOne MoE features a 236B fine-grained MoE design.",
+            "supporting_chunk_idx": 5,
+            "rationale": "ExaOne MoE features a 236B fine-grained MoE design."
+          },
+          {
+            "claim_idx": 12,
+            "claim_text": "ExaOne MoE uses Multi-Token Prediction (MTP) for self-speculative decoding.",
+            "supporting_chunk_idx": 5,
+            "rationale": "ExaOne MoE uses Multi-Token Prediction (MTP) for self-speculative decoding."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer provides a list of different model architectures, but includes extraneous content (the sources) that is not directly related to the question about architecture info.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_020",
+      "query": "Initialising `VisionEncoderDecoderModel` from a pretrained encoder and a pretrained decoder",
+      "answer_text": "To initialize a `VisionEncoderDecoderModel` from a pretrained encoder and a pretrained decoder, you would follow these steps:\n\n1. Define the configuration for the encoder and decoder using their respective configurations.\n2. Create a `VisionEncoderDecoderConfig` object from these encoder and decoder configurations.\n3. Initialize the `VisionEncoderDecoderModel` with this configuration.\n\nHere is an example code snippet based on the provided context:\n\n```python\n# Define the configurations for the encoder and decoder\nconfig_encoder = ViTConfig()  # Example: ViT configuration\nconfig_decoder = BertConfig()  # Example: BERT configuration\n\n# Create the encoder-decoder configuration\nconfig = VisionEncoderDecoderConfig.from_encoder_decoder_configs(config_encoder, config_decoder)\n\n# Initialize the VisionEncoderDecoderModel\nmodel = VisionEncoderDecoderModel(config=config)\n```\n\nNote that initializing the model from pretrained checkpoints requires fine-tuning on a specific downstream task, as discussed in the *Warm-starting-encoder-decoder blog post* [1].\n\nReferences:\n[1] [Warm-starting-encoder-decoder blog post](https://huggingface.co/blog/warm-starting-encoder-decoder)",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1611.6533880001498,
+        "assemble_ms": 0.02938000011454278,
+        "generate_ms": 16276.325932999953
+      },
+      "citation_check": {
+        "n_markers_in_text": 2,
+        "n_resolved_citations": 1,
+        "all_markers_in_range": true,
+        "any_marker_present": true
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 0.8,
+        "rationale": "4 of 5 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "You can initialize a `VisionEncoderDecoderModel` with a `VisionEncoderDecoderConfig` object.",
+            "supporting_chunk_idx": 3,
+            "rationale": "The code snippet shows how to initialize a VisionEncoderDecoderModel with a VisionEncoderDecoderConfig object."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "Initializing the model from pretrained checkpoints requires fine-tuning on a specific downstream task.",
+            "supporting_chunk_idx": null,
+            "rationale": "There is no information in the provided chunks to support this claim."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "You can create a `VisionEncoderDecoderConfig` object from encoder and decoder configurations.",
+            "supporting_chunk_idx": 5,
+            "rationale": "The code snippet shows how to define the configuration for the encoder and decoder using their respective configurations."
+          },
+          {
+            "claim_idx": 4,
+            "claim_text": "You can define the configuration for the encoder and decoder using their respective configurations.",
+            "supporting_chunk_idx": 4,
+            "rationale": "The text describes how to define the configuration for the encoder and decoder using their respective configurations."
+          },
+          {
+            "claim_idx": 5,
+            "claim_text": "You can initialize the `VisionEncoderDecoderModel` with a `VisionEncoderDecoderConfig` object.",
+            "supporting_chunk_idx": 3,
+            "rationale": "The text describes how to initialize the VisionEncoderDecoderModel with a VisionEncoderDecoderConfig object."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 1.0,
+        "rationale": "The answer directly addresses the question, providing a step-by-step guide on how to initialize a `VisionEncoderDecoderModel` from pretrained encoder and decoder, along with an example code snippet.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_021",
+      "query": "Support Model",
+      "answer_text": "The supported models include:\n\n- GLM-4.1V-9B-Base\n- GLM-4.1V-9B-Thinking\n- GLM-4.6V-Flash\n- AutoGLM-Phone-9B\n\nThese models are available on the Hugging Face platform [here](https://github.com/zai-org/GLM-V*).",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1538.2136289999835,
+        "assemble_ms": 0.0329209999563318,
+        "generate_ms": 5416.199534000043
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "5 of 5 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "GLM-4.1V-9B-Base is a supported model.",
+            "supporting_chunk_idx": 1,
+            "rationale": "The supported model is explicitly listed in the chunk."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "GLM-4.1V-9B-Thinking is a supported model.",
+            "supporting_chunk_idx": 1,
+            "rationale": "The supported model is explicitly listed in the chunk."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "GLM-4.6V-Flash is a supported model.",
+            "supporting_chunk_idx": 1,
+            "rationale": "The supported model is explicitly listed in the chunk."
+          },
+          {
+            "claim_idx": 4,
+            "claim_text": "AutoGLM-Phone-9B is a supported model.",
+            "supporting_chunk_idx": 1,
+            "rationale": "The supported model is explicitly listed in the chunk."
+          },
+          {
+            "claim_idx": 5,
+            "claim_text": "The models are available on the Hugging Face platform.",
+            "supporting_chunk_idx": 5,
+            "rationale": "The models are available on the Hugging Face platform is explicitly stated in the chunk."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses the question by listing supported models, but includes extraneous content by providing a link to the models' repository.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_022",
+      "query": "Models and configurations",
+      "answer_text": "Models and configurations in the context of the Transformers library are structured hierarchically and follow specific guidelines to ensure readability and maintainability. \n\n- **Models** inherit from a base class (`PreTrainedModel`) which provides essential functionalities like loading pre-trained models and saving them. A new model should only depend on `PreTrainedModel` to leverage its methods such as `from_pretrained` and `save_pretrained`. An example model, `BrandNewLlama`, is described as inheriting from both `BrandNewLlamaPreTrainedModel` and `PreTrainedModel` [2].\n\n- **Configurations** are defined by the base `PreTrainedConfig` class and serve as blueprints for models. They contain all necessary information to build a model, including attributes like the number of hidden layers, vocabulary size, and activation functions [4, 5]. Custom configurations must subclass `PreTrainedConfig` to ensure compatibility with other models in the library [5].\n\nThese structures help in maintaining a consistent and readable codebase while allowing for customization and extension of existing models and configurations [1, 3].",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1809.9215529998673,
+        "assemble_ms": 0.039051000157996896,
+        "generate_ms": 15656.524978000107
+      },
+      "citation_check": {
+        "n_markers_in_text": 2,
+        "n_resolved_citations": 2,
+        "all_markers_in_range": true,
+        "any_marker_present": true
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "5 of 5 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "Models inherit from a base class (`PreTrainedModel`)",
+            "supporting_chunk_idx": 1,
+            "rationale": "The base class is explicitly mentioned as `PreTrainedModel`."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "A new model should only depend on `PreTrainedModel` to leverage its methods",
+            "supporting_chunk_idx": 2,
+            "rationale": "The text states that a new model should only depend on `PreTrainedModel`."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "An example model, `BrandNewLlama`, is described as inheriting from both `BrandNewLlamaPreTrainedModel` and `PreTrainedModel`",
+            "supporting_chunk_idx": 3,
+            "rationale": "The example model `BrandNewLlama` is described as inheriting from both `BrandNewLlamaPreTrainedModel` and `PreTrainedModel`."
+          },
+          {
+            "claim_idx": 4,
+            "claim_text": "Configurations are defined by the base `PreTrainedConfig` class",
+            "supporting_chunk_idx": 2,
+            "rationale": "The base class for configurations is mentioned as `PreTrainedConfig`."
+          },
+          {
+            "claim_idx": 5,
+            "claim_text": "Custom configurations must subclass `PreTrainedConfig` to ensure compatibility with other models in the library",
+            "supporting_chunk_idx": 5,
+            "rationale": "The text explicitly states that custom configurations must subclass `PreTrainedConfig`."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses the question about models and configurations in the Transformers library, but includes extraneous content such as specific examples and references to other sources.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_023",
+      "query": "Usage: MarkupLMProcessor",
+      "answer_text": "Here is an example of how to use `MarkupLMProcessor`:\n\n```python\nfrom transformers import MarkupLMFeatureExtractor, MarkupLMTokenizerFast, MarkupLMProcessor\n\nfeature_extractor = MarkupLMFeatureExtractor()\ntokenizer = MarkupLMTokenizerFast.from_pretrained(\"microsoft/markuplm-base\")\nprocessor = MarkupLMProcessor(feature_extractor, tokenizer)\n```\n\nAlternatively, you can directly create a `MarkupLMProcessor` instance from a pretrained model:\n\n```python\nprocessor = MarkupLMProcessor.from_pretrained(\"microsoft/markuplm-base\")\n```\n\nThen you can process an HTML string like this:\n\n```python\nhtml_string = \"\"\"\n<!DOCTYPE html>\n<html>\n<head>\n<title>Hello world</title>\n</head>\n<body>\n<h1>Welcome</h1>\n<p>Here is my website.</p>\n</body>\n</html>\"\"\"\n\ninputs = processor(html_string, return_tensors=\"pt\")\n```\n\nThis will generate the necessary inputs for the `MarkupLM` model, including `input_ids`, `attention_mask`, `token_type_ids`, `xpath_subs_seq`, and `xpath_tags_seq`.",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1234.1318559999763,
+        "assemble_ms": 0.031199999966702308,
+        "generate_ms": 15090.293756999927
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "4 of 4 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "`MarkupLMProcessor` can be created from a feature extractor and a tokenizer.",
+            "supporting_chunk_idx": 1,
+            "rationale": "The processor is created with a feature extractor and a tokenizer."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "A `MarkupLMProcessor` instance can be created directly from a pretrained model.",
+            "supporting_chunk_idx": 5,
+            "rationale": "The processor can be created directly from a pretrained model."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "The `MarkupLMProcessor` can process an HTML string.",
+            "supporting_chunk_idx": 3,
+            "rationale": "The processor can process an HTML string."
+          },
+          {
+            "claim_idx": 4,
+            "claim_text": "The `MarkupLMProcessor` generates `input_ids`, `attention_mask`, `token_type_ids`, `xpath_subs_seq`, and `xpath_tags_seq` for the `MarkupLM` model.",
+            "supporting_chunk_idx": 4,
+            "rationale": "The processor generates token-level input for the MarkupLM model."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 1.0,
+        "rationale": "The answer directly addresses the question by providing a clear example of how to use `MarkupLMProcessor`, including code snippets and explanations of its usage.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_024",
+      "query": "Register a pipeline",
+      "answer_text": "To register a pipeline, you need to use the `PIPELINE_REGISTRY.register_pipeline` method. You should provide the following parameters:\n\n- `\"new-task\"`: The name of the new task your pipeline supports.\n- `MyPipeline`: The class of the pipeline you created.\n- `AutoModelForSequenceClassification`: The PyTorch model associated with this pipeline.\n- `default={\"pt\": (\"user/awesome-model\", \"branch-name\")}`: The default model version and branch to use when loading the model. \n- `\"text\"`: The type of the task, indicating it is a text-based task.\n\nHere is an example of how to register a pipeline based on the provided context:\n\n```python\nPIPELINE_REGISTRY.register_pipeline(\n    \"new-task\",\n    pipeline_class=MyPipeline,\n    pt_model=AutoModelForSequenceClassification,\n    default={\"pt\": (\"user/awesome-model\", \"branch-name\")},\n    type=\"text\",\n)\n```\n\nMake sure to replace `MyPipeline` with the actual class name of your custom pipeline and adjust the `default` parameter according to your needs [N1][N3].",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1180.3579009999794,
+        "assemble_ms": 0.034430999903634074,
+        "generate_ms": 15860.319136000044
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "6 of 6 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "The `PIPELINE_REGISTRY.register_pipeline` method is used to register a pipeline.",
+            "supporting_chunk_idx": 3,
+            "rationale": "The `PIPELINE_REGISTRY.register_pipeline` method is used to register a pipeline, as shown in chunk 3."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "The `new-task` parameter is the name of the new task a pipeline supports.",
+            "supporting_chunk_idx": 3,
+            "rationale": "The `new-task` parameter is the name of the new task a pipeline supports, as demonstrated in chunk 3."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "The `MyPipeline` class is the class of the pipeline you created.",
+            "supporting_chunk_idx": 3,
+            "rationale": "The `MyPipeline` class is the class of the pipeline you created, as shown in chunk 3."
+          },
+          {
+            "claim_idx": 4,
+            "claim_text": "The `AutoModelForSequenceClassification` is the PyTorch model associated with this pipeline.",
+            "supporting_chunk_idx": 4,
+            "rationale": "The `AutoModelForSequenceClassification` is the PyTorch model associated with this pipeline, as shown in chunk 4."
+          },
+          {
+            "claim_idx": 5,
+            "claim_text": "The `default` parameter specifies the default model version and branch to use when loading the model.",
+            "supporting_chunk_idx": 5,
+            "rationale": "The `default` parameter specifies the default model version and branch to use when loading the model, as shown in chunk 5."
+          },
+          {
+            "claim_idx": 6,
+            "claim_text": "The `text` parameter is the type of the task, indicating it is a text-based task.",
+            "supporting_chunk_idx": 5,
+            "rationale": "The `text` parameter is the type of the task, indicating it is a text-based task, as shown in chunk 5."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses the question of how to register a pipeline, but includes extraneous content such as an example and a note about replacing placeholders, which are not essential to the registration process.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_025",
+      "query": "CANINE specific outputs",
+      "answer_text": "CANINE specific outputs are provided by the `CanineModelOutputWithPooling` class [N3].",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1530.2033179998489,
+        "assemble_ms": 0.03309099997750309,
+        "generate_ms": 1874.1446189999351
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "1 of 1 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "CANINE specific outputs are provided by the `CanineModelOutputWithPooling` class.",
+            "supporting_chunk_idx": 1,
+            "rationale": "The documentation for CANINE mentions sentence prediction as one of its capabilities."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses the question, but includes an extraneous reference to [N3] which is not relevant to the question being asked.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_026",
+      "query": "Model Architecture",
+      "answer_text": "A model architecture refers to the model's skeleton, which defines its structure and how different components are connected [4]. It specifies the design and layout of the neural network layers and their interactions. For example, BERT is an architecture while a specific pre-trained version like google-bert/bert-base-uncased is a checkpoint [4]. Researchers and engineers who are exploring or extending model architectures would be interested in understanding and working with different model architectures [3].",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1086.1877360000562,
+        "assemble_ms": 0.025390000018887804,
+        "generate_ms": 6326.652072999877
+      },
+      "citation_check": {
+        "n_markers_in_text": 3,
+        "n_resolved_citations": 2,
+        "all_markers_in_range": true,
+        "any_marker_present": true
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "3 of 3 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "A model architecture defines its structure and how different components are connected.",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 describes model architecture, which includes its structure and component connections."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "BERT is an architecture.",
+            "supporting_chunk_idx": 2,
+            "rationale": "Chunk 2 explicitly states that BERT is an architecture."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "A specific pre-trained version like google-bert/bert-base-uncased is a checkpoint.",
+            "supporting_chunk_idx": 3,
+            "rationale": "Chunk 3 explains that a specific pre-trained version like google-bert/bert-base-uncased is a checkpoint."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses the question, but includes some extraneous content about researchers and engineers working with model architectures, which is not directly related to the definition of model architecture.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_027",
+      "query": "Usage tips and examples",
+      "answer_text": "Here are some usage tips and examples from the provided context:\n\n1. **Text Style Transfer and Simplification**: You can use the model for tasks like text style transfer and text simplification.\n   \n2. **Sequence Classification and Question Answering**: The model can be adapted for natural language understanding tasks such as sequence classification and extractive question answering.\n\n3. **Perceiver**: While the Perceiver library showcases some examples, there are many more use cases including question answering, named-entity recognition, object detection, audio classification, and video classification. Specific guides are available for text classification, masked language modeling, and image classification.\n\n4. **Chat Templating Example**: An example of a raw conversation history is provided, showing how chat templating works. Here's a snippet:\n   - **User**: \"Hello, how are you?\"\n   - **Assistant**: \"I'm doing great. How can I help you today?\"\n   - **User**: \"I'd like to show off how chat templating works!\"\n\n5. **Context Maintenance**: Tips include maintaining context and role-specific processing, such as ensuring proper closure of tags and matching roles.\n\nFor more detailed information, you can refer to the specific task guides linked in the context or the GitHub repository mentioned [here](https://github.com/RUCAIBox/MVP) [N1].",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1561.79870699998,
+        "assemble_ms": 0.030680999998367042,
+        "generate_ms": 18662.63896600003
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 0.8333333333333334,
+        "rationale": "5 of 6 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "You can use the model for tasks like text style transfer and text simplification.",
+            "supporting_chunk_idx": 1,
+            "rationale": "The model's capabilities include generation, text style transfer, and text simplification."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "The model can be adapted for natural language understanding tasks such as sequence classification and extractive question answering.",
+            "supporting_chunk_idx": 2,
+            "rationale": "The model can be adapted for natural language understanding tasks such as sequence classification and extractive question answering."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "The Perceiver library showcases examples including question answering, named-entity recognition, object detection, audio classification, and video classification.",
+            "supporting_chunk_idx": 3,
+            "rationale": "The Perceiver library showcases examples including question answering, named-entity recognition, object detection, audio classification, and video classification."
+          },
+          {
+            "claim_idx": 4,
+            "claim_text": "Specific guides are available for text classification, masked language modeling, and image classification.",
+            "supporting_chunk_idx": 4,
+            "rationale": "Specific guides are available for tasks such as text classification, masked language modeling, and image classification."
+          },
+          {
+            "claim_idx": 5,
+            "claim_text": "Context and role-specific processing is important for tasks like chat templating.",
+            "supporting_chunk_idx": 5,
+            "rationale": "Context and role-specific processing is important for tasks like chat templating."
+          },
+          {
+            "claim_idx": 6,
+            "claim_text": "More detailed information is available in the specific task guides linked in the context or the GitHub repository mentioned.",
+            "supporting_chunk_idx": null,
+            "rationale": "OUT_OF_RANGE: chunk 6 not in [1, 5]. More detailed information is available in the specific task guides linked in the context or the GitHub repository mentioned."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer provides several examples and tips related to the usage of the model, but includes some extraneous content such as a reference to a GitHub repository and a mention of task guides that are not directly relevant to the question.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_028",
+      "query": "Funnel specific outputs",
+      "answer_text": "The Funnel specific outputs are documented under `models.funnel.modeling_funnel.FunnelForPreTrainingOutput`. [N1]",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1288.6105410000255,
+        "assemble_ms": 0.03666100019472651,
+        "generate_ms": 2240.7021629999235
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "1 of 1 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "The Funnel specific outputs are documented under `models.funnel.modeling_funnel.FunnelForPreTrainingOutput`.",
+            "supporting_chunk_idx": 1,
+            "rationale": "The documentation for Funnel specific outputs is found in the first chunk."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 1.0,
+        "rationale": "The answer directly addresses the question by providing the specific documentation for Funnel outputs.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_029",
+      "query": "Model Architecture",
+      "answer_text": "A model architecture refers to the model's skeleton, which defines its structure and how different components are connected [4]. It specifies the design and layout of the neural network layers and their interactions. For example, BERT is an architecture while a specific pre-trained version like google-bert/bert-base-uncased is a checkpoint [4]. Researchers and engineers who are exploring or extending model architectures would be interested in understanding and working with different model architectures [3].",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 975.7000470001458,
+        "assemble_ms": 0.0312099998609483,
+        "generate_ms": 6430.092994000006
+      },
+      "citation_check": {
+        "n_markers_in_text": 3,
+        "n_resolved_citations": 2,
+        "all_markers_in_range": true,
+        "any_marker_present": true
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "3 of 3 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "A model architecture defines its structure and how different components are connected.",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 describes model architecture, which includes its structure and component connections."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "BERT is an architecture.",
+            "supporting_chunk_idx": 2,
+            "rationale": "Chunk 2 explicitly states that BERT is an architecture."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "A specific pre-trained version like google-bert/bert-base-uncased is a checkpoint.",
+            "supporting_chunk_idx": 3,
+            "rationale": "Chunk 3 explains that a specific pre-trained version like google-bert/bert-base-uncased is a checkpoint."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses the question, but includes some extraneous content about researchers and engineers working with model architectures, which is not directly related to the definition of model architecture.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_030",
+      "query": "Usage example",
+      "answer_text": "I don't have enough context to answer that. The provided contexts do not contain specific usage examples. They discuss general aspects of VQA, model prompts, embedding types, coding guidelines, and chat templating, but not concrete usage examples.",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1721.1555259998477,
+        "assemble_ms": 0.049860999979500775,
+        "generate_ms": 3847.171032999995
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 0.0,
+        "rationale": "NO_CLAIMS_EXTRACTED: claim-extraction step returned no atomic claims. Answer may be a refusal, pure code, or the extraction parser may have failed.",
+        "claim_attributions": []
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.0,
+        "rationale": "The answer does not directly address the question, instead providing a statement about the lack of context, which is not what was asked.",
+        "claim_attributions": []
+      }
+    }
+  ]
+}

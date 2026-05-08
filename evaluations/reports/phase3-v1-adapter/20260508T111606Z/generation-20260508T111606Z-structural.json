@@ -1,0 +1,1540 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-05-08T11:42:48+00:00",
+  "eval_set": "structural",
+  "eval_set_size": 30,
+  "limit_applied": null,
+  "config": {
+    "chunking_strategy": "recursive",
+    "chunks_total": 12601,
+    "generator_model": "Qwen/Qwen2.5-7B-Instruct",
+    "adapter_path": "/adapters/v1",
+    "judge_model": "meta-llama/Meta-Llama-3.1-8B-Instruct",
+    "use_4bit_generator": true,
+    "use_4bit_judge": true,
+    "rerank_candidates": 20,
+    "top_k": 5,
+    "max_context_tokens": 3500,
+    "max_new_tokens_generator": 512,
+    "max_new_tokens_judge": 256
+  },
+  "aggregates": {
+    "faithfulness": {
+      "score": {
+        "n": 30,
+        "mean": 0.64,
+        "median": 1.0,
+        "stdev": 0.483,
+        "min": 0.0,
+        "max": 1.0,
+        "score_distribution": {
+          "0.0": 10,
+          "0.0-0.25": 1,
+          "0.25-0.5": 0,
+          "0.5-0.75": 0,
+          "0.75-1.0": 0,
+          "1.0": 19
+        }
+      },
+      "claims": {
+        "total_extracted": 86,
+        "total_supported": 78,
+        "support_rate": 0.907,
+        "mean_per_answer": 2.87,
+        "max_per_answer": 10,
+        "n_no_claims_extracted": 10,
+        "n_score_parse_failures": 0,
+        "n_claim_parse_failures": 0,
+        "n_claim_out_of_range": 0
+      },
+      "chunk_usage_distribution": {
+        "1": 43,
+        "5": 5,
+        "3": 14,
+        "2": 8,
+        "none": 8,
+        "4": 8
+      }
+    },
+    "relevance": {
+      "n": 30,
+      "mean": 0.525,
+      "median": 0.75,
+      "anchor_distribution": {
+        "0.00": 10,
+        "0.25": 0,
+        "0.50": 0,
+        "0.75": 17,
+        "1.00": 3
+      },
+      "n_parse_failures": 0
+    },
+    "citation_check": {
+      "n": 30,
+      "frac_with_any_marker": 0.667,
+      "frac_all_in_range": 0.667,
+      "mean_n_markers_in_text": 1.967
+    }
+  },
+  "timing_ms_per_query": {
+    "retrieve_ms": {
+      "p50": 1502.89,
+      "p95": 2172.83,
+      "p99": 4247.65,
+      "mean": 1614.04,
+      "n": 30
+    },
+    "assemble_ms": {
+      "p50": 0.04,
+      "p95": 0.05,
+      "p99": 0.05,
+      "mean": 0.04,
+      "n": 30
+    },
+    "generate_ms": {
+      "p50": 5335.2,
+      "p95": 12824.98,
+      "p99": 15306.78,
+      "mean": 5784.81,
+      "n": 30
+    }
+  },
+  "per_query": [
+    {
+      "query_id": "structural_001",
+      "query": "Prefill a cache (prefix caching)",
+      "answer_text": "Prefill a cache by initializing a `Cache` with key-value pairs for a certain prefix prompt and then generating different sequences from that cached state [1]. For example, initialize a `StaticCache`, cache an initial prompt, and then generate multiple sequences from the prefilled prompt [1].",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 4998.500894000017,
+        "assemble_ms": 0.02692099997148034,
+        "generate_ms": 5932.815634000008
+      },
+      "citation_check": {
+        "n_markers_in_text": 2,
+        "n_resolved_citations": 1,
+        "all_markers_in_range": true,
+        "any_marker_present": true
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "1 of 1 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "Prefill a cache by initializing a `Cache` with key-value pairs for a certain prefix prompt.",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 describes how to prefill a cache with key-value pairs for a certain prefix prompt."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses the question, but includes extraneous content about the example and the reference [1].",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_002",
+      "query": "Using `apply_chat_template`",
+      "answer_text": "Pass structured input to `apply_chat_template` as a list of dictionaries with `role` and `content` keys [1]. The `role` key specifies the speaker (common roles are `user`, `assistant`, and `system`) and the `content` key contains the message [1]. For example, each message should be a dictionary like {\"role\": \"user\", \"content\": \"Hello!\"} [1]. If you're using transformers>=4.49.0, you can also get a vectorized output from `apply_chat_template` [3].",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1176.286125000047,
+        "assemble_ms": 0.0333010000304057,
+        "generate_ms": 11300.134185000046
+      },
+      "citation_check": {
+        "n_markers_in_text": 4,
+        "n_resolved_citations": 2,
+        "all_markers_in_range": true,
+        "any_marker_present": true
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "5 of 5 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "Pass structured input to `apply_chat_template` as a list of dictionaries with `role` and `content` keys.",
+            "supporting_chunk_idx": 1,
+            "rationale": "The input to `apply_chat_template` should be structured as a list of dictionaries with `role` and `content` keys."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "The `role` key specifies the speaker (common roles are `user`, `assistant`, and `system`)",
+            "supporting_chunk_idx": 1,
+            "rationale": "The `role` key specifies the speaker, and the `content` key contains the message."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "The `content` key contains the message",
+            "supporting_chunk_idx": 1,
+            "rationale": "The `content` key contains the message."
+          },
+          {
+            "claim_idx": 4,
+            "claim_text": "Each message should be a dictionary like `{'role': 'user', 'content': 'Hello!'}`",
+            "supporting_chunk_idx": 5,
+            "rationale": "Each message should be a dictionary like `{'role': 'user', 'content': 'Hello!'}`"
+          },
+          {
+            "claim_idx": 5,
+            "claim_text": "If you're using transformers>=4.49.0, you can also get a vectorized output from `apply_chat_template`",
+            "supporting_chunk_idx": 3,
+            "rationale": "If you're using transformers>=4.49.0, you can also get a vectorized output from `apply_chat_template`"
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses the use of `apply_chat_template`, but includes extraneous information about the structured input format and the vectorized output available in transformers>=4.49.0.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_003",
+      "query": "Lxmert specific outputs",
+      "answer_text": "Lxmert specific outputs include LxmertModelOutput, LxmertForPreTrainingOutput, and LxmertForQuestionAnsweringOutput [1]. The cross-modality encoder returns only the cross-attention output and disregards the self-attention outputs from each modality [2]. Visual hidden states pass through the cross-modality layer, containing information from both modalities; to access a modality that only attends to itself, select the vision or language hidden states from the first input in the tuple [3].",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 2409.3523559999994,
+        "assemble_ms": 0.0360420000333761,
+        "generate_ms": 10140.175759000045
+      },
+      "citation_check": {
+        "n_markers_in_text": 3,
+        "n_resolved_citations": 3,
+        "all_markers_in_range": true,
+        "any_marker_present": true
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "3 of 3 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "Lxmert specific outputs include LxmertModelOutput, LxmertForPreTrainingOutput, and LxmertForQuestionAnsweringOutput",
+            "supporting_chunk_idx": 1,
+            "rationale": "The specific outputs of Lxmert are listed in the first chunk."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "The cross-modality encoder returns only the cross-attention output and disregards the self-attention outputs from each modality",
+            "supporting_chunk_idx": 2,
+            "rationale": "The second chunk explains how the cross-modality encoder returns only the cross-attention output."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "Visual hidden states pass through the cross-modality layer, containing information from both modalities; to access a modality that only attends to itself, select the vision or language hidden states from the first input in the tuple",
+            "supporting_chunk_idx": 3,
+            "rationale": "The third chunk describes how visual hidden states pass through the cross-modality layer, containing information from both modalities."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses the question about Lxmert specific outputs, but includes extraneous information about the cross-modality encoder and visual hidden states, which is not directly related to the question.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_004",
+      "query": "Usage example",
+      "answer_text": "I don't have enough context to answer that.",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1765.0343370000883,
+        "assemble_ms": 0.036582000007001625,
+        "generate_ms": 1383.826632000023
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 0.0,
+        "rationale": "NO_CLAIMS_EXTRACTED: claim-extraction step returned no atomic claims. Answer may be a refusal, pure code, or the extraction parser may have failed.",
+        "claim_attributions": []
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.0,
+        "rationale": "The answer does not provide any information related to the question, instead it expresses uncertainty.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_005",
+      "query": "Usage examples",
+      "answer_text": "Usage examples include image captioning, where the encoder processes the image and an autoregressive language model generates the caption [1], and optical character recognition [1]. The Perceiver showcases examples for question answering, named-entity recognition, object detection, audio classification, video classification, text classification, masked language modeling, and image classification [2].",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1624.31703499999,
+        "assemble_ms": 0.040561999981036934,
+        "generate_ms": 6778.9355200000045
+      },
+      "citation_check": {
+        "n_markers_in_text": 3,
+        "n_resolved_citations": 2,
+        "all_markers_in_range": true,
+        "any_marker_present": true
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 0.2,
+        "rationale": "2 of 10 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "The Perceiver showcases examples for question answering.",
+            "supporting_chunk_idx": null,
+            "rationale": "There is no mention of question answering in the provided chunks."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "The Perceiver showcases examples for named-entity recognition.",
+            "supporting_chunk_idx": null,
+            "rationale": "There is no mention of named-entity recognition in the provided chunks."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "The Perceiver showcases examples for object detection.",
+            "supporting_chunk_idx": null,
+            "rationale": "There is no mention of object detection in the provided chunks."
+          },
+          {
+            "claim_idx": 4,
+            "claim_text": "The Perceiver showcases examples for audio classification.",
+            "supporting_chunk_idx": null,
+            "rationale": "There is no mention of audio classification in the provided chunks."
+          },
+          {
+            "claim_idx": 5,
+            "claim_text": "The Perceiver showcases examples for video classification.",
+            "supporting_chunk_idx": null,
+            "rationale": "There is no mention of video classification in the provided chunks."
+          },
+          {
+            "claim_idx": 6,
+            "claim_text": "The Perceiver showcases examples for text classification.",
+            "supporting_chunk_idx": null,
+            "rationale": "There is no mention of text classification in the provided chunks."
+          },
+          {
+            "claim_idx": 7,
+            "claim_text": "The Perceiver showcases examples for masked language modeling.",
+            "supporting_chunk_idx": null,
+            "rationale": "There is no mention of masked language modeling in the provided chunks."
+          },
+          {
+            "claim_idx": 8,
+            "claim_text": "The Perceiver showcases examples for image classification.",
+            "supporting_chunk_idx": null,
+            "rationale": "There is no mention of image classification in the provided chunks."
+          },
+          {
+            "claim_idx": 9,
+            "claim_text": "The Perceiver showcases examples for image captioning.",
+            "supporting_chunk_idx": 3,
+            "rationale": "Chunk 3 describes image captioning as an example application."
+          },
+          {
+            "claim_idx": 10,
+            "claim_text": "The Perceiver showcases examples for optical character recognition.",
+            "supporting_chunk_idx": 2,
+            "rationale": "Chunk 2 mentions optical character recognition as an example use case."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses the question by providing examples of usage, but includes extraneous content with the mention of specific tasks and references.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_006",
+      "query": "Albert specific outputs",
+      "answer_text": "Albert specific outputs are documented in the `models.albert.modeling_albert.AlbertForPreTrainingOutput` class [1].",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1862.9074589999846,
+        "assemble_ms": 0.04558299997370341,
+        "generate_ms": 2901.8017490000148
+      },
+      "citation_check": {
+        "n_markers_in_text": 1,
+        "n_resolved_citations": 1,
+        "all_markers_in_range": true,
+        "any_marker_present": true
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "1 of 1 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "Albert specific outputs are documented in the `models.albert.modeling_albert.AlbertForPreTrainingOutput` class.",
+            "supporting_chunk_idx": 1,
+            "rationale": "The documentation of AlbertConfig is provided in the first chunk."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses the question, but includes an extraneous reference to a citation that is not relevant to the question itself.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_007",
+      "query": "Per-Layer-Type RoPE Configuration",
+      "answer_text": "Some models like Gemma-3 use different layer types with different attention mechanisms, such as \"full attention\" in some blocks and \"sliding-window attention\" in others [1]. Transformers supports specifying distinct RoPE parameters per layer type for these models by setting `rope_parameters` as a nested dictionary where top-level keys correspond to `config.layer_types` and values are per-type RoPE parameters [1][4]. During model initialization, each decoder layer automatically looks up the matching RoPE configuration based on its declared layer type [2]. For example, a Gemma3Config can define separate RoPE settings for \"full_attention\" and \"sliding_attention\" layers [4].",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1493.1562709999753,
+        "assemble_ms": 0.032411999995929364,
+        "generate_ms": 13006.099759999983
+      },
+      "citation_check": {
+        "n_markers_in_text": 5,
+        "n_resolved_citations": 3,
+        "all_markers_in_range": true,
+        "any_marker_present": true
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "4 of 4 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "Some models like Gemma-3 use different layer types with different attention mechanisms.",
+            "supporting_chunk_idx": 1,
+            "rationale": "The context mentions Gemma-3 model which uses different layer types with different attention mechanisms."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "Transformers supports specifying distinct RoPE parameters per layer type.",
+            "supporting_chunk_idx": 2,
+            "rationale": "The context explicitly states that Transformers supports specifying distinct RoPE parameters per layer type."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "During model initialization, each decoder layer automatically looks up the matching RoPE configuration based on its declared layer type.",
+            "supporting_chunk_idx": 3,
+            "rationale": "The context explains how decoder layers automatically look up the matching RoPE configuration during model initialization."
+          },
+          {
+            "claim_idx": 4,
+            "claim_text": "A Gemma3Config can define separate RoPE settings for \"full_attention\" and \"sliding_attention\" layers.",
+            "supporting_chunk_idx": 4,
+            "rationale": "The context provides an example of a Gemma3Config defining separate RoPE settings for 'full_attention' and 'sliding_attention' layers."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 1.0,
+        "rationale": "The answer directly addresses the question by providing detailed information on how to configure RoPE per layer type in Transformers, including an example of how to define separate settings for different layer types.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_008",
+      "query": "Load IMDb dataset",
+      "answer_text": "Load the IMDb dataset from the \ud83e\udd17 Datasets library with `load_dataset(\"imdb\")` [1]. For example: `imdb = load_dataset(\"imdb\")` [1].",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1714.2022609999685,
+        "assemble_ms": 0.04355200007921667,
+        "generate_ms": 4491.825425999991
+      },
+      "citation_check": {
+        "n_markers_in_text": 2,
+        "n_resolved_citations": 1,
+        "all_markers_in_range": true,
+        "any_marker_present": true
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "1 of 1 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "Load the IMDb dataset from the HuggingFace Datasets library with `load_dataset(\"imdb\")`",
+            "supporting_chunk_idx": 2,
+            "rationale": "The code snippet shows how to load the IMDb dataset from the HuggingFace Datasets library with `load_dataset('imdb')`."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses the question by specifying the library and function to use, but includes extraneous content (the example code) that is not necessary to answer the question.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_009",
+      "query": "Audio Transformations",
+      "answer_text": "Audio transformations include converting frequencies to mel scale (`hertz_to_mel`), converting mel scale back to frequencies (`mel_to_hertz`), creating mel filter banks (`mel_filter_bank`), calculating optimal FFT length (`optimal_fft_length`), applying window functions (`window_function`), generating spectrograms (`spectrogram`), converting power to decibels (`power_to_db`), and converting amplitude to decibels (`amplitude_to_db`) [1]. These functions are primarily useful when studying the code of audio processors in the library [1].",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1317.9823049999868,
+        "assemble_ms": 0.0386420000495491,
+        "generate_ms": 10715.592598000057
+      },
+      "citation_check": {
+        "n_markers_in_text": 2,
+        "n_resolved_citations": 1,
+        "all_markers_in_range": true,
+        "any_marker_present": true
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "9 of 9 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "Audio transformations include converting frequencies to mel scale (`hertz_to_mel`)",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 lists audio transformations, including converting frequencies to mel scale."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "Audio transformations include converting mel scale back to frequencies (`mel_to_hertz`)",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 lists audio transformations, including converting mel scale back to frequencies."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "Audio transformations include creating mel filter banks (`mel_filter_bank`)",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 lists audio transformations, including creating mel filter banks."
+          },
+          {
+            "claim_idx": 4,
+            "claim_text": "Audio transformations include calculating optimal FFT length (`optimal_fft_length`)",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 lists audio transformations, including calculating optimal FFT length."
+          },
+          {
+            "claim_idx": 5,
+            "claim_text": "Audio transformations include applying window functions (`window_function`)",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 lists audio transformations, including applying window functions."
+          },
+          {
+            "claim_idx": 6,
+            "claim_text": "Audio transformations include generating spectrograms (`spectrogram`)",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 lists audio transformations, including generating spectrograms."
+          },
+          {
+            "claim_idx": 7,
+            "claim_text": "Audio transformations include converting power to decibels (`power_to_db`)",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 lists audio transformations, including converting power to decibels."
+          },
+          {
+            "claim_idx": 8,
+            "claim_text": "Audio transformations include converting amplitude to decibels (`amplitude_to_db`)",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 lists audio transformations, including converting amplitude to decibels."
+          },
+          {
+            "claim_idx": 9,
+            "claim_text": "These functions are primarily useful when studying the code of audio processors in the library",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 lists audio transformations, which are primarily useful when studying the code of audio processors in the library."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses the topic of audio transformations, but includes extraneous information about the functions' usefulness and a reference to the library, which is not directly relevant to the question.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_010",
+      "query": "Key Features",
+      "answer_text": "I don't have enough context to answer that.",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1139.5580810000183,
+        "assemble_ms": 0.036261999980524706,
+        "generate_ms": 1309.8822700000028
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 0.0,
+        "rationale": "NO_CLAIMS_EXTRACTED: claim-extraction step returned no atomic claims. Answer may be a refusal, pure code, or the extraction parser may have failed.",
+        "claim_attributions": []
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.0,
+        "rationale": "The answer does not address the question, instead providing a statement about the lack of context.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_011",
+      "query": "Transformers integration",
+      "answer_text": "I don't have enough context to answer that.",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1042.8120279999575,
+        "assemble_ms": 0.03842199998871365,
+        "generate_ms": 1234.7998039999766
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 0.0,
+        "rationale": "NO_CLAIMS_EXTRACTED: claim-extraction step returned no atomic claims. Answer may be a refusal, pure code, or the extraction parser may have failed.",
+        "claim_attributions": []
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.0,
+        "rationale": "The answer does not address the question, instead providing a disclaimer about the lack of context.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_012",
+      "query": "Transformers integration",
+      "answer_text": "I don't have enough context to answer that.",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1082.122948999995,
+        "assemble_ms": 0.03724199996213429,
+        "generate_ms": 1368.2020050000574
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 0.0,
+        "rationale": "NO_CLAIMS_EXTRACTED: claim-extraction step returned no atomic claims. Answer may be a refusal, pure code, or the extraction parser may have failed.",
+        "claim_attributions": []
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.0,
+        "rationale": "The answer does not address the question, instead providing a disclaimer about the lack of context.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_013",
+      "query": "Image Transformations",
+      "answer_text": "The library provides several image transformation functions including center crop, center-to-corners format conversion, corners-to-center format conversion, ID-to-RGB conversion, normalization, padding, RGB-to-ID conversion, rescaling, resizing, and converting to PIL images [1].",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1516.5228549999483,
+        "assemble_ms": 0.03697199997532152,
+        "generate_ms": 5115.88881900002
+      },
+      "citation_check": {
+        "n_markers_in_text": 1,
+        "n_resolved_citations": 1,
+        "all_markers_in_range": true,
+        "any_marker_present": true
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "10 of 10 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "The library provides center crop image transformation.",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 lists various image transformations, including center crop."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "The library provides center-to-corners format conversion.",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 lists various image transformations, including center-to-corners format conversion."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "The library provides corners-to-center format conversion.",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 lists various image transformations, including corners-to-center format conversion."
+          },
+          {
+            "claim_idx": 4,
+            "claim_text": "The library provides ID-to-RGB conversion.",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 lists various image transformations, including ID-to-RGB conversion."
+          },
+          {
+            "claim_idx": 5,
+            "claim_text": "The library provides normalization.",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 lists various image transformations, including normalization."
+          },
+          {
+            "claim_idx": 6,
+            "claim_text": "The library provides padding.",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 lists various image transformations, including padding."
+          },
+          {
+            "claim_idx": 7,
+            "claim_text": "The library provides RGB-to-ID conversion.",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 lists various image transformations, including RGB-to-ID conversion."
+          },
+          {
+            "claim_idx": 8,
+            "claim_text": "The library provides rescaling.",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 lists various image transformations, including rescaling."
+          },
+          {
+            "claim_idx": 9,
+            "claim_text": "The library provides resizing.",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 lists various image transformations, including resizing."
+          },
+          {
+            "claim_idx": 10,
+            "claim_text": "The library provides converting to PIL images.",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 lists various image transformations, including converting to PIL images."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses the question by listing various image transformation functions, but includes an extraneous reference to [1] which is not relevant to the question.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_014",
+      "query": "Support Model",
+      "answer_text": "This Model type supports these zai-org models: GLM-4.1V-9B-Base, GLM-4.1V-9B-Thinking, GLM-4.6V-Flash, and AutoGLM-Phone-9B [1].",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1508.6897959999988,
+        "assemble_ms": 0.030111000000943022,
+        "generate_ms": 5716.540295000073
+      },
+      "citation_check": {
+        "n_markers_in_text": 1,
+        "n_resolved_citations": 1,
+        "all_markers_in_range": true,
+        "any_marker_present": true
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "4 of 4 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "This Model type supports GLM-4.1V-9B-Base.",
+            "supporting_chunk_idx": 1,
+            "rationale": "The supported model is explicitly listed in the chunk."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "This Model type supports GLM-4.1V-9B-Thinking.",
+            "supporting_chunk_idx": 1,
+            "rationale": "The supported model is explicitly listed in the chunk."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "This Model type supports GLM-4.6V-Flash.",
+            "supporting_chunk_idx": 1,
+            "rationale": "The supported model is explicitly listed in the chunk."
+          },
+          {
+            "claim_idx": 4,
+            "claim_text": "This Model type supports AutoGLM-Phone-9B.",
+            "supporting_chunk_idx": 1,
+            "rationale": "The supported model is explicitly listed in the chunk."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses the question by listing supported model types, but the reference [1] is extraneous content that is not necessary to answer the question.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_015",
+      "query": "Combining Starcoder and Flash Attention 2",
+      "answer_text": "Install the latest version of Flash Attention 2 with `pip install -U flash-attn --no-build-isolation` [1]. Then load your model in half-precision (e.g. `torch.bfloat16`) before loading it with `AutoModelForCausalLM.from_pretrained(..., dtype=torch.float16, attn_implementation=\"flash_attention_2\")` [4].",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1411.37679499991,
+        "assemble_ms": 0.04732200000034936,
+        "generate_ms": 7902.724588999945
+      },
+      "citation_check": {
+        "n_markers_in_text": 2,
+        "n_resolved_citations": 2,
+        "all_markers_in_range": true,
+        "any_marker_present": true
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "4 of 4 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "You can install the latest version of Flash Attention 2 with `pip install -U flash-attn --no-build-isolation`",
+            "supporting_chunk_idx": 1,
+            "rationale": "The installation command is directly quoted from chunk 1."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "You can load your model in half-precision with `torch.bfloat16`",
+            "supporting_chunk_idx": 4,
+            "rationale": "Half-precision loading is mentioned in the documentation of Flash Attention 2, which is discussed in chunk 4."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "You can load your model with `AutoModelForCausalLM.from_pretrained` and `attn_implementation='flash_attention_2'`",
+            "supporting_chunk_idx": 4,
+            "rationale": "Loading the model with the specified parameters is described in chunk 4."
+          },
+          {
+            "claim_idx": 4,
+            "claim_text": "You can load your model with `dtype=torch.float16`",
+            "supporting_chunk_idx": 4,
+            "rationale": "The model loading parameters are specified in chunk 4."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses the question by providing instructions on how to combine Starcoder and Flash Attention 2, but includes extraneous content in the form of specific installation and loading commands.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_016",
+      "query": "Custom dataset",
+      "answer_text": "The summarization scripts support custom datasets as long as they are CSV or JSONL files [1]. When using your own dataset, specify `train_file` and `validation_file` to point to your training and validation files, `text_column` for the input text to summarize, and `summary_column` for the target text [1].",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1883.7388279999914,
+        "assemble_ms": 0.038291999999273685,
+        "generate_ms": 6658.347585000001
+      },
+      "citation_check": {
+        "n_markers_in_text": 2,
+        "n_resolved_citations": 1,
+        "all_markers_in_range": true,
+        "any_marker_present": true
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "5 of 5 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "The summarization scripts support CSV files.",
+            "supporting_chunk_idx": 1,
+            "rationale": "The chunk mentions that the summarization scripts support custom datasets as long as they are a CSV or JSONL file."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "The summarization scripts support JSONL files.",
+            "supporting_chunk_idx": 1,
+            "rationale": "The chunk mentions that the summarization scripts support custom datasets as long as they are a CSV or JSONL file."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "train_file and validation_file are parameters.",
+            "supporting_chunk_idx": 3,
+            "rationale": "The chunk mentions that train_file and validation_file are parameters for custom datasets."
+          },
+          {
+            "claim_idx": 4,
+            "claim_text": "text_column is a parameter.",
+            "supporting_chunk_idx": 4,
+            "rationale": "The chunk mentions that text_column is a parameter for custom datasets."
+          },
+          {
+            "claim_idx": 5,
+            "claim_text": "summary_column is a parameter.",
+            "supporting_chunk_idx": 4,
+            "rationale": "The chunk mentions that summary_column is a parameter for custom datasets."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 1.0,
+        "rationale": "The answer directly addresses the question, providing specific details on how to use a custom dataset with the summarization scripts.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_017",
+      "query": "Template writing tips",
+      "answer_text": "I don't have enough context to answer that.",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1777.2486940000363,
+        "assemble_ms": 0.04480200004763901,
+        "generate_ms": 1559.481097999992
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 0.0,
+        "rationale": "NO_CLAIMS_EXTRACTED: claim-extraction step returned no atomic claims. Answer may be a refusal, pure code, or the extraction parser may have failed.",
+        "claim_attributions": []
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.0,
+        "rationale": "The answer does not provide any information or tips related to template writing, instead it requests more context which is not relevant to the question.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_018",
+      "query": "Text-prompted zero-shot object detection by hand",
+      "answer_text": "I don't have enough context to answer that.",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1542.5190839999914,
+        "assemble_ms": 0.027521999982127454,
+        "generate_ms": 1410.7998890000317
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 0.0,
+        "rationale": "NO_CLAIMS_EXTRACTED: claim-extraction step returned no atomic claims. Answer may be a refusal, pure code, or the extraction parser may have failed.",
+        "claim_attributions": []
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.0,
+        "rationale": "The answer does not address the question at all, instead opting for an evasion.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_019",
+      "query": "Architecture Info",
+      "answer_text": "I don't have enough context to answer that.",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1321.2756599999693,
+        "assemble_ms": 0.03236099996684061,
+        "generate_ms": 1293.299313000034
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 0.0,
+        "rationale": "NO_CLAIMS_EXTRACTED: claim-extraction step returned no atomic claims. Answer may be a refusal, pure code, or the extraction parser may have failed.",
+        "claim_attributions": []
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.0,
+        "rationale": "The answer does not address the question at all, instead providing a generic response that does not provide any relevant information.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_020",
+      "query": "Initialising `VisionEncoderDecoderModel` from a pretrained encoder and a pretrained decoder",
+      "answer_text": "Initialize by passing `VisionEncoderDecoderConfig.from_encoder_decoder_configs(config_encoder, config_decoder)` where `config_encoder` is a config for your vision model (e.g., ViTConfig) and `config_decoder` is a config for your language model (e.g., BertConfig) [3]. Then create the model with `VisionEncoderDecoderModel(config=config)` [3]. Any pretrained Transformer-based vision model (e.g., Swin) can serve as the encoder, and any pretrained language model (e.g., BERT, GPT2) or the decoder part of sequence-to-sequence models (e.g., BART) can be used as the decoder [1][2]. The cross-attention layers will be randomly initialized depending on the decoder architecture [5], so the model needs to be fine-tuned on a downstream task [5].",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1730.0994710000168,
+        "assemble_ms": 0.03334199993787479,
+        "generate_ms": 16246.495184999958
+      },
+      "citation_check": {
+        "n_markers_in_text": 6,
+        "n_resolved_citations": 4,
+        "all_markers_in_range": true,
+        "any_marker_present": true
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "4 of 4 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "Any pretrained Transformer-based vision model can serve as the encoder.",
+            "supporting_chunk_idx": 1,
+            "rationale": "Pretrained Transformer-based vision models can be used as the encoder."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "Any pretrained language model or the decoder part of sequence-to-sequence models can be used as the decoder.",
+            "supporting_chunk_idx": 1,
+            "rationale": "Pretrained language models or the decoder part of sequence-to-sequence models can be used as the decoder."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "The cross-attention layers will be randomly initialized depending on the decoder architecture.",
+            "supporting_chunk_idx": 5,
+            "rationale": "The cross-attention layers might be randomly initialized depending on the decoder architecture."
+          },
+          {
+            "claim_idx": 4,
+            "claim_text": "The model needs to be fine-tuned on a downstream task.",
+            "supporting_chunk_idx": 5,
+            "rationale": "Initializing the model from a pretrained encoder and decoder checkpoint requires fine-tuning on a downstream task."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses the question, but includes some extraneous content about the cross-attention layers and the need for fine-tuning, which is not directly related to the initialization process.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_021",
+      "query": "Support Model",
+      "answer_text": "This Model type supports these zai-org models: GLM-4.1V-9B-Base, GLM-4.1V-9B-Thinking, GLM-4.6V-Flash, and AutoGLM-Phone-9B [1].",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1425.445685999989,
+        "assemble_ms": 0.031451000040760846,
+        "generate_ms": 5531.072964000032
+      },
+      "citation_check": {
+        "n_markers_in_text": 1,
+        "n_resolved_citations": 1,
+        "all_markers_in_range": true,
+        "any_marker_present": true
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "4 of 4 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "This Model type supports GLM-4.1V-9B-Base.",
+            "supporting_chunk_idx": 1,
+            "rationale": "The supported model is explicitly listed in the chunk."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "This Model type supports GLM-4.1V-9B-Thinking.",
+            "supporting_chunk_idx": 1,
+            "rationale": "The supported model is explicitly listed in the chunk."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "This Model type supports GLM-4.6V-Flash.",
+            "supporting_chunk_idx": 1,
+            "rationale": "The supported model is explicitly listed in the chunk."
+          },
+          {
+            "claim_idx": 4,
+            "claim_text": "This Model type supports AutoGLM-Phone-9B.",
+            "supporting_chunk_idx": 1,
+            "rationale": "The supported model is explicitly listed in the chunk."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses the question by listing supported model types, but the reference [1] is extraneous content that is not necessary to answer the question.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_022",
+      "query": "Models and configurations",
+      "answer_text": "All Transformers models inherit from a base `PreTrainedModel` and `PreTrainedConfig` class [1][2]. The configuration is the model's blueprint [2]. A configuration subclassed from `PreTrainedConfig` contains all necessary information to build a model, including attributes like the number of hidden layers, vocabulary size, and activation function [3][4]. Custom configurations must subclass `PreTrainedConfig` to ensure compatibility with Transformers' functionality [5]. Models have a `configuration.py` file defining attributes and a `modeling.py` file that uses those attributes to define the layers and operations [4].",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1790.660072000037,
+        "assemble_ms": 0.03807200005212508,
+        "generate_ms": 12275.13106899994
+      },
+      "citation_check": {
+        "n_markers_in_text": 7,
+        "n_resolved_citations": 5,
+        "all_markers_in_range": true,
+        "any_marker_present": true
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "4 of 4 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "All Transformers models inherit from a base `PreTrainedModel` and `PreTrainedConfig` class",
+            "supporting_chunk_idx": 1,
+            "rationale": "The base model and configuration classes are described in this section."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "A configuration subclassed from `PreTrainedConfig` contains all necessary information to build a model",
+            "supporting_chunk_idx": 2,
+            "rationale": "The configuration class is explicitly mentioned as the models blueprint."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "Custom configurations must subclass `PreTrainedConfig` to ensure compatibility with Transformers' functionality",
+            "supporting_chunk_idx": 3,
+            "rationale": "The main rules for customizing a configuration are described in this section."
+          },
+          {
+            "claim_idx": 4,
+            "claim_text": "Models have a `configuration.py` file defining attributes and a `modeling.py` file that uses those attributes to define the layers and operations",
+            "supporting_chunk_idx": 4,
+            "rationale": "The necessary information to build a model is explicitly mentioned as being contained in the configuration class."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses the question about models and configurations, but includes some extraneous content about the structure of the code and the necessity of subclassing `PreTrainedConfig`.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_023",
+      "query": "Usage: MarkupLMProcessor",
+      "answer_text": "MarkupLMProcessor combines MarkupLMFeatureExtractor and MarkupLMTokenizer/Fast to prepare inputs for the model [1][4]. You can provide HTML strings (and possibly additional data) directly to MarkupLMProcessor [1][4], or separately instantiate FeatureExtractor and Tokenizer then pass them to Processor [4]. MarkupLMProcessor supports 5 use cases including web page classification (training/inference) and token classification (inference) when parse_html=True [2].",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1362.309812000035,
+        "assemble_ms": 0.03304099993783893,
+        "generate_ms": 9305.63853600006
+      },
+      "citation_check": {
+        "n_markers_in_text": 6,
+        "n_resolved_citations": 3,
+        "all_markers_in_range": true,
+        "any_marker_present": true
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "3 of 3 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "MarkupLMProcessor combines MarkupLMFeatureExtractor and MarkupLMTokenizer/Fast to prepare inputs for the model",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 describes the processor's internal components and their functions."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "MarkupLMProcessor supports web page classification (training/inference) when parse_html=True",
+            "supporting_chunk_idx": 3,
+            "rationale": "Chunk 3 lists the use cases supported by the processor, including web page classification."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "MarkupLMProcessor supports token classification (inference) when parse_html=True",
+            "supporting_chunk_idx": 3,
+            "rationale": "Chunk 3 lists the use cases supported by the processor, including web page classification and token classification."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses the question by describing the usage of MarkupLMProcessor, but includes extraneous content about its components and supported use cases.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_024",
+      "query": "Register a pipeline",
+      "answer_text": "Register the new task your pipeline supports in the `PIPELINE_REGISTRY` by calling `PIPELINE_REGISTRY.register_pipeline()` with parameters including `pipeline_class`, `pt_model`, `default`, and `type` [2][3]. For example: `PIPELINE_REGISTRY.register_pipeline(\"new-task\", pipeline_class=MyPipeline, pt_model=AutoModelForSequenceClassification, default={\"pt\": (\"user/awesome-model\", \"branch-name\")}, type=\"text\")` [3]. The `register_pipeline` function then adds the pipeline details (task type, pipeline class, supported backends) to the model's `config.json` file [1].",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1211.8716689999474,
+        "assemble_ms": 0.03735199993570859,
+        "generate_ms": 12603.612718000022
+      },
+      "citation_check": {
+        "n_markers_in_text": 4,
+        "n_resolved_citations": 3,
+        "all_markers_in_range": true,
+        "any_marker_present": true
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "7 of 7 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "PIPELINE_REGISTRY.register_pipeline() is a function.",
+            "supporting_chunk_idx": 3,
+            "rationale": "The register_pipeline function is defined in the PIPELINE_REGISTRY."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "The register_pipeline function adds pipeline details to the model's config.json file.",
+            "supporting_chunk_idx": 3,
+            "rationale": "The register_pipeline function adds pipeline details to the model's config.json file."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "The register_pipeline function accepts parameters including pipeline_class, pt_model, default, and type.",
+            "supporting_chunk_idx": 3,
+            "rationale": "The register_pipeline function accepts parameters including pipeline_class, pt_model, default, and type."
+          },
+          {
+            "claim_idx": 4,
+            "claim_text": "AutoModelForSequenceClassification is a model class.",
+            "supporting_chunk_idx": 4,
+            "rationale": "AutoModelForSequenceClassification is a model class."
+          },
+          {
+            "claim_idx": 5,
+            "claim_text": "MyPipeline is a pipeline class.",
+            "supporting_chunk_idx": 3,
+            "rationale": "MyPipeline is a pipeline class."
+          },
+          {
+            "claim_idx": 6,
+            "claim_text": "The default parameter of register_pipeline is a dictionary.",
+            "supporting_chunk_idx": 3,
+            "rationale": "The default parameter of register_pipeline is a dictionary."
+          },
+          {
+            "claim_idx": 7,
+            "claim_text": "The type parameter of register_pipeline is a string.",
+            "supporting_chunk_idx": 3,
+            "rationale": "The type parameter of register_pipeline is a string."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses the question of registering a pipeline, but includes extraneous content about the `register_pipeline` function and the `config.json` file, which are not directly relevant to the task of registering a pipeline.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_025",
+      "query": "CANINE specific outputs",
+      "answer_text": "CANINE specific outputs are defined in `models.canine.modeling_canine.CanineModelOutputWithPooling` [1].",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1497.0956489999026,
+        "assemble_ms": 0.02870200000870682,
+        "generate_ms": 2750.633339999922
+      },
+      "citation_check": {
+        "n_markers_in_text": 1,
+        "n_resolved_citations": 1,
+        "all_markers_in_range": true,
+        "any_marker_present": true
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "1 of 1 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "CANINE specific outputs are defined in `models.canine.modeling_canine.CanineModelOutputWithPooling`.",
+            "supporting_chunk_idx": 1,
+            "rationale": "The documentation for CANINE specific outputs is found in chunk 1."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 1.0,
+        "rationale": "The answer directly addresses the question by providing a specific definition for CANINE specific outputs, making it highly relevant.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_026",
+      "query": "Model Architecture",
+      "answer_text": "An architecture refers to the model's skeleton \u2014 the structure and design of the neural network itself [4]. A checkpoint refers to the model's weights for a given architecture [4]. The term \"model\" is used interchangeably with architecture and checkpoint [4].",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1081.3560340000095,
+        "assemble_ms": 0.05007300001125259,
+        "generate_ms": 5139.332265999883
+      },
+      "citation_check": {
+        "n_markers_in_text": 3,
+        "n_resolved_citations": 1,
+        "all_markers_in_range": true,
+        "any_marker_present": true
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "3 of 3 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "An architecture refers to the model's skeleton \u2014 the structure and design of the neural network itself",
+            "supporting_chunk_idx": 2,
+            "rationale": "The definition of architecture is provided in the context of model classes."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "A checkpoint refers to the model's weights for a given architecture",
+            "supporting_chunk_idx": 5,
+            "rationale": "The explanation of checkpoint is provided in the context of day-0 integration."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "The term 'model' is used interchangeably with architecture and checkpoint",
+            "supporting_chunk_idx": 2,
+            "rationale": "The definition of model is provided in the context of model classes."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses the question, but includes extraneous information about the interchangeability of terms and references to a source, which are not directly relevant to the question about model architecture.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_027",
+      "query": "Usage tips and examples",
+      "answer_text": "I don't have enough context to answer that.",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1832.6226330000281,
+        "assemble_ms": 0.03952200017920404,
+        "generate_ms": 1197.230148000017
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 0.0,
+        "rationale": "NO_CLAIMS_EXTRACTED: claim-extraction step returned no atomic claims. Answer may be a refusal, pure code, or the extraction parser may have failed.",
+        "claim_attributions": []
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.0,
+        "rationale": "The answer does not address the question at all, failing to provide any relevant information or examples.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_028",
+      "query": "Funnel specific outputs",
+      "answer_text": "I don't have enough context to answer that.",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1255.8660479999162,
+        "assemble_ms": 0.034760999824356986,
+        "generate_ms": 1236.2172119999286
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 0.0,
+        "rationale": "NO_CLAIMS_EXTRACTED: claim-extraction step returned no atomic claims. Answer may be a refusal, pure code, or the extraction parser may have failed.",
+        "claim_attributions": []
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.0,
+        "rationale": "The answer does not address the question at all, instead providing a generic response that does not pertain to the topic of funneling specific outputs.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_029",
+      "query": "Model Architecture",
+      "answer_text": "A model architecture refers to the model's skeleton \u2014 the structure and design of the neural network [4]. A checkpoint refers to the model's weights for a given architecture [4]. The terms \"model\" and \"architecture\" are used interchangeably when referring to a model class in the library [4].",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 941.1899859999266,
+        "assemble_ms": 0.04341299995758163,
+        "generate_ms": 5775.382393999962
+      },
+      "citation_check": {
+        "n_markers_in_text": 3,
+        "n_resolved_citations": 1,
+        "all_markers_in_range": true,
+        "any_marker_present": true
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 1.0,
+        "rationale": "3 of 3 claims supported by retrieved chunks.",
+        "claim_attributions": [
+          {
+            "claim_idx": 1,
+            "claim_text": "A model architecture refers to the model's skeleton \u2014 the structure and design of the neural network",
+            "supporting_chunk_idx": 1,
+            "rationale": "Chunk 1 describes model architecture, which includes the structure and design of the neural network."
+          },
+          {
+            "claim_idx": 2,
+            "claim_text": "A checkpoint refers to the model's weights for a given architecture",
+            "supporting_chunk_idx": 2,
+            "rationale": "Chunk 2 explains that a checkpoint refers to the model's weights for a given architecture."
+          },
+          {
+            "claim_idx": 3,
+            "claim_text": "The terms 'model' and 'architecture' are used interchangeably when referring to a model class in the library",
+            "supporting_chunk_idx": 5,
+            "rationale": "Chunk 5 mentions that the model contributor and community demand for an architecture, implying that the terms are used interchangeably."
+          }
+        ]
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.75,
+        "rationale": "The answer directly addresses the question, but includes extraneous information about checkpoints and the interchangeability of terms in the library, which is not directly related to the question about model architecture.",
+        "claim_attributions": []
+      }
+    },
+    {
+      "query_id": "structural_030",
+      "query": "Usage example",
+      "answer_text": "I don't have enough context to answer that.",
+      "is_no_answer_query": false,
+      "n_retrieved_chunks": 5,
+      "timing": {
+        "retrieve_ms": 1705.1805930000228,
+        "assemble_ms": 0.0312520000989025,
+        "generate_ms": 1262.3676589998922
+      },
+      "citation_check": {
+        "n_markers_in_text": 0,
+        "n_resolved_citations": 0,
+        "all_markers_in_range": false,
+        "any_marker_present": false
+      },
+      "faithfulness": {
+        "metric": "faithfulness",
+        "score": 0.0,
+        "rationale": "NO_CLAIMS_EXTRACTED: claim-extraction step returned no atomic claims. Answer may be a refusal, pure code, or the extraction parser may have failed.",
+        "claim_attributions": []
+      },
+      "relevance": {
+        "metric": "relevance",
+        "score": 0.0,
+        "rationale": "The answer does not provide any information related to the question, instead it expresses uncertainty.",
+        "claim_attributions": []
+      }
+    }
+  ]
+}
