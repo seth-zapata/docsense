@@ -9,7 +9,7 @@ Usage::
 
     # One-time setup (done locally, once per Modal account)
     modal token new                                       # authenticate CLI
-    modal secret create hf-token HF_TOKEN=hf_xxxxxxx      # optional, avoids HF rate limits
+    modal secret create hf_token HF_TOKEN=hf_xxxxxxx      # required; use a read-scoped HF token
 
     # Smoke: 1 grad step on 10 examples, ~30 sec compute (~6-10 min wall
     # including image build + weight download on first invocation)
@@ -31,8 +31,12 @@ key ones for this script:
   invocation.
 - ``docsense-adapters`` volume — adapter weights are written here,
   downloaded to local after run via ``modal volume get``.
-- ``HF_TOKEN`` secret — optional but recommended; without it we hit
-  HF rate limits if the cache isn't already warm.
+- ``hf_token`` Modal Secret — wired into the function decorator. Not
+  strictly needed for Qwen 2.5 (non-gated) but included so future
+  experiments with gated models work without an emergency script
+  change. Use a read-scoped token (HF settings) for least privilege.
+  The secret never touches the git repo; Modal injects it as an env
+  var at function runtime, never persisted to image layers or logs.
 - ``add_local_dir`` for the dataset — committed in the repo, mounted
   at build time. ~2 MB; trivial cost.
 - ``add_local_python_source("docsense")`` — mounts the package source
@@ -96,15 +100,24 @@ adapters_vol = modal.Volume.from_name("docsense-adapters", create_if_missing=Tru
         "/root/.cache/huggingface": hf_cache_vol,
         "/adapters": adapters_vol,
     },
-    # No HF_TOKEN secret needed: Qwen 2.5 7B Instruct is Apache 2.0
-    # and non-gated, the persistent docsense-hf-cache volume means we
-    # download weights once and reuse forever (no rate-limit risk on
-    # subsequent runs), and Modal's `Secret.from_name` actually
-    # requires the secret to EXIST — `required_keys=[]` only relaxes
-    # which keys must be present within an existing secret. To opt
-    # back in for a future gated model, create the secret via:
-    #   modal secret create hf-token HF_TOKEN=hf_xxx
-    # then add: secrets=[modal.Secret.from_name("hf-token")] here.
+    # HF_TOKEN secret wired in even though Qwen 2.5 (Apache 2.0,
+    # non-gated) doesn't strictly require it. Reasoning:
+    # - Cost of including: ~zero. The secret already exists in the
+    #   Modal account regardless of whether the script references
+    #   it; the reference only changes whether the value is injected
+    #   into the function's runtime env.
+    # - Benefit: when (not if) we switch to a gated model in some
+    #   future experiment, training "just works" instead of failing
+    #   with NotFoundError at exactly the wrong moment.
+    # - Security: Modal's secret store keeps the value out of the
+    #   git repo, image layers, and logs. The token should be
+    #   read-scoped (HF Hub setting) for principle-of-least-privilege.
+    # Note: Modal's `Secret.from_name` REQUIRES the secret to exist
+    # by name — there is no "optional secret" mode. If you don't have
+    # an HF account / token at all, comment out the `secrets=` line
+    # below; the script then works for non-gated models like Qwen
+    # without any auth (which is what PR #33 confirmed empirically).
+    secrets=[modal.Secret.from_name("hf_token")],
     timeout=3600,
 )
 def train(
